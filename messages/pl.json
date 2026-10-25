@@ -1,0 +1,14 @@
+{
+  "meta": {
+    "title": "FinFlow — zarządzanie finansami firmy",
+    "description": "Ewidencja wpływów, wydatków i przepływów pieniężnych Twojej firmy. 14 dni za darmo."
+  },
+  "common": {
+    "language": "Język",
+    "save": "Zapisz",
+    "cancel": "Anuluj",
+    "delete": "Usuń",
+    "close": "Zamknij",
+    "loading": "Ładowanie…"
+  }
+}

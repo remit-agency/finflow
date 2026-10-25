@@ -1,0 +1,14 @@
+{
+  "meta": {
+    "title": "FinFlow — Business Finance Manager",
+    "description": "Track income, expenses and cash flow for your business. 14-day free trial."
+  },
+  "common": {
+    "language": "Language",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "close": "Close",
+    "loading": "Loading…"
+  }
+}
