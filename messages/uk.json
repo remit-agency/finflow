@@ -362,5 +362,114 @@
       "trialUntil": "Trial до {date}",
       "upgrade": "Upgrade to Pro"
     }
+  },
+  "analytics": {
+    "title": "Аналітика",
+    "subtitle": "Оберіть розділ для перегляду звітів",
+    "exportCsv": "Експорт CSV",
+    "cards": {
+      "cashflow": "Доходи, витрати та баланс по місяцях у вигляді графіку",
+      "pl": "Прибутки та збитки по категоріях за обраний період",
+      "calendar": "Рух коштів по днях — зручний перегляд по місяцях",
+      "balance": "Активи, зобов’язання та власний капітал організації"
+    },
+    "columns": {
+      "account": "Рахунок",
+      "type": "Тип",
+      "category": "Категорія",
+      "month": "Місяць",
+      "day": "День",
+      "income": "Дохід",
+      "expense": "Витрата",
+      "net": "Різниця",
+      "balance": "Баланс",
+      "currency": "Валюта",
+      "total": "Всього"
+    },
+    "cashflow": {
+      "subtitle": "Рух коштів за обраний період",
+      "totalIncome": "Доходи",
+      "totalExpense": "Витрати",
+      "detailMonths": "Деталізація по місяцях",
+      "detailDays": "Деталізація по днях",
+      "empty": "Немає даних за цей період."
+    },
+    "pl": {
+      "title": "P&L — Прибутки та збитки",
+      "subtitle": "По категоріях за обраний період"
+    },
+    "calendar": {
+      "subtitle": "Щоденний рух грошей"
+    },
+    "balance": {
+      "subtitle": "Активи та капітал",
+      "asOf": "Станом на:",
+      "asOfLabel": "Станом на",
+      "periods": {
+        "currentMonth": "Поточний місяць",
+        "quarter": "Квартал",
+        "year": "Рік"
+      }
+    }
+  },
+  "charts": {
+    "loading": "Завантаження...",
+    "noData": "Немає даних за цей період",
+    "addTransactions": "Додати транзакції →",
+    "cashFlow": {
+      "income": "Дохід",
+      "expense": "Витрата",
+      "balance": "Баланс",
+      "net": "Різниця"
+    },
+    "plSummary": {
+      "profit": "Прибуток / Збиток за період",
+      "margin": "Рентабельність",
+      "incomeByCategory": "Доходи за категоріями",
+      "expenseByCategory": "Витрати за категоріями"
+    },
+    "plTable": {
+      "category": "Категорія",
+      "total": "Всього",
+      "income": "Доходи",
+      "expense": "Витрати",
+      "totalIncome": "Всього доходи",
+      "totalExpense": "Всього витрати",
+      "profit": "Прибуток / Збиток"
+    },
+    "calendar": {
+      "previousMonth": "Попередній місяць",
+      "nextMonth": "Наступний місяць",
+      "empty": "Немає транзакцій за цей місяць",
+      "day": "День",
+      "income": "Дохід",
+      "expense": "Витрата",
+      "transfer": "Переказ",
+      "balance": "Баланс"
+    },
+    "balanceSheet": {
+      "assets": "Активи",
+      "liabilities": "Зобов’язання",
+      "fixedAssets": "Основні засоби",
+      "realEstate": "Нерухомість",
+      "equipment": "Обладнання",
+      "crypto": "Інвестиції (крипто)",
+      "currentAssets": "Поточні активи",
+      "inventory": "Запаси",
+      "receivables": "Дебіторська заборгованість",
+      "money": "Гроші",
+      "noAccounts": "Немає рахунків",
+      "totalAssets": "Всього активи",
+      "equity": "Власний капітал",
+      "charterCapital": "Статутний капітал",
+      "additionalCapital": "Додатковий капітал",
+      "retainedEarnings": "Нерозподілений прибуток",
+      "debt": "Позиковий капітал",
+      "loans": "Кредити",
+      "totalLiabilities": "Всього зобов’язання",
+      "check": "Баланс",
+      "balanced": "Активи = Зобов’язання",
+      "difference": "Різниця: {amount}"
+    }
   }
 }

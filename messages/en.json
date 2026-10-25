@@ -362,5 +362,114 @@
       "trialUntil": "Trial until {date}",
       "upgrade": "Upgrade to Pro"
     }
+  },
+  "analytics": {
+    "title": "Analytics",
+    "subtitle": "Choose a section to view reports",
+    "exportCsv": "Export CSV",
+    "cards": {
+      "cashflow": "Income, expenses and balance by month as a chart",
+      "pl": "Profit and loss by category for the selected period",
+      "calendar": "Cash movement day by day, easy to browse by month",
+      "balance": "Assets, liabilities and equity of the organisation"
+    },
+    "columns": {
+      "account": "Account",
+      "type": "Type",
+      "category": "Category",
+      "month": "Month",
+      "day": "Day",
+      "income": "Income",
+      "expense": "Expense",
+      "net": "Difference",
+      "balance": "Balance",
+      "currency": "Currency",
+      "total": "Total"
+    },
+    "cashflow": {
+      "subtitle": "Cash movement for the selected period",
+      "totalIncome": "Income",
+      "totalExpense": "Expenses",
+      "detailMonths": "Breakdown by month",
+      "detailDays": "Breakdown by day",
+      "empty": "No data for this period."
+    },
+    "pl": {
+      "title": "Profit & Loss (P&L)",
+      "subtitle": "By category for the selected period"
+    },
+    "calendar": {
+      "subtitle": "Daily cash movement"
+    },
+    "balance": {
+      "subtitle": "Assets and equity",
+      "asOf": "As of:",
+      "asOfLabel": "As of",
+      "periods": {
+        "currentMonth": "Current month",
+        "quarter": "Quarter",
+        "year": "Year"
+      }
+    }
+  },
+  "charts": {
+    "loading": "Loading...",
+    "noData": "No data for this period",
+    "addTransactions": "Add transactions →",
+    "cashFlow": {
+      "income": "Income",
+      "expense": "Expense",
+      "balance": "Balance",
+      "net": "Difference"
+    },
+    "plSummary": {
+      "profit": "Profit / loss for the period",
+      "margin": "Profit margin",
+      "incomeByCategory": "Income by category",
+      "expenseByCategory": "Expenses by category"
+    },
+    "plTable": {
+      "category": "Category",
+      "total": "Total",
+      "income": "Income",
+      "expense": "Expenses",
+      "totalIncome": "Total income",
+      "totalExpense": "Total expenses",
+      "profit": "Profit / loss"
+    },
+    "calendar": {
+      "previousMonth": "Previous month",
+      "nextMonth": "Next month",
+      "empty": "No transactions this month",
+      "day": "Day",
+      "income": "Income",
+      "expense": "Expense",
+      "transfer": "Transfer",
+      "balance": "Balance"
+    },
+    "balanceSheet": {
+      "assets": "Assets",
+      "liabilities": "Liabilities",
+      "fixedAssets": "Fixed assets",
+      "realEstate": "Real estate",
+      "equipment": "Equipment",
+      "crypto": "Investments (crypto)",
+      "currentAssets": "Current assets",
+      "inventory": "Inventory",
+      "receivables": "Accounts receivable",
+      "money": "Cash",
+      "noAccounts": "No accounts",
+      "totalAssets": "Total assets",
+      "equity": "Equity",
+      "charterCapital": "Share capital",
+      "additionalCapital": "Additional capital",
+      "retainedEarnings": "Retained earnings",
+      "debt": "Debt capital",
+      "loans": "Loans",
+      "totalLiabilities": "Total liabilities",
+      "check": "Balance",
+      "balanced": "Assets = Liabilities",
+      "difference": "Difference: {amount}"
+    }
   }
 }

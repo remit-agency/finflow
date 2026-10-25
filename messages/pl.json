@@ -362,5 +362,114 @@
       "trialUntil": "Okres próbny do {date}",
       "upgrade": "Przejdź na Pro"
     }
+  },
+  "analytics": {
+    "title": "Analityka",
+    "subtitle": "Wybierz sekcję, aby zobaczyć raporty",
+    "exportCsv": "Eksport CSV",
+    "cards": {
+      "cashflow": "Wpływy, wydatki i saldo według miesięcy na wykresie",
+      "pl": "Zyski i straty według kategorii za wybrany okres",
+      "calendar": "Przepływ środków dzień po dniu, wygodny przegląd według miesięcy",
+      "balance": "Aktywa, zobowiązania i kapitał własny organizacji"
+    },
+    "columns": {
+      "account": "Konto",
+      "type": "Typ",
+      "category": "Kategoria",
+      "month": "Miesiąc",
+      "day": "Dzień",
+      "income": "Wpływ",
+      "expense": "Wydatek",
+      "net": "Różnica",
+      "balance": "Saldo",
+      "currency": "Waluta",
+      "total": "Razem"
+    },
+    "cashflow": {
+      "subtitle": "Przepływ środków za wybrany okres",
+      "totalIncome": "Wpływy",
+      "totalExpense": "Wydatki",
+      "detailMonths": "Szczegóły według miesięcy",
+      "detailDays": "Szczegóły według dni",
+      "empty": "Brak danych za ten okres."
+    },
+    "pl": {
+      "title": "Rachunek zysków i strat (P&L)",
+      "subtitle": "Według kategorii za wybrany okres"
+    },
+    "calendar": {
+      "subtitle": "Dzienny ruch pieniędzy"
+    },
+    "balance": {
+      "subtitle": "Aktywa i kapitał",
+      "asOf": "Stan na:",
+      "asOfLabel": "Stan na",
+      "periods": {
+        "currentMonth": "Bieżący miesiąc",
+        "quarter": "Kwartał",
+        "year": "Rok"
+      }
+    }
+  },
+  "charts": {
+    "loading": "Ładowanie...",
+    "noData": "Brak danych za ten okres",
+    "addTransactions": "Dodaj operacje →",
+    "cashFlow": {
+      "income": "Wpływ",
+      "expense": "Wydatek",
+      "balance": "Saldo",
+      "net": "Różnica"
+    },
+    "plSummary": {
+      "profit": "Zysk / strata za okres",
+      "margin": "Rentowność",
+      "incomeByCategory": "Wpływy według kategorii",
+      "expenseByCategory": "Wydatki według kategorii"
+    },
+    "plTable": {
+      "category": "Kategoria",
+      "total": "Razem",
+      "income": "Wpływy",
+      "expense": "Wydatki",
+      "totalIncome": "Razem wpływy",
+      "totalExpense": "Razem wydatki",
+      "profit": "Zysk / strata"
+    },
+    "calendar": {
+      "previousMonth": "Poprzedni miesiąc",
+      "nextMonth": "Następny miesiąc",
+      "empty": "Brak operacji w tym miesiącu",
+      "day": "Dzień",
+      "income": "Wpływ",
+      "expense": "Wydatek",
+      "transfer": "Przelew",
+      "balance": "Saldo"
+    },
+    "balanceSheet": {
+      "assets": "Aktywa",
+      "liabilities": "Zobowiązania",
+      "fixedAssets": "Środki trwałe",
+      "realEstate": "Nieruchomości",
+      "equipment": "Wyposażenie",
+      "crypto": "Inwestycje (krypto)",
+      "currentAssets": "Aktywa obrotowe",
+      "inventory": "Zapasy",
+      "receivables": "Należności",
+      "money": "Środki pieniężne",
+      "noAccounts": "Brak kont",
+      "totalAssets": "Razem aktywa",
+      "equity": "Kapitał własny",
+      "charterCapital": "Kapitał zakładowy",
+      "additionalCapital": "Kapitał zapasowy",
+      "retainedEarnings": "Zysk zatrzymany",
+      "debt": "Kapitał obcy",
+      "loans": "Kredyty",
+      "totalLiabilities": "Razem zobowiązania",
+      "check": "Bilans",
+      "balanced": "Aktywa = Zobowiązania",
+      "difference": "Różnica: {amount}"
+    }
   }
 }

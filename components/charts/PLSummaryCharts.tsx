@@ -1,6 +1,8 @@
 'use client'
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { useTranslations } from 'next-intl'
+import { useFormatters } from '@/lib/i18n/useFormatters'
 import { PLRow } from '@/lib/utils/analytics'
 import { TOKEN_COLORS } from '@/lib/ui/colors'
 import { cn } from '@/lib/utils'
@@ -13,12 +15,15 @@ interface Props {
 const COLORS_INCOME = [TOKEN_COLORS.income, '#16a34a', '#4ade80', '#86efac', '#bbf7d0', TOKEN_COLORS.brand]
 const COLORS_EXPENSE = [TOKEN_COLORS.expense, '#f87171', '#fca5a5', '#f97316', '#fb923c', '#fecaca']
 
-function formatNum(n: number): string {
-  return new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(n)
+/** Whole numbers in the UI language. */
+function useFormatNum(): (n: number) => string {
+  const { number } = useFormatters()
+  return (n) => number(n, { maximumFractionDigits: 0 })
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CustomTooltip({ active, payload }: any) {
+  const formatNum = useFormatNum()
   if (!active || !payload?.length) return null
   const item = payload[0]
   return (
@@ -44,6 +49,7 @@ function SummaryPie({
   /** Text colour utility of the total (`text-income` / `text-expense`). */
   toneClassName: string
 }) {
+  const formatNum = useFormatNum()
   const data = rows
     .filter((r) => r.total > 0)
     .map((r, i) => ({
@@ -104,6 +110,8 @@ function SummaryPie({
 }
 
 export default function PLSummaryCharts({ rows }: Props) {
+  const t = useTranslations('charts.plSummary')
+  const formatNum = useFormatNum()
   const incomeRows = rows.filter((r) => r.type === 'income')
   const expenseRows = rows.filter((r) => r.type === 'expense')
   const totalIncome = incomeRows.reduce((s, r) => s + r.total, 0)
@@ -120,13 +128,13 @@ export default function PLSummaryCharts({ rows }: Props) {
         )}
       >
         <div>
-          <p className="text-sm text-ink-muted">Прибуток / Збиток за період</p>
+          <p className="text-sm text-ink-muted">{t('profit')}</p>
           <p className={cn('text-3xl font-bold tabular-nums mt-1', profit >= 0 ? 'text-income' : 'text-expense')}>
             {profit >= 0 ? '+' : ''}{formatNum(profit)}
           </p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-ink-muted">Рентабельність</p>
+          <p className="text-xs text-ink-muted">{t('margin')}</p>
           <p className={cn('text-xl font-semibold mt-1', profit >= 0 ? 'text-income' : 'text-expense')}>
             {totalIncome > 0 ? Math.round((profit / totalIncome) * 100) : 0}%
           </p>
@@ -136,14 +144,14 @@ export default function PLSummaryCharts({ rows }: Props) {
       {/* Pie charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <SummaryPie
-          title="Доходи за категоріями"
+          title={t('incomeByCategory')}
           total={totalIncome}
           rows={incomeRows}
           colors={COLORS_INCOME}
           toneClassName="text-income"
         />
         <SummaryPie
-          title="Витрати за категоріями"
+          title={t('expenseByCategory')}
           total={totalExpense}
           rows={expenseRows}
           colors={COLORS_EXPENSE}

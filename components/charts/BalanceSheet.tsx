@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Account } from '@/types'
-import { currencySymbol, formatCurrency } from '@/lib/utils/currency'
+import { useTranslations } from 'next-intl'
+import { useFormatters } from '@/lib/i18n/useFormatters'
 import { TOKEN_COLORS } from '@/lib/ui/colors'
 
 interface BalanceSheetProps {
@@ -48,6 +49,7 @@ function EditableRow({
   currency: string
   onChange: (v: number) => void
 }) {
+  const { currencySymbol } = useFormatters()
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
       <span className="text-sm text-ink flex-1">{label}</span>
@@ -69,6 +71,7 @@ function EditableRow({
 }
 
 function ReadOnlyRow({ label, value, currency, color }: { label: string; value: number; currency: string; color?: string }) {
+  const { money } = useFormatters()
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
       <span className="text-sm text-ink flex-1">{label}</span>
@@ -76,13 +79,14 @@ function ReadOnlyRow({ label, value, currency, color }: { label: string; value: 
         className="text-sm font-medium shrink-0"
         style={{ fontVariantNumeric: 'tabular-nums', color: color ?? (value >= 0 ? TOKEN_COLORS.ink : TOKEN_COLORS.expense) }}
       >
-        {formatCurrency(value, currency)}
+        {money(value, currency)}
       </span>
     </div>
   )
 }
 
 function SectionHeader({ roman, title, total, currency }: { roman: string; title: string; total: number; currency: string }) {
+  const { money } = useFormatters()
   return (
     <div className="flex items-center justify-between py-2 border-t border-line mt-2">
       <span className="text-xs font-bold text-ink-muted uppercase tracking-wide">
@@ -92,7 +96,7 @@ function SectionHeader({ roman, title, total, currency }: { roman: string; title
         className="text-sm font-semibold"
         style={{ fontVariantNumeric: 'tabular-nums', color: total >= 0 ? TOKEN_COLORS.ink : TOKEN_COLORS.expense }}
       >
-        {formatCurrency(total, currency)}
+        {money(total, currency)}
       </span>
     </div>
   )
@@ -117,6 +121,8 @@ function Skeleton() {
 }
 
 export default function BalanceSheet({ accounts, orgId = 'default', currency, loading }: BalanceSheetProps) {
+  const t = useTranslations('charts.balanceSheet')
+  const { money } = useFormatters()
   const storageKey = `balance-sheet-${orgId}`
 
   const [fields, setFields] = useState<EditableFields>(DEFAULT_FIELDS)
@@ -177,15 +183,15 @@ export default function BalanceSheet({ accounts, orgId = 'default', currency, lo
       {/* ======= ASSETS ======= */}
       <div className="rounded-xl border border-line bg-surface p-5 space-y-1">
         <div className="flex items-center justify-between pb-3 border-b border-line">
-          <h3 className="text-sm font-bold text-ink uppercase tracking-wide">Активи</h3>
-          <span className="text-sm font-bold text-brand-soft-foreground">{formatCurrency(totalAssets, currency)}</span>
+          <h3 className="text-sm font-bold text-ink uppercase tracking-wide">{t('assets')}</h3>
+          <span className="text-sm font-bold text-brand-soft-foreground">{money(totalAssets, currency)}</span>
         </div>
 
         {/* I. Fixed */}
-        <SectionHeader roman="I" title="Основні засоби" total={fixedTotal} currency={currency} />
-        <EditableRow label="Нерухомість" value={fields.realestate} currency={currency} onChange={(v) => updateField('realestate', v)} />
-        <EditableRow label="Обладнання" value={fields.equipment} currency={currency} onChange={(v) => updateField('equipment', v)} />
-        <ReadOnlyRow label="Інвестиції (крипто)" value={cryptoTotal} currency={currency} />
+        <SectionHeader roman="I" title={t('fixedAssets')} total={fixedTotal} currency={currency} />
+        <EditableRow label={t('realEstate')} value={fields.realestate} currency={currency} onChange={(v) => updateField('realestate', v)} />
+        <EditableRow label={t('equipment')} value={fields.equipment} currency={currency} onChange={(v) => updateField('equipment', v)} />
+        <ReadOnlyRow label={t('crypto')} value={cryptoTotal} currency={currency} />
         {cryptoAccounts.map((acc) => (
           <div key={acc.id} className="flex items-center justify-between gap-3 pl-4 py-1">
             <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -193,19 +199,19 @@ export default function BalanceSheet({ accounts, orgId = 'default', currency, lo
               <span className="text-xs text-ink-muted truncate">{acc.name}</span>
             </div>
             {/* A single account is shown in its own currency. */}
-            <span className="text-xs text-ink-muted shrink-0">{formatCurrency(acc.balance, acc.currency)}</span>
+            <span className="text-xs text-ink-muted shrink-0">{money(acc.balance, acc.currency)}</span>
           </div>
         ))}
 
         {/* II. Current */}
-        <SectionHeader roman="II" title="Поточні активи" total={currentTotal} currency={currency} />
-        <EditableRow label="Запаси" value={fields.inventory} currency={currency} onChange={(v) => updateField('inventory', v)} />
-        <EditableRow label="Дебіторська заборгованість" value={fields.receivables} currency={currency} onChange={(v) => updateField('receivables', v)} />
+        <SectionHeader roman="II" title={t('currentAssets')} total={currentTotal} currency={currency} />
+        <EditableRow label={t('inventory')} value={fields.inventory} currency={currency} onChange={(v) => updateField('inventory', v)} />
+        <EditableRow label={t('receivables')} value={fields.receivables} currency={currency} onChange={(v) => updateField('receivables', v)} />
 
         {/* III. Money */}
-        <SectionHeader roman="III" title="Гроші" total={moneyTotal} currency={currency} />
+        <SectionHeader roman="III" title={t('money')} total={moneyTotal} currency={currency} />
         {accounts.length === 0 ? (
-          <p className="text-sm text-ink-muted italic py-1">Немає рахунків</p>
+          <p className="text-sm text-ink-muted italic py-1">{t('noAccounts')}</p>
         ) : (
           accounts.map((acc) => (
             <div key={acc.id} className="flex items-center justify-between gap-3 py-1">
@@ -217,7 +223,7 @@ export default function BalanceSheet({ accounts, orgId = 'default', currency, lo
                 className="text-sm font-medium shrink-0"
                 style={{ color: acc.balance >= 0 ? TOKEN_COLORS.ink : TOKEN_COLORS.expense }}
               >
-                {formatCurrency(acc.balance, acc.currency)}
+                {money(acc.balance, acc.currency)}
               </span>
             </div>
           ))
@@ -225,32 +231,32 @@ export default function BalanceSheet({ accounts, orgId = 'default', currency, lo
 
         {/* Total */}
         <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-ink">
-          <span className="text-base font-bold text-ink">Всього активи</span>
-          <span className="text-base font-bold text-brand-soft-foreground">{formatCurrency(totalAssets, currency)}</span>
+          <span className="text-base font-bold text-ink">{t('totalAssets')}</span>
+          <span className="text-base font-bold text-brand-soft-foreground">{money(totalAssets, currency)}</span>
         </div>
       </div>
 
       {/* ======= LIABILITIES ======= */}
       <div className="rounded-xl border border-line bg-surface p-5 space-y-1">
         <div className="flex items-center justify-between pb-3 border-b border-line">
-          <h3 className="text-sm font-bold text-ink uppercase tracking-wide">Зобов’язання</h3>
-          <span className="text-sm font-bold text-ink">{formatCurrency(totalLiabilities, currency)}</span>
+          <h3 className="text-sm font-bold text-ink uppercase tracking-wide">{t('liabilities')}</h3>
+          <span className="text-sm font-bold text-ink">{money(totalLiabilities, currency)}</span>
         </div>
 
         {/* I. Equity */}
-        <SectionHeader roman="I" title="Власний капітал" total={equityTotal} currency={currency} />
-        <EditableRow label="Статутний капітал" value={fields.charter_capital} currency={currency} onChange={(v) => updateField('charter_capital', v)} />
-        <EditableRow label="Додатковий капітал" value={fields.additional_capital} currency={currency} onChange={(v) => updateField('additional_capital', v)} />
-        <ReadOnlyRow label="Нерозподілений прибуток" value={retainedEarnings} currency={currency} color={retainedEarnings >= 0 ? TOKEN_COLORS.income : TOKEN_COLORS.expense} />
+        <SectionHeader roman="I" title={t('equity')} total={equityTotal} currency={currency} />
+        <EditableRow label={t('charterCapital')} value={fields.charter_capital} currency={currency} onChange={(v) => updateField('charter_capital', v)} />
+        <EditableRow label={t('additionalCapital')} value={fields.additional_capital} currency={currency} onChange={(v) => updateField('additional_capital', v)} />
+        <ReadOnlyRow label={t('retainedEarnings')} value={retainedEarnings} currency={currency} color={retainedEarnings >= 0 ? TOKEN_COLORS.income : TOKEN_COLORS.expense} />
 
         {/* II. Debt */}
-        <SectionHeader roman="II" title="Позиковий капітал" total={debtTotal} currency={currency} />
-        <EditableRow label="Кредити" value={fields.loans} currency={currency} onChange={(v) => updateField('loans', v)} />
+        <SectionHeader roman="II" title={t('debt')} total={debtTotal} currency={currency} />
+        <EditableRow label={t('loans')} value={fields.loans} currency={currency} onChange={(v) => updateField('loans', v)} />
 
         {/* Total */}
         <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-ink">
-          <span className="text-base font-bold text-ink">Всього зобов’язання</span>
-          <span className="text-base font-bold text-ink">{formatCurrency(totalLiabilities, currency)}</span>
+          <span className="text-base font-bold text-ink">{t('totalLiabilities')}</span>
+          <span className="text-base font-bold text-ink">{money(totalLiabilities, currency)}</span>
         </div>
 
         {/* Balance check */}
@@ -260,11 +266,11 @@ export default function BalanceSheet({ accounts, orgId = 'default', currency, lo
             ? 'bg-brand-soft text-income'
             : 'bg-expense-soft text-expense',
         ].join(' ')}>
-          <span>Баланс</span>
+          <span>{t('check')}</span>
           <span>
             {Math.abs(totalAssets - totalLiabilities) < 0.01
-              ? "Активи = Зобов\u2019язання"
-              : `Різниця: ${formatCurrency(Math.abs(totalAssets - totalLiabilities), currency)}`}
+              ? t('balanced')
+              : t('difference', { amount: money(Math.abs(totalAssets - totalLiabilities), currency) })}
           </span>
         </div>
       </div>
