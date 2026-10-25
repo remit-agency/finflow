@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useShell } from '@/lib/hooks/useShell'
 import { settingsPath } from '@/lib/shell/settings-sections'
@@ -34,6 +35,8 @@ export function ProfileMenu() {
         <DropdownMenuGroup>
           <DropdownMenuLabel className="truncate">{user?.email}</DropdownMenuLabel>
         </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <LanguageSwitcher variant="menu" />
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push(settingsPath(orgId, 'company'))}>
           <Settings />

@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useOrg } from '@/lib/hooks/useOrg'
 import { auth } from '@/lib/firebase/firebase'
@@ -128,7 +129,10 @@ export default function RegisterPage() {
   const fromLogin = companyOnly && new URLSearchParams(window.location.search).get('step') === 'org'
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0f0f0f] px-4 py-8">
+    <div className="relative min-h-screen flex items-center justify-center bg-[#0f0f0f] px-4 py-8">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher variant="select" />
+      </div>
       <Card className="w-full max-w-[440px] bg-white rounded-[12px] shadow-lg">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2 mb-2">

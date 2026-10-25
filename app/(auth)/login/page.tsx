@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { getMyOrganizationsForAuthPage } from '@/lib/firebase/members'
 import { safeRedirectPath } from '@/lib/auth/paths'
@@ -64,7 +65,10 @@ export default function LoginPage() {
   const isValid = email.length > 0 && password.length >= 6
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0f0f0f] px-4">
+    <div className="relative min-h-screen flex items-center justify-center bg-[#0f0f0f] px-4">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher variant="select" />
+      </div>
       <Card className="w-full max-w-[400px] bg-white rounded-[12px] shadow-lg">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2 mb-2">
