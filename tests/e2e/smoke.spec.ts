@@ -55,11 +55,11 @@ test.describe('smoke on emulators', () => {
     // 1. Register: one submit creates the Auth user and organizations/{orgId}.
     await page.goto('/register')
     await waitForHydration(page, '#name')
-    await page.getByLabel('Your name', { exact: true }).fill('Smoke Tester')
-    await page.getByLabel('Email', { exact: true }).fill(email)
-    await page.getByLabel('Password', { exact: true }).fill('smoke-pass-123')
-    await page.getByLabel('Company name', { exact: true }).fill(orgName)
-    await page.getByRole('button', { name: 'Try 14 days free' }).click()
+    await page.getByLabel('Ваше ім\'я', { exact: true }).fill('Smoke Tester')
+    await page.getByLabel('Електронна пошта', { exact: true }).fill(email)
+    await page.getByLabel('Пароль', { exact: true }).fill('smoke-pass-123')
+    await page.getByLabel('Назва компанії', { exact: true }).fill(orgName)
+    await page.getByRole('button', { name: 'Спробувати 14 днів безкоштовно' }).click()
 
     // 2. Redirect to /{orgId}/transactions. The header shows the org name only after
     //    useOrg loaded it, which exercises the organizations get/list security rules.

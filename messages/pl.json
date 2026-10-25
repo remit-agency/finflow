@@ -28,7 +28,75 @@
     "signOut": "Nie udało się wylogować",
     "switchOrg": "Nie udało się przełączyć firmy",
     "deleteAccount": "Nie udało się usunąć konta",
-    "loadOrgs": "Nie udało się wczytać firm"
+    "loadOrgs": "Nie udało się wczytać firm",
+    "auth": {
+      "wrongPassword": "Nieprawidłowy adres e-mail lub hasło.",
+      "userNotFound": "Nie znaleziono użytkownika z tym adresem e-mail.",
+      "emailInUse": "Konto z tym adresem e-mail już istnieje.",
+      "weakPassword": "Hasło jest zbyt słabe. Użyj co najmniej 6 znaków.",
+      "tooManyRequests": "Zbyt wiele prób. Spróbuj ponownie za kilka minut.",
+      "network": "Błąd sieci. Sprawdź połączenie i spróbuj ponownie.",
+      "popupClosed": "Okno logowania zostało zamknięte przed zakończeniem.",
+      "generic": "Coś poszło nie tak. Spróbuj ponownie."
+    },
+    "orgCreate": {
+      "org_limit_reached": "Możesz być właścicielem najwyżej 3 firm.",
+      "unauthorized": "Sesja wygasła. Zaloguj się ponownie.",
+      "invalid": "Sprawdź nazwę firmy i walutę.",
+      "network": "Błąd sieci. Sprawdź połączenie i spróbuj ponownie.",
+      "server": "Nie udało się utworzyć firmy. Spróbuj ponownie."
+    }
+  },
+  "auth": {
+    "or": "lub",
+    "login": {
+      "title": "Logowanie",
+      "description": "Podaj dane, aby zalogować się na konto",
+      "email": "E-mail",
+      "emailPlaceholder": "you@company.com",
+      "password": "Hasło",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Zaloguj się",
+      "submitting": "Logowanie…",
+      "google": "Zaloguj się przez Google",
+      "noAccount": "Nie masz konta?",
+      "toRegister": "Zarejestruj się"
+    },
+    "register": {
+      "title": "Wypróbuj za darmo",
+      "description": "14 dni za darmo, bez karty płatniczej",
+      "companyOnlyTitle": "Dokończ konfigurację",
+      "companyOnlyDescription": "Konto jest gotowe. Dodaj firmę, aby kontynuować.",
+      "companyOnlyFromLoginTitle": "Utwórz firmę",
+      "companyOnlyFromLoginDescription": "Jesteś zalogowany, ale nie masz jeszcze firmy.",
+      "name": "Twoje imię",
+      "namePlaceholder": "Jan Kowalski",
+      "email": "E-mail",
+      "emailPlaceholder": "you@company.com",
+      "password": "Hasło",
+      "passwordPlaceholder": "Co najmniej 6 znaków",
+      "companySection": "Firma",
+      "orgName": "Nazwa firmy",
+      "orgNamePlaceholder": "Moja firma",
+      "currency": "Waluta",
+      "currencyPlaceholder": "Wybierz walutę",
+      "submit": "Wypróbuj 14 dni za darmo",
+      "submitting": "Tworzenie konta…",
+      "createCompany": "Utwórz firmę",
+      "creatingCompany": "Tworzenie firmy…",
+      "google": "Zarejestruj się przez Google",
+      "googleNeedsCompany": "Najpierw podaj nazwę firmy",
+      "haveAccount": "Masz już konto?",
+      "toLogin": "Zaloguj się",
+      "notYou": "To nie Ty?",
+      "signOut": "Wyloguj się"
+    },
+    "currencies": {
+      "UAH": "UAH — hrywna ukraińska",
+      "EUR": "EUR — euro",
+      "USD": "USD — dolar amerykański",
+      "PLN": "PLN — złoty polski"
+    }
   },
   "shell": {
     "modules": {

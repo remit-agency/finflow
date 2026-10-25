@@ -28,7 +28,75 @@
     "signOut": "Could not sign out",
     "switchOrg": "Could not switch company",
     "deleteAccount": "Could not delete the account",
-    "loadOrgs": "Could not load companies"
+    "loadOrgs": "Could not load companies",
+    "auth": {
+      "wrongPassword": "Incorrect email or password.",
+      "userNotFound": "No user found with this email.",
+      "emailInUse": "An account with this email already exists.",
+      "weakPassword": "The password is too weak. Use at least 6 characters.",
+      "tooManyRequests": "Too many attempts. Try again in a few minutes.",
+      "network": "Network error. Check your connection and try again.",
+      "popupClosed": "The sign-in window was closed before it finished.",
+      "generic": "Something went wrong. Please try again."
+    },
+    "orgCreate": {
+      "org_limit_reached": "You can own at most 3 companies.",
+      "unauthorized": "Your session has expired. Please sign in again.",
+      "invalid": "Please check the company name and currency.",
+      "network": "Network error. Check your connection and try again.",
+      "server": "Could not create the company. Please try again."
+    }
+  },
+  "auth": {
+    "or": "or",
+    "login": {
+      "title": "Sign in",
+      "description": "Enter your credentials to access your account",
+      "email": "Email",
+      "emailPlaceholder": "you@company.com",
+      "password": "Password",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "google": "Sign in with Google",
+      "noAccount": "Don't have an account?",
+      "toRegister": "Create one"
+    },
+    "register": {
+      "title": "Start free trial",
+      "description": "14 days free, no credit card required",
+      "companyOnlyTitle": "Finish setting up",
+      "companyOnlyDescription": "Your account is ready. Add your company to continue.",
+      "companyOnlyFromLoginTitle": "Create your company",
+      "companyOnlyFromLoginDescription": "You are signed in, but you do not have a company yet.",
+      "name": "Your name",
+      "namePlaceholder": "John Smith",
+      "email": "Email",
+      "emailPlaceholder": "you@company.com",
+      "password": "Password",
+      "passwordPlaceholder": "At least 6 characters",
+      "companySection": "Company",
+      "orgName": "Company name",
+      "orgNamePlaceholder": "My Company LLC",
+      "currency": "Primary currency",
+      "currencyPlaceholder": "Select currency",
+      "submit": "Try 14 days free",
+      "submitting": "Creating account…",
+      "createCompany": "Create company",
+      "creatingCompany": "Creating company…",
+      "google": "Sign up with Google",
+      "googleNeedsCompany": "Please enter your company name first",
+      "haveAccount": "Already have an account?",
+      "toLogin": "Sign in",
+      "notYou": "Not you?",
+      "signOut": "Sign out"
+    },
+    "currencies": {
+      "UAH": "UAH — Ukrainian Hryvnia",
+      "EUR": "EUR — Euro",
+      "USD": "USD — US Dollar",
+      "PLN": "PLN — Polish Zloty"
+    }
   },
   "shell": {
     "modules": {

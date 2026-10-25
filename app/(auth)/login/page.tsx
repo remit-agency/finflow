@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,8 +13,12 @@ import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { getMyOrganizationsForAuthPage } from '@/lib/firebase/members'
 import { safeRedirectPath } from '@/lib/auth/paths'
+import { authErrorKey } from '@/lib/firebase/auth-errors'
 
 export default function LoginPage() {
+  const t = useTranslations('auth.login')
+  const tAuth = useTranslations('auth')
+  const tAuthErr = useTranslations('errors.auth')
   const router = useRouter()
   const { signIn, signInGoogle } = useAuth()
   const [email, setEmail] = useState('')
@@ -36,8 +41,7 @@ export default function LoginPage() {
         router.push('/register?step=org')
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Login failed'
-      toast.error(message)
+      toast.error(tAuthErr(authErrorKey(err)))
     } finally {
       setLoading(false)
     }
@@ -55,8 +59,7 @@ export default function LoginPage() {
         router.push('/register?step=org')
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Google login failed'
-      toast.error(message)
+      toast.error(tAuthErr(authErrorKey(err)))
     } finally {
       setLoading(false)
     }
@@ -77,21 +80,19 @@ export default function LoginPage() {
             </div>
             <span className="text-[#111111] font-semibold text-lg">FinFlow</span>
           </div>
-          <CardTitle className="text-[#111111] text-xl font-semibold">Sign in</CardTitle>
-          <CardDescription className="text-[#6b7280]">
-            Enter your credentials to access your account
-          </CardDescription>
+          <CardTitle className="text-[#111111] text-xl font-semibold">{t('title')}</CardTitle>
+          <CardDescription className="text-[#6b7280]">{t('description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email" className="text-[#111111] text-sm font-medium">
-                Email
+                {t('email')}
               </Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@company.com"
+                placeholder={t('emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="rounded-[6px] border-[#e5e7eb] text-[#111111] focus-visible:ring-[#00c896]"
@@ -101,12 +102,12 @@ export default function LoginPage() {
 
             <div className="space-y-1.5">
               <Label htmlFor="password" className="text-[#111111] text-sm font-medium">
-                Password
+                {t('password')}
               </Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder={t('passwordPlaceholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="rounded-[6px] border-[#e5e7eb] text-[#111111] focus-visible:ring-[#00c896]"
@@ -119,7 +120,7 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full bg-[#00c896] hover:bg-[#00b584] text-white rounded-[8px] font-medium disabled:opacity-50"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? t('submitting') : t('submit')}
             </Button>
           </form>
 
@@ -128,7 +129,7 @@ export default function LoginPage() {
               <div className="w-full border-t border-[#e5e7eb]" />
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="bg-white px-2 text-[#6b7280]">or</span>
+              <span className="bg-white px-2 text-[#6b7280]">{tAuth('or')}</span>
             </div>
           </div>
 
@@ -157,13 +158,13 @@ export default function LoginPage() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            Continue with Google
+            {t('google')}
           </Button>
 
           <p className="text-center text-sm text-[#6b7280] mt-4">
-            Don&apos;t have an account?{' '}
+            {t('noAccount')}{' '}
             <Link href="/register" className="text-[#00c896] hover:underline font-medium">
-              Create one
+              {t('toRegister')}
             </Link>
           </p>
         </CardContent>
