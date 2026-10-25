@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Building2, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,12 +14,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { deleteAccount } from '@/lib/firebase/accounts'
+import { useFormatters } from '@/lib/i18n/useFormatters'
 import { useShell } from '@/lib/hooks/useShell'
 import { isJournalPath } from '@/lib/shell/modules'
 import { settingsPath } from '@/lib/shell/settings-sections'
 import { cn } from '@/lib/utils'
 import { summarizeAccounts } from '@/lib/utils/accounts'
-import { formatCurrency, splitCurrency } from '@/lib/utils/currency'
 import type { Account } from '@/types'
 
 interface AccountsSidebarProps {
@@ -38,6 +39,10 @@ function rowClass(selected: boolean): string {
 }
 
 export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }: AccountsSidebarProps) {
+  const t = useTranslations('shell.accounts')
+  const tCommon = useTranslations('common')
+  const tErrors = useTranslations('errors')
+  const { money, splitMoney } = useFormatters()
   const router = useRouter()
   const pathname = usePathname()
   const {
@@ -77,12 +82,12 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
   }
 
   const handleDelete = async (account: Account) => {
-    if (!confirm(`Видалити рахунок «${account.name}»?`)) return
+    if (!confirm(t('confirmDelete', { name: account.name }))) return
     if (selectedAccountId === account.id) selectAccount(null)
     try {
       await deleteAccount(orgId, account.id)
     } catch {
-      toast.error('Не вдалося видалити рахунок')
+      toast.error(tErrors('deleteAccount'))
     }
   }
 
@@ -93,10 +98,10 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
         data-collapsed="true"
         className="flex h-full w-14 flex-col items-center gap-2 border-r border-line py-3"
       >
-        <Button variant="ghost" size="icon-sm" onClick={toggleSidebar} aria-label="Розгорнути сайдбар" aria-expanded={false}>
+        <Button variant="ghost" size="icon-sm" onClick={toggleSidebar} aria-label={t('expand')} aria-expanded={false}>
           <ChevronRight />
         </Button>
-        <ul aria-label="Рахунки (згорнуто)" className="flex flex-1 flex-col items-center gap-1 overflow-y-auto">
+        <ul aria-label={t('collapsedList')} className="flex flex-1 flex-col items-center gap-1 overflow-y-auto">
           {accounts.map((account) => {
             const selected = selectedAccountId === account.id
             return (
@@ -106,7 +111,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
                   onClick={() => choose(selected ? null : account.id)}
                   aria-pressed={selected}
                   aria-label={account.name}
-                  title={`${account.name}: ${formatCurrency(account.balance, account.currency)}`}
+                  title={`${account.name}: ${money(account.balance, account.currency)}`}
                   className={cn(
                     'flex size-9 items-center justify-center rounded-control transition-colors hover:bg-canvas focus-visible:outline-2 focus-visible:outline-brand-soft-foreground',
                     selected && 'bg-brand-soft',
@@ -119,14 +124,14 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
           })}
         </ul>
         {canWrite && (
-          <Button variant="soft" size="icon-sm" onClick={handleAdd} aria-label="Додати рахунок">
+          <Button variant="soft" size="icon-sm" onClick={handleAdd} aria-label={t('add')}>
             <Plus />
           </Button>
         )}
         {canBank && (
           <Link
             href={settingsPath(orgId, 'banks')}
-            aria-label="Підключити банк"
+            aria-label={t('connectBank')}
             className="flex size-7 items-center justify-center rounded-control text-brand-soft-foreground hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
           >
             <Building2 className="size-4" />
@@ -136,7 +141,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
     )
   }
 
-  const total = summary ? splitCurrency(summary.total, summary.currency) : null
+  const total = summary ? splitMoney(summary.total, summary.currency) : null
 
   return (
     <div
@@ -148,7 +153,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
         <div data-testid="accounts-summary" className="min-w-0">
           {summary && total ? (
             <>
-              <p className="text-xs text-ink-muted">Разом у {summary.currency}</p>
+              <p className="text-xs text-ink-muted">{t('totalIn', { currency: summary.currency })}</p>
               <p
                 data-testid="accounts-total"
                 className={cn(
@@ -158,7 +163,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
               >
                 {/* The full amount as one text node for assistive tech (and text queries); the
                     visual copy shows the decimals and the currency smaller and muted. */}
-                <span className="sr-only">{formatCurrency(summary.total, summary.currency)}</span>
+                <span className="sr-only">{money(summary.total, summary.currency)}</span>
                 <span aria-hidden>
                   {total.whole}
                   <span className="text-base font-semibold text-ink-muted">
@@ -176,7 +181,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
           )}
         </div>
         {variant === 'panel' ? (
-          <Button variant="ghost" size="icon-sm" onClick={toggleSidebar} aria-label="Згорнути сайдбар" aria-expanded>
+          <Button variant="ghost" size="icon-sm" onClick={toggleSidebar} aria-label={t('collapse')} aria-expanded>
             <ChevronLeft />
           </Button>
         ) : (
@@ -186,13 +191,13 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
 
       <div className="flex-1 overflow-y-auto border-t border-line px-2 pt-3 pb-4">
         <div className="flex items-center justify-between gap-2 pr-1 pb-1 pl-3">
-          <h2 className="text-sm font-semibold text-ink">Мої рахунки</h2>
+          <h2 className="text-sm font-semibold text-ink">{t('mine')}</h2>
           {canWrite && (
             <Button
               variant="ghost"
               size="icon-sm"
               onClick={handleAdd}
-              aria-label="Додати рахунок"
+              aria-label={t('add')}
               className="text-brand-soft-foreground hover:bg-brand-soft hover:text-brand-soft-foreground"
             >
               <Plus />
@@ -202,7 +207,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
 
         <button type="button" onClick={() => choose(null)} aria-pressed={selectedAccountId === null} className={rowClass(selectedAccountId === null)}>
           <span className="size-2.5 shrink-0 rounded-full bg-brand" />
-          <span className="min-w-0 flex-1 truncate">Усі рахунки</span>
+          <span className="min-w-0 flex-1 truncate">{t('all')}</span>
           {!accountsLoading && <span className="text-xs text-ink-muted tabular-nums">{accounts.length}</span>}
         </button>
 
@@ -213,9 +218,9 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
             ))}
           </div>
         ) : accounts.length === 0 ? (
-          <p className="px-3 py-4 text-sm text-ink-muted">Рахунків ще немає</p>
+          <p className="px-3 py-4 text-sm text-ink-muted">{t('none')}</p>
         ) : (
-          <ul aria-label="Список рахунків" className="mt-1 space-y-0.5">
+          <ul aria-label={t('list')} className="mt-1 space-y-0.5">
             {accounts.map((account) => {
               const selected = selectedAccountId === account.id
               return (
@@ -229,7 +234,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
                     <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: account.color }} />
                     <span className="min-w-0 flex-1 truncate">{account.name}</span>
                     <span className={cn('shrink-0 text-xs tabular-nums', account.balance < 0 ? 'text-expense' : 'text-ink-muted')}>
-                      {formatCurrency(account.balance, account.currency)}
+                      {money(account.balance, account.currency)}
                     </span>
                   </button>
                   {canWrite && (
@@ -237,7 +242,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
                       {/* Shown on hover or keyboard focus of the row (and while its menu is open);
                           always shown on touch screens, which have no hover. */}
                       <DropdownMenuTrigger
-                        aria-label={`Дії з рахунком ${account.name}`}
+                        aria-label={t('actionsFor', { name: account.name })}
                         className="flex size-7 shrink-0 items-center justify-center rounded-control text-ink-muted opacity-0 transition-[opacity,color,background-color] group-hover/row:opacity-100 group-focus-within/row:opacity-100 hover:bg-canvas hover:text-ink focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-brand-soft-foreground data-popup-open:opacity-100 [@media(hover:none)]:opacity-100"
                       >
                         <MoreHorizontal className="size-4" />
@@ -245,11 +250,11 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
                       <DropdownMenuContent align="end" className="w-44">
                         <DropdownMenuItem onClick={() => handleEdit(account)}>
                           <Pencil />
-                          Редагувати
+                          {tCommon('edit')}
                         </DropdownMenuItem>
                         <DropdownMenuItem variant="destructive" onClick={() => void handleDelete(account)}>
                           <Trash2 />
-                          Видалити
+                          {tCommon('delete')}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -269,8 +274,8 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
           >
             <Building2 className="size-4 shrink-0 text-brand-soft-foreground" />
             <span className="min-w-0">
-              <span className="block text-sm font-medium text-ink">Підключити банк</span>
-              <span className="block text-xs text-ink-muted">Open Banking, бета</span>
+              <span className="block text-sm font-medium text-ink">{t('connectBank')}</span>
+              <span className="block text-xs text-ink-muted">{t('openBanking')}</span>
             </span>
           </Link>
         )}

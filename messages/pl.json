@@ -9,6 +9,111 @@
     "cancel": "Anuluj",
     "delete": "Usuń",
     "close": "Zamknij",
-    "loading": "Ładowanie…"
+    "loading": "Ładowanie…",
+    "edit": "Edytuj",
+    "toggleTheme": "Przełącz motyw",
+    "accountTypes": {
+      "bank": "Konto bankowe",
+      "cash": "Gotówka",
+      "card": "Karta",
+      "crypto": "Krypto"
+    }
+  },
+  "roles": {
+    "owner": "Właściciel",
+    "accountant": "Księgowy",
+    "viewer": "Przeglądający"
+  },
+  "errors": {
+    "signOut": "Nie udało się wylogować",
+    "switchOrg": "Nie udało się przełączyć firmy",
+    "deleteAccount": "Nie udało się usunąć konta",
+    "loadOrgs": "Nie udało się wczytać firm"
+  },
+  "shell": {
+    "modules": {
+      "transactions": "Płatności",
+      "analytics": "Analityka"
+    },
+    "analyticsSections": {
+      "cashflow": "Przepływy pieniężne (Cash Flow)",
+      "pl": "Rachunek zysków i strat (P&L)",
+      "balance": "Bilans",
+      "calendar": "Kalendarz"
+    },
+    "settingsSections": {
+      "company": "Firma",
+      "categories": "Kategorie",
+      "banks": "Banki",
+      "subscription": "Subskrypcja"
+    },
+    "nav": {
+      "modules": "Moduły",
+      "analytics": "Sekcje analityki",
+      "settings": "Sekcje ustawień"
+    },
+    "header": {
+      "openAccounts": "Otwórz konta",
+      "income": "Wpływ",
+      "expense": "Wydatek",
+      "transfer": "Przelew"
+    },
+    "frame": {
+      "settings": "Ustawienia",
+      "accounts": "Konta"
+    },
+    "insufficientRights": {
+      "title": "Brak uprawnień",
+      "body": "Ta sekcja jest dostępna tylko dla właściciela firmy."
+    },
+    "noAccess": {
+      "deniedTitle": "Brak dostępu do tej firmy",
+      "errorTitle": "Nie udało się sprawdzić dostępu",
+      "deniedBody": "Ta firma nie należy do Twojego konta lub nie istnieje.",
+      "errorBody": "Sprawdź połączenie i spróbuj ponownie.",
+      "toMyCompany": "Przejdź do mojej firmy",
+      "retry": "Spróbuj ponownie",
+      "signOut": "Wyloguj się"
+    },
+    "orgSwitcher": {
+      "company": "Firma",
+      "yourCompanies": "Twoje firmy",
+      "current": "Bieżąca firma"
+    },
+    "profile": {
+      "label": "Profil",
+      "settings": "Ustawienia",
+      "signOut": "Wyloguj się"
+    },
+    "settingsMenu": {
+      "back": "Do płatności",
+      "title": "Ustawienia"
+    },
+    "accounts": {
+      "expand": "Rozwiń panel boczny",
+      "collapse": "Zwiń panel boczny",
+      "collapsedList": "Konta (zwinięte)",
+      "add": "Dodaj konto",
+      "connectBank": "Połącz bank",
+      "openBanking": "Open Banking, beta",
+      "totalIn": "Razem w {currency}",
+      "mine": "Moje konta",
+      "all": "Wszystkie konta",
+      "none": "Nie ma jeszcze kont",
+      "list": "Lista kont",
+      "actionsFor": "Działania dla konta {name}",
+      "confirmDelete": "Usunąć konto „{name}”?"
+    },
+    "verifyEmail": {
+      "alreadySent": "Wiadomość została już wysłana. Poczekaj minutę.",
+      "sent": "Wiadomość wysłana",
+      "tooMany": "Zbyt wiele prób. Spróbuj ponownie za kilka minut.",
+      "sendFailed": "Nie udało się wysłać wiadomości. Spróbuj później.",
+      "short": "Potwierdź adres e-mail, aby połączyć banki",
+      "long": "Potwierdź adres e-mail <strong>{email}</strong>, aby połączyć banki. Wiadomość nie dotarła? Wyślij ją ponownie.",
+      "sending": "Wysyłanie…",
+      "resendShort": "Wyślij",
+      "resendLong": "Wyślij wiadomość ponownie"
+    }
   }
 }

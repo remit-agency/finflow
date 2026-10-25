@@ -2,11 +2,12 @@
 
 export type AnalyticsSection = 'cashflow' | 'pl' | 'balance' | 'calendar'
 
-export const ANALYTICS_SECTIONS: ReadonlyArray<{ slug: AnalyticsSection; label: string }> = [
-  { slug: 'cashflow', label: 'Cash Flow' },
-  { slug: 'pl', label: 'P&L' },
-  { slug: 'balance', label: 'Баланс' },
-  { slug: 'calendar', label: 'Календар' },
+// The label of a section is `t('shell.analyticsSections.<slug>')`.
+export const ANALYTICS_SECTIONS: ReadonlyArray<{ slug: AnalyticsSection }> = [
+  { slug: 'cashflow' },
+  { slug: 'pl' },
+  { slug: 'balance' },
+  { slug: 'calendar' },
 ]
 
 export function analyticsPath(orgId: string, section: AnalyticsSection): string {

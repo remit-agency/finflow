@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { LazyAccountForm, LazyTransactionForm } from '@/components/forms/lazy'
 import { getMembership } from '@/lib/firebase/members'
@@ -71,6 +72,7 @@ const ShellContext = createContext<ShellContextValue | null>(null)
 const sidebarStore = createCollapsedStore(browserLocalStorage)
 
 export function ShellProvider({ orgId, children }: { orgId: string; children: ReactNode }) {
+  const tErrors = useTranslations('errors')
   const router = useRouter()
   const { org: loadedOrg, switchOrg } = useOrg()
   const { user } = useAuth()
@@ -164,8 +166,8 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
     }
     if (!orgIdValid || !loadedOrg || loadedOrg.id === orgId || requestedOrgId.current === orgId) return
     requestedOrgId.current = orgId
-    switchOrg(orgId).catch(() => toast.error('Не вдалося переключити компанію'))
-  }, [loadedOrg, orgId, orgIdValid, switchOrg])
+    switchOrg(orgId).catch(() => toast.error(tErrors('switchOrg')))
+  }, [loadedOrg, orgId, orgIdValid, switchOrg, tErrors])
 
   const chooseOrg = (id: string) => {
     if (id === orgId) return
@@ -174,7 +176,7 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
     router.push(`/${id}/transactions`)
     switchOrg(id).catch(() => {
       chosenOrgId.current = null
-      toast.error('Не вдалося переключити компанію')
+      toast.error(tErrors('switchOrg'))
     })
   }
 

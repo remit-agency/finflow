@@ -31,12 +31,7 @@ describe('isSettingsPath', () => {
 
 describe('SETTINGS_SECTIONS', () => {
   it('lists the four sections in menu order', () => {
-    expect(SETTINGS_SECTIONS.map((s) => [s.slug, s.label])).toEqual([
-      ['company', 'Компанія'],
-      ['categories', 'Категорії'],
-      ['banks', 'Банки'],
-      ['subscription', 'Підписка'],
-    ])
+    expect(SETTINGS_SECTIONS.map((s) => s.slug)).toEqual(['company', 'categories', 'banks', 'subscription'])
   })
 })
 

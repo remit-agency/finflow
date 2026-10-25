@@ -1,13 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { ReceiptText } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { LazyTransactionForm } from '@/components/forms/lazy'
 import { useShell } from '@/lib/hooks/useShell'
 import { cn } from '@/lib/utils'
-import { ACCOUNT_TYPE_LABELS } from '@/lib/utils/accounts'
 import { formatCurrency } from '@/lib/utils/currency'
 import { formatDayShortUtc, formatWeekdayShortUtc, summarizeDay } from '@/lib/utils/journal'
 import type { Transaction, Account, Category } from '@/types'
@@ -58,6 +58,8 @@ export function TransactionList({
   orgId,
   loading,
 }: TransactionListProps) {
+  // S03 (shell task): only the account type lines are translated here; the rest of this file moves with the journal zone.
+  const tAccountTypes = useTranslations('common.accountTypes')
   const { can } = useShell()
   const canEdit = can('data.write')
   const [editTx, setEditTx] = useState<Transaction | null>(null)
@@ -173,7 +175,7 @@ export function TransactionList({
                         {/* Second line: the category below md (its column is hidden there), the account type above. */}
                         <span className="block max-w-44 truncate text-xs text-ink-muted md:hidden">{categoryName}</span>
                         <span className="hidden max-w-56 truncate text-xs text-ink-muted md:block">
-                          {account ? ACCOUNT_TYPE_LABELS[account.type] ?? '' : ''}
+                          {account ? tAccountTypes(account.type) : ''}
                         </span>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">

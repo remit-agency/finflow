@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import VerifyEmailBanner from '@/components/auth/VerifyEmailBanner'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -19,6 +20,8 @@ import { isSettingsPath } from '@/lib/shell/settings-sections'
 // Settings are a separate screen (as in Finmap): there the left column holds the settings menu
 // instead of the accounts and the module tabs are hidden; the header stays.
 export function AppShell({ children }: { children: ReactNode }) {
+  const t = useTranslations('shell.frame')
+  const tCommon = useTranslations('common')
   const { orgId, access, drawerOpen, setDrawerOpen } = useShell()
   const inSettings = isSettingsPath(usePathname(), orgId)
 
@@ -49,11 +52,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex min-h-0 flex-1 lg:px-3 lg:pb-3">
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden border-t border-line bg-surface lg:rounded-panel lg:border lg:shadow-panel">
           {inSettings ? (
-            <aside aria-label="Налаштування" className="hidden shrink-0 lg:flex">
+            <aside aria-label={t('settings')} className="hidden shrink-0 lg:flex">
               {granted && <SettingsMenu variant="panel" />}
             </aside>
           ) : (
-            <aside aria-label="Рахунки" className="hidden shrink-0 lg:flex">
+            <aside aria-label={t('accounts')}className="hidden shrink-0 lg:flex">
               {granted && <AccountsSidebar />}
             </aside>
           )}
@@ -75,14 +78,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           showCloseButton={false}
           className="top-0 left-0 flex h-dvh max-h-dvh w-80 max-w-[calc(100%-3rem)] translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-r-panel p-0 duration-200 sm:max-w-[calc(100%-3rem)] lg:hidden data-open:zoom-in-100 data-open:slide-in-from-left data-closed:zoom-out-100 data-closed:slide-out-to-left motion-reduce:data-open:animate-none motion-reduce:data-closed:animate-none"
         >
-          <DialogTitle className="sr-only">Рахунки</DialogTitle>
+          <DialogTitle className="sr-only">{t('accounts')}</DialogTitle>
           {granted && (
             <AccountsSidebar
               variant="drawer"
               onNavigate={() => setDrawerOpen(false)}
               headerAction={
                 // A visible way out besides Esc and the backdrop; Base UI returns focus to «☰».
-                <DialogClose render={<Button variant="ghost" size="icon-sm" aria-label="Закрити" />}>
+                <DialogClose render={<Button variant="ghost" size="icon-sm" aria-label={tCommon('close')} />}>
                   <X />
                 </DialogClose>
               }

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { ArrowLeftRight, Menu, Minus, Plus } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { OrgSwitcher } from '@/components/shell/OrgSwitcher'
@@ -12,6 +13,7 @@ import { cn } from '@/lib/utils'
 // stays as screen-reader text, so the accessible names never change). From 1024 px the header is
 // three columns, as in Finmap: company on the left, the three equal-width CTAs centred, profile right.
 export function AppHeader() {
+  const t = useTranslations('shell.header')
   const { orgId, openTransactionForm, drawerOpen, setDrawerOpen, can, access } = useShell()
   const cta = 'lg:h-10 lg:min-w-32 lg:px-4'
 
@@ -22,7 +24,7 @@ export function AppHeader() {
           variant="ghost"
           size="icon-lg"
           className="lg:hidden"
-          aria-label="Відкрити рахунки"
+          aria-label={t('openAccounts')}
           aria-haspopup="dialog"
           aria-expanded={drawerOpen}
           onClick={() => setDrawerOpen(true)}
@@ -53,11 +55,11 @@ export function AppHeader() {
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 lg:gap-3">
           <Button size="lg" onClick={() => openTransactionForm('income')} className={cn(cta, 'bg-income text-white hover:bg-income/90')}>
             <Plus />
-            <span className="sr-only sm:not-sr-only">Дохід</span>
+            <span className="sr-only sm:not-sr-only">{t('income')}</span>
           </Button>
           <Button size="lg" onClick={() => openTransactionForm('expense')} className={cn(cta, 'bg-expense text-white hover:bg-expense/90')}>
             <Minus />
-            <span className="sr-only sm:not-sr-only">Витрата</span>
+            <span className="sr-only sm:not-sr-only">{t('expense')}</span>
           </Button>
           <Button
             size="lg"
@@ -66,7 +68,7 @@ export function AppHeader() {
             className={cn(cta, 'border-line bg-surface text-ink hover:bg-canvas')}
           >
             <ArrowLeftRight />
-            <span className="sr-only sm:not-sr-only">Переказ</span>
+            <span className="sr-only sm:not-sr-only">{t('transfer')}</span>
           </Button>
         </div>
       ) : (

@@ -9,6 +9,111 @@
     "cancel": "Скасувати",
     "delete": "Видалити",
     "close": "Закрити",
-    "loading": "Завантаження…"
+    "loading": "Завантаження…",
+    "edit": "Редагувати",
+    "toggleTheme": "Переключити тему",
+    "accountTypes": {
+      "bank": "Банківський рахунок",
+      "cash": "Готівка",
+      "card": "Карта",
+      "crypto": "Крипто"
+    }
+  },
+  "roles": {
+    "owner": "Власник",
+    "accountant": "Бухгалтер",
+    "viewer": "Глядач"
+  },
+  "errors": {
+    "signOut": "Не вдалося вийти",
+    "switchOrg": "Не вдалося переключити компанію",
+    "deleteAccount": "Не вдалося видалити рахунок",
+    "loadOrgs": "Не вдалося завантажити компанії"
+  },
+  "shell": {
+    "modules": {
+      "transactions": "Платежі",
+      "analytics": "Аналітика"
+    },
+    "analyticsSections": {
+      "cashflow": "Cash Flow",
+      "pl": "P&L",
+      "balance": "Баланс",
+      "calendar": "Календар"
+    },
+    "settingsSections": {
+      "company": "Компанія",
+      "categories": "Категорії",
+      "banks": "Банки",
+      "subscription": "Підписка"
+    },
+    "nav": {
+      "modules": "Модулі",
+      "analytics": "Розділи аналітики",
+      "settings": "Розділи налаштувань"
+    },
+    "header": {
+      "openAccounts": "Відкрити рахунки",
+      "income": "Дохід",
+      "expense": "Витрата",
+      "transfer": "Переказ"
+    },
+    "frame": {
+      "settings": "Налаштування",
+      "accounts": "Рахунки"
+    },
+    "insufficientRights": {
+      "title": "Недостатньо прав",
+      "body": "Цей розділ доступний лише власнику компанії."
+    },
+    "noAccess": {
+      "deniedTitle": "Немає доступу до цієї компанії",
+      "errorTitle": "Не вдалося перевірити доступ",
+      "deniedBody": "Ця компанія не належить вашому обліковому запису, або її не існує.",
+      "errorBody": "Перевірте з’єднання та спробуйте ще раз.",
+      "toMyCompany": "До моєї компанії",
+      "retry": "Спробувати ще раз",
+      "signOut": "Вийти"
+    },
+    "orgSwitcher": {
+      "company": "Компанія",
+      "yourCompanies": "Ваші компанії",
+      "current": "Поточна компанія"
+    },
+    "profile": {
+      "label": "Профіль",
+      "settings": "Налаштування",
+      "signOut": "Вийти"
+    },
+    "settingsMenu": {
+      "back": "До платежів",
+      "title": "Налаштування"
+    },
+    "accounts": {
+      "expand": "Розгорнути сайдбар",
+      "collapse": "Згорнути сайдбар",
+      "collapsedList": "Рахунки (згорнуто)",
+      "add": "Додати рахунок",
+      "connectBank": "Підключити банк",
+      "openBanking": "Open Banking, бета",
+      "totalIn": "Разом у {currency}",
+      "mine": "Мої рахунки",
+      "all": "Усі рахунки",
+      "none": "Рахунків ще немає",
+      "list": "Список рахунків",
+      "actionsFor": "Дії з рахунком {name}",
+      "confirmDelete": "Видалити рахунок «{name}»?"
+    },
+    "verifyEmail": {
+      "alreadySent": "Лист уже надіслано. Зачекайте хвилину.",
+      "sent": "Лист надіслано",
+      "tooMany": "Забагато спроб. Спробуйте за кілька хвилин.",
+      "sendFailed": "Не вдалося надіслати лист. Спробуйте пізніше.",
+      "short": "Підтвердіть email, щоб підключати банки",
+      "long": "Підтвердіть email <strong>{email}</strong>, щоб підключати банки. Не отримали лист? Надішліть його ще раз.",
+      "sending": "Надсилаємо…",
+      "resendShort": "Надіслати",
+      "resendLong": "Надіслати лист ще раз"
+    }
   }
 }

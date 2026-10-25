@@ -4,11 +4,12 @@ import { can, type Action, type Role } from '@/lib/shell/permissions'
 
 export type SettingsSection = 'company' | 'categories' | 'banks' | 'subscription'
 
-export const SETTINGS_SECTIONS: ReadonlyArray<{ slug: SettingsSection; label: string }> = [
-  { slug: 'company', label: 'Компанія' },
-  { slug: 'categories', label: 'Категорії' },
-  { slug: 'banks', label: 'Банки' },
-  { slug: 'subscription', label: 'Підписка' },
+// The label of a section is `t('shell.settingsSections.<slug>')`.
+export const SETTINGS_SECTIONS: ReadonlyArray<{ slug: SettingsSection }> = [
+  { slug: 'company' },
+  { slug: 'categories' },
+  { slug: 'banks' },
+  { slug: 'subscription' },
 ]
 
 export function settingsPath(orgId: string, section: SettingsSection): string {

@@ -9,6 +9,111 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "close": "Close",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "edit": "Edit",
+    "toggleTheme": "Toggle theme",
+    "accountTypes": {
+      "bank": "Bank account",
+      "cash": "Cash",
+      "card": "Card",
+      "crypto": "Crypto"
+    }
+  },
+  "roles": {
+    "owner": "Owner",
+    "accountant": "Accountant",
+    "viewer": "Viewer"
+  },
+  "errors": {
+    "signOut": "Could not sign out",
+    "switchOrg": "Could not switch company",
+    "deleteAccount": "Could not delete the account",
+    "loadOrgs": "Could not load companies"
+  },
+  "shell": {
+    "modules": {
+      "transactions": "Payments",
+      "analytics": "Analytics"
+    },
+    "analyticsSections": {
+      "cashflow": "Cash Flow",
+      "pl": "Profit & Loss (P&L)",
+      "balance": "Balance",
+      "calendar": "Calendar"
+    },
+    "settingsSections": {
+      "company": "Company",
+      "categories": "Categories",
+      "banks": "Banks",
+      "subscription": "Subscription"
+    },
+    "nav": {
+      "modules": "Modules",
+      "analytics": "Analytics sections",
+      "settings": "Settings sections"
+    },
+    "header": {
+      "openAccounts": "Open accounts",
+      "income": "Income",
+      "expense": "Expense",
+      "transfer": "Transfer"
+    },
+    "frame": {
+      "settings": "Settings",
+      "accounts": "Accounts"
+    },
+    "insufficientRights": {
+      "title": "Insufficient permissions",
+      "body": "This section is available to the company owner only."
+    },
+    "noAccess": {
+      "deniedTitle": "No access to this company",
+      "errorTitle": "Could not verify access",
+      "deniedBody": "This company does not belong to your account, or it does not exist.",
+      "errorBody": "Check your connection and try again.",
+      "toMyCompany": "Go to my company",
+      "retry": "Try again",
+      "signOut": "Sign out"
+    },
+    "orgSwitcher": {
+      "company": "Company",
+      "yourCompanies": "Your companies",
+      "current": "Current company"
+    },
+    "profile": {
+      "label": "Profile",
+      "settings": "Settings",
+      "signOut": "Sign out"
+    },
+    "settingsMenu": {
+      "back": "Back to payments",
+      "title": "Settings"
+    },
+    "accounts": {
+      "expand": "Expand sidebar",
+      "collapse": "Collapse sidebar",
+      "collapsedList": "Accounts (collapsed)",
+      "add": "Add account",
+      "connectBank": "Connect a bank",
+      "openBanking": "Open Banking, beta",
+      "totalIn": "Total in {currency}",
+      "mine": "My accounts",
+      "all": "All accounts",
+      "none": "No accounts yet",
+      "list": "Accounts list",
+      "actionsFor": "Actions for account {name}",
+      "confirmDelete": "Delete account “{name}”?"
+    },
+    "verifyEmail": {
+      "alreadySent": "The email has already been sent. Please wait a minute.",
+      "sent": "Email sent",
+      "tooMany": "Too many attempts. Try again in a few minutes.",
+      "sendFailed": "Could not send the email. Try again later.",
+      "short": "Confirm your email to connect banks",
+      "long": "Confirm your email <strong>{email}</strong> to connect banks. Did not get the email? Send it again.",
+      "sending": "Sending…",
+      "resendShort": "Send",
+      "resendLong": "Send the email again"
+    }
   }
 }
