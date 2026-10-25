@@ -45,6 +45,15 @@
       "invalid": "Перевірте назву компанії та валюту.",
       "network": "Помилка мережі. Перевірте з’єднання та спробуйте ще раз.",
       "server": "Не вдалося створити компанію. Спробуйте ще раз."
+    },
+    "bank": {
+      "connectFailed": "Помилка підключення банку",
+      "notConfirmed": "Підключення не підтверджено",
+      "saveFailed": "Помилка збереження підключення",
+      "loadInstitutions": "Не вдалось завантажити банки",
+      "emailNotVerified": "Підтвердіть email, щоб підключити банк",
+      "connect": "Помилка: {message}",
+      "disconnectFailed": "Помилка відключення банку"
     }
   },
   "auth": {
@@ -283,6 +292,75 @@
       "equipment": "Обладнання",
       "taxes": "Податки",
       "other": "Інше (витрата)"
+    }
+  },
+  "settings": {
+    "title": "Налаштування",
+    "banks": {
+      "title": "Підключення банку",
+      "description": "Santander, PKO, mBank, ING та інші банки через Enable Banking",
+      "connect": "Підключити банк",
+      "redirecting": "Перенаправлення...",
+      "loading": "Завантаження...",
+      "searchPlaceholder": "Пошук банку...",
+      "noneFound": "Банків не знайдено",
+      "connectedOn": "Підключено {date}",
+      "connected": "{name} підключено",
+      "disconnected": "Банк відключено",
+      "defaultInstitution": "Банк",
+      "countries": {
+        "PL": "🇵🇱 Польща",
+        "DE": "🇩🇪 Німеччина",
+        "GB": "🇬🇧 Велика Британія",
+        "FR": "🇫🇷 Франція",
+        "NL": "🇳🇱 Нідерланди",
+        "LT": "🇱🇹 Литва",
+        "UA": "🇺🇦 Україна"
+      }
+    },
+    "categories": {
+      "title": "Категорії",
+      "description": "Доходи та витрати",
+      "income": "Доходи",
+      "expense": "Витрати",
+      "none": "Немає категорій",
+      "addTitle": "Додати категорію",
+      "nameLabel": "Назва категорії",
+      "typeLabel": "Тип категорії",
+      "typeIncome": "Дохід",
+      "typeExpense": "Витрата",
+      "colorLabel": "Колір {color}",
+      "deleteLabel": "Видалити категорію {name}",
+      "submit": "Додати",
+      "added": "Категорію додано",
+      "deleted": "Видалено",
+      "failed": "Помилка"
+    },
+    "company": {
+      "title": "Компанія",
+      "description": "Назва та валюта",
+      "nameLabel": "Назва",
+      "currencyLabel": "Валюта",
+      "saving": "Збереження...",
+      "saved": "Збережено",
+      "saveFailed": "Помилка збереження",
+      "ownerOnly": "Змінювати дані компанії може лише власник.",
+      "currencies": {
+        "UAH": "UAH — українська гривня",
+        "EUR": "EUR — євро",
+        "USD": "USD — долар США",
+        "PLN": "PLN — польський злотий"
+      }
+    },
+    "subscription": {
+      "title": "Підписка",
+      "plans": {
+        "trial": "trial plan",
+        "pro": "pro plan",
+        "free": "free plan"
+      },
+      "trialUntil": "Trial до {date}",
+      "upgrade": "Upgrade to Pro"
     }
   }
 }

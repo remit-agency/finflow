@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { doc, updateDoc } from 'firebase/firestore'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -13,14 +14,12 @@ import { useOrg } from '@/lib/hooks/useOrg'
 import { useShell } from '@/lib/hooks/useShell'
 import { db } from '@/lib/firebase/firebase'
 
-const CURRENCIES = [
-  { value: 'UAH', label: 'UAH — Ukrainian Hryvnia' },
-  { value: 'EUR', label: 'EUR — Euro' },
-  { value: 'USD', label: 'USD — US Dollar' },
-  { value: 'PLN', label: 'PLN — Polish Zloty' },
-]
+// Codes only; the labels live in the catalogs (settings.company.currencies.<code>).
+const CURRENCIES = ['UAH', 'EUR', 'USD', 'PLN'] as const
 
 export default function CompanySettingsPage() {
+  const t = useTranslations('settings.company')
+  const tCommon = useTranslations('common')
   const params = useParams()
   const orgId = params.orgSlug as string
   // The shell's org is always the URL's org; switchOrg only refreshes it after a save.
@@ -49,11 +48,11 @@ export default function CompanySettingsPage() {
     try {
       await updateDoc(doc(db, 'organizations', orgId), { name: trimmedName, currency })
     } catch {
-      toast.error('Помилка збереження')
+      toast.error(t('saveFailed'))
       setSaving(false)
       return
     }
-    toast.success('Збережено')
+    toast.success(t('saved'))
     // Reload the org so the header and the sidebar total show the new name and currency.
     // The save already succeeded, so a failed refresh must not be reported as a failed save.
     try {
@@ -69,13 +68,13 @@ export default function CompanySettingsPage() {
   return (
     <Card className="ring-line">
       <CardHeader>
-        <CardTitle className="text-base font-semibold text-ink">Компанія</CardTitle>
-        <CardDescription className="text-ink-muted">Назва та валюта</CardDescription>
+        <CardTitle className="text-base font-semibold text-ink">{t('title')}</CardTitle>
+        <CardDescription className="text-ink-muted">{t('description')}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSave} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="orgName" className="text-ink">Назва</Label>
+            <Label htmlFor="orgName" className="text-ink">{t('nameLabel')}</Label>
             <Input
               id="orgName"
               value={name}
@@ -87,7 +86,7 @@ export default function CompanySettingsPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="currency" className="text-ink">Валюта</Label>
+            <Label htmlFor="currency" className="text-ink">{t('currencyLabel')}</Label>
             <NativeSelect
               id="currency"
               value={currency}
@@ -96,17 +95,17 @@ export default function CompanySettingsPage() {
               className="border-line"
               disabled={!canEdit}
             >
-              {CURRENCIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
+              {CURRENCIES.map((code) => (
+                <option key={code} value={code}>{t(`currencies.${code}`)}</option>
               ))}
             </NativeSelect>
           </div>
           {canEdit ? (
             <Button type="submit" size="lg" disabled={!isChanged || saving}>
-              {saving ? 'Збереження...' : 'Зберегти'}
+              {saving ? t('saving') : tCommon('save')}
             </Button>
           ) : (
-            <p className="text-xs text-ink-muted">Змінювати дані компанії може лише власник.</p>
+            <p className="text-xs text-ink-muted">{t('ownerOnly')}</p>
           )}
         </form>
       </CardContent>

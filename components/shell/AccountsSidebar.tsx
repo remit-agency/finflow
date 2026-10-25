@@ -63,6 +63,9 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
   // Only accounts in the company currency; other currencies are not mentioned before S04.
   // Not before both the org and the accounts are loaded: an empty list would show a false 0,00.
   const summary = org && !accountsLoading ? summarizeAccounts(accounts, org.currency) : null
+  // An account document without a currency must not break the whole list (Intl throws on a missing
+  // currency code): its balance is shown in the company currency, like a legacy document would.
+  const accountMoney = (account: Account) => money(account.balance, account.currency || org?.currency || 'PLN')
 
   const choose = (accountId: string | null) => {
     selectAccount(accountId)
@@ -111,7 +114,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
                   onClick={() => choose(selected ? null : account.id)}
                   aria-pressed={selected}
                   aria-label={account.name}
-                  title={`${account.name}: ${money(account.balance, account.currency)}`}
+                  title={`${account.name}: ${accountMoney(account)}`}
                   className={cn(
                     'flex size-9 items-center justify-center rounded-control transition-colors hover:bg-canvas focus-visible:outline-2 focus-visible:outline-brand-soft-foreground',
                     selected && 'bg-brand-soft',
@@ -234,7 +237,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
                     <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: account.color }} />
                     <span className="min-w-0 flex-1 truncate">{account.name}</span>
                     <span className={cn('shrink-0 text-xs tabular-nums', account.balance < 0 ? 'text-expense' : 'text-ink-muted')}>
-                      {money(account.balance, account.currency)}
+                      {accountMoney(account)}
                     </span>
                   </button>
                   {canWrite && (

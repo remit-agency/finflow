@@ -45,6 +45,15 @@
       "invalid": "Please check the company name and currency.",
       "network": "Network error. Check your connection and try again.",
       "server": "Could not create the company. Please try again."
+    },
+    "bank": {
+      "connectFailed": "Could not connect the bank",
+      "notConfirmed": "The connection was not confirmed",
+      "saveFailed": "Could not save the connection",
+      "loadInstitutions": "Could not load the banks",
+      "emailNotVerified": "Verify your email to connect a bank",
+      "connect": "Error: {message}",
+      "disconnectFailed": "Could not disconnect the bank"
     }
   },
   "auth": {
@@ -283,6 +292,75 @@
       "equipment": "Equipment",
       "taxes": "Taxes",
       "other": "Other (expense)"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "banks": {
+      "title": "Bank connection",
+      "description": "Santander, PKO, mBank, ING and other banks through Enable Banking",
+      "connect": "Connect a bank",
+      "redirecting": "Redirecting...",
+      "loading": "Loading...",
+      "searchPlaceholder": "Search for a bank...",
+      "noneFound": "No banks found",
+      "connectedOn": "Connected {date}",
+      "connected": "{name} connected",
+      "disconnected": "Bank disconnected",
+      "defaultInstitution": "Bank",
+      "countries": {
+        "PL": "🇵🇱 Poland",
+        "DE": "🇩🇪 Germany",
+        "GB": "🇬🇧 United Kingdom",
+        "FR": "🇫🇷 France",
+        "NL": "🇳🇱 Netherlands",
+        "LT": "🇱🇹 Lithuania",
+        "UA": "🇺🇦 Ukraine"
+      }
+    },
+    "categories": {
+      "title": "Categories",
+      "description": "Income and expenses",
+      "income": "Income",
+      "expense": "Expenses",
+      "none": "No categories",
+      "addTitle": "Add a category",
+      "nameLabel": "Category name",
+      "typeLabel": "Category type",
+      "typeIncome": "Income",
+      "typeExpense": "Expense",
+      "colorLabel": "Color {color}",
+      "deleteLabel": "Delete category {name}",
+      "submit": "Add",
+      "added": "Category added",
+      "deleted": "Deleted",
+      "failed": "Error"
+    },
+    "company": {
+      "title": "Company",
+      "description": "Name and currency",
+      "nameLabel": "Name",
+      "currencyLabel": "Currency",
+      "saving": "Saving...",
+      "saved": "Saved",
+      "saveFailed": "Could not save",
+      "ownerOnly": "Only the owner can change the company details.",
+      "currencies": {
+        "UAH": "UAH — Ukrainian Hryvnia",
+        "EUR": "EUR — Euro",
+        "USD": "USD — US Dollar",
+        "PLN": "PLN — Polish Zloty"
+      }
+    },
+    "subscription": {
+      "title": "Subscription",
+      "plans": {
+        "trial": "trial plan",
+        "pro": "pro plan",
+        "free": "free plan"
+      },
+      "trialUntil": "Trial until {date}",
+      "upgrade": "Upgrade to Pro"
     }
   }
 }

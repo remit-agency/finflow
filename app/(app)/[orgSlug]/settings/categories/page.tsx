@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { doc, deleteDoc } from 'firebase/firestore'
 import { toast } from 'sonner'
 import { Plus, Trash2 } from 'lucide-react'
@@ -24,6 +25,7 @@ const CATEGORY_COLORS = [
 ]
 
 export default function CategoriesSettingsPage() {
+  const t = useTranslations('settings.categories')
   const params = useParams()
   const orgId = params.orgSlug as string
   const { incomeCategories, expenseCategories, can } = useShell()
@@ -41,9 +43,9 @@ export default function CategoriesSettingsPage() {
     try {
       await createCategory(orgId, { name: newCatName.trim(), type: newCatType, color: newCatColor })
       setNewCatName('')
-      toast.success('Категорію додано')
+      toast.success(t('added'))
     } catch {
-      toast.error('Помилка')
+      toast.error(t('failed'))
     } finally {
       setAddingCat(false)
     }
@@ -52,27 +54,27 @@ export default function CategoriesSettingsPage() {
   const handleDeleteCategory = async (cat: Category) => {
     try {
       await deleteDoc(doc(db, 'organizations', orgId, 'categories', cat.id))
-      toast.success('Видалено')
+      toast.success(t('deleted'))
     } catch {
-      toast.error('Помилка')
+      toast.error(t('failed'))
     }
   }
 
   return (
     <Card className="ring-line">
       <CardHeader>
-        <CardTitle className="text-base font-semibold text-ink">Категорії</CardTitle>
-        <CardDescription className="text-ink-muted">Доходи та витрати</CardDescription>
+        <CardTitle className="text-base font-semibold text-ink">{t('title')}</CardTitle>
+        <CardDescription className="text-ink-muted">{t('description')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {[
-          { label: 'Доходи', cats: incomeCategories },
-          { label: 'Витрати', cats: expenseCategories },
-        ].map(({ label, cats }) => (
-          <div key={label}>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</p>
+          { type: 'income' as const, cats: incomeCategories },
+          { type: 'expense' as const, cats: expenseCategories },
+        ].map(({ type, cats }) => (
+          <div key={type}>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t(type)}</p>
             {cats.length === 0 ? (
-              <p className="text-sm italic text-ink-subtle">Немає категорій</p>
+              <p className="text-sm italic text-ink-subtle">{t('none')}</p>
             ) : (
               <div className="space-y-1">
                 {cats.map((cat) => (
@@ -83,7 +85,7 @@ export default function CategoriesSettingsPage() {
                       <button
                         type="button"
                         onClick={() => handleDeleteCategory(cat)}
-                        aria-label={`Видалити категорію ${cat.name}`}
+                        aria-label={t('deleteLabel', { name: cat.name })}
                         className="text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:text-expense focus-visible:opacity-100"
                       >
                         <Trash2 className="size-3.5" />
@@ -98,24 +100,24 @@ export default function CategoriesSettingsPage() {
 
         {canEdit && (
         <div className="border-t border-line pt-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Додати категорію</p>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t('addTitle')}</p>
           <form onSubmit={handleAddCategory} className="space-y-3">
             <div className="flex gap-2">
               <Input
                 value={newCatName}
                 onChange={(e) => setNewCatName(e.target.value)}
-                placeholder="Назва категорії"
-                aria-label="Назва категорії"
+                placeholder={t('nameLabel')}
+                aria-label={t('nameLabel')}
                 className="h-9 flex-1 rounded-control border-line bg-surface"
               />
               <NativeSelect
                 value={newCatType}
                 onChange={(e) => setNewCatType(e.target.value as 'income' | 'expense')}
-                aria-label="Тип категорії"
+                aria-label={t('typeLabel')}
                 className="border-line"
               >
-                <option value="income">Дохід</option>
-                <option value="expense">Витрата</option>
+                <option value="income">{t('typeIncome')}</option>
+                <option value="expense">{t('typeExpense')}</option>
               </NativeSelect>
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -124,7 +126,7 @@ export default function CategoriesSettingsPage() {
                   key={c}
                   type="button"
                   onClick={() => setNewCatColor(c)}
-                  aria-label={`Колір ${c}`}
+                  aria-label={t('colorLabel', { color: c })}
                   aria-pressed={newCatColor === c}
                   className={cn(
                     'size-5 rounded-full border-2 transition-transform',
@@ -136,7 +138,7 @@ export default function CategoriesSettingsPage() {
             </div>
             <Button type="submit" disabled={!newCatName.trim() || addingCat}>
               <Plus className="mr-1 size-3.5" />
-              Додати
+              {t('submit')}
             </Button>
           </form>
         </div>

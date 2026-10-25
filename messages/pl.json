@@ -45,6 +45,15 @@
       "invalid": "Sprawdź nazwę firmy i walutę.",
       "network": "Błąd sieci. Sprawdź połączenie i spróbuj ponownie.",
       "server": "Nie udało się utworzyć firmy. Spróbuj ponownie."
+    },
+    "bank": {
+      "connectFailed": "Nie udało się połączyć z bankiem",
+      "notConfirmed": "Połączenie nie zostało potwierdzone",
+      "saveFailed": "Nie udało się zapisać połączenia",
+      "loadInstitutions": "Nie udało się załadować banków",
+      "emailNotVerified": "Potwierdź adres e-mail, aby połączyć bank",
+      "connect": "Błąd: {message}",
+      "disconnectFailed": "Nie udało się rozłączyć banku"
     }
   },
   "auth": {
@@ -283,6 +292,75 @@
       "equipment": "Sprzęt",
       "taxes": "Podatki",
       "other": "Inne (wydatek)"
+    }
+  },
+  "settings": {
+    "title": "Ustawienia",
+    "banks": {
+      "title": "Połączenie z bankiem",
+      "description": "Santander, PKO, mBank, ING i inne banki przez Enable Banking",
+      "connect": "Połącz bank",
+      "redirecting": "Przekierowanie...",
+      "loading": "Ładowanie...",
+      "searchPlaceholder": "Szukaj banku...",
+      "noneFound": "Nie znaleziono banków",
+      "connectedOn": "Połączono {date}",
+      "connected": "Połączono z bankiem {name}",
+      "disconnected": "Bank został rozłączony",
+      "defaultInstitution": "Bank",
+      "countries": {
+        "PL": "🇵🇱 Polska",
+        "DE": "🇩🇪 Niemcy",
+        "GB": "🇬🇧 Wielka Brytania",
+        "FR": "🇫🇷 Francja",
+        "NL": "🇳🇱 Holandia",
+        "LT": "🇱🇹 Litwa",
+        "UA": "🇺🇦 Ukraina"
+      }
+    },
+    "categories": {
+      "title": "Kategorie",
+      "description": "Wpływy i wydatki",
+      "income": "Wpływy",
+      "expense": "Wydatki",
+      "none": "Brak kategorii",
+      "addTitle": "Dodaj kategorię",
+      "nameLabel": "Nazwa kategorii",
+      "typeLabel": "Typ kategorii",
+      "typeIncome": "Wpływ",
+      "typeExpense": "Wydatek",
+      "colorLabel": "Kolor {color}",
+      "deleteLabel": "Usuń kategorię {name}",
+      "submit": "Dodaj",
+      "added": "Kategoria została dodana",
+      "deleted": "Usunięto",
+      "failed": "Błąd"
+    },
+    "company": {
+      "title": "Firma",
+      "description": "Nazwa i waluta",
+      "nameLabel": "Nazwa",
+      "currencyLabel": "Waluta",
+      "saving": "Zapisywanie...",
+      "saved": "Zapisano",
+      "saveFailed": "Nie udało się zapisać",
+      "ownerOnly": "Dane firmy może zmieniać tylko właściciel.",
+      "currencies": {
+        "UAH": "UAH — hrywna ukraińska",
+        "EUR": "EUR — euro",
+        "USD": "USD — dolar amerykański",
+        "PLN": "PLN — złoty polski"
+      }
+    },
+    "subscription": {
+      "title": "Subskrypcja",
+      "plans": {
+        "trial": "plan próbny",
+        "pro": "plan Pro",
+        "free": "plan darmowy"
+      },
+      "trialUntil": "Okres próbny do {date}",
+      "upgrade": "Przejdź na Pro"
     }
   }
 }
