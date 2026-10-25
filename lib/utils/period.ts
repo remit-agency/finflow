@@ -1,18 +1,20 @@
 /**
  * The report period filter (S01A, Finmap ergonomics): presets, their inclusive date ranges, the
- * labels of the menu and the pill, and a slug for file names. Pure, unit-tested.
+ * pill text of a custom range, and a slug for file names. Pure, unit-tested. The names of the
+ * presets live in the message catalogs (`periods.<preset>`).
  *
  * Calendar maths run in UTC, like the app's day grouping (lib/utils/date.ts `toDateKey`): a range
  * starts at 00:00:00.000 UTC of its first day and ends at 23:59:59.999 UTC of its last day, and
- * "today" is the UTC day of `now`. Weeks start on Monday (Poland). Europe/Warsaw handling arrives
- * with S03 (the company time zone).
+ * "today" is the UTC day of `now`. Weeks start on Monday (Poland). Today is Warsaw's date: callers
+ * pass `todayUtcDay()` (lib/utils/today.ts) as `now`; stored days and ranges stay UTC days.
  */
+import { formatDate } from '../i18n/format'
+import type { Locale } from '../i18n/config'
 import {
   addDaysUtc,
   dayKeyUtc,
   daysInMonthUtc,
   endOfDayUtc,
-  formatDateUtc,
   startOfDayUtc,
   startOfWeekUtc,
   utcDay,
@@ -55,20 +57,6 @@ export const REPORT_PERIOD_PRESETS: readonly PeriodPreset[] = [
 
 export const DEFAULT_REPORT_PERIOD: PeriodSelection = { preset: 'currentYear' }
 
-export const PERIOD_LABELS: Record<PeriodPreset, string> = {
-  currentYear: 'На поточний рік',
-  prevYear: 'За попередній рік',
-  currentWeek: 'За поточний тиждень',
-  prevWeek: 'За останній тиждень',
-  currentMonth: 'За поточний місяць',
-  prevMonth: 'За останній місяць',
-  allTime: 'Весь час',
-  custom: 'Обрати дати',
-}
-
-/** Header of the period menu. */
-export const PERIOD_MENU_HEADER = 'ЗА ДАТОЮ ОПЕРАЦІЇ'
-
 function inclusive(firstDay: Date, lastDay: Date): { start: Date; end: Date } {
   return { start: startOfDayUtc(firstDay), end: endOfDayUtc(lastDay) }
 }
@@ -108,13 +96,26 @@ export function resolvePeriod(selection: PeriodSelection, now: Date): PeriodRang
   }
 }
 
-/** The pill label: the preset label, or «12.03.2026 – 18.04.2026» for a custom range. */
-export function formatPeriodLabel(selection: PeriodSelection): string {
+/** «12.03.2026» (day, month, year in the UI language) of a UTC day. */
+export function formatPeriodDay(date: Date, locale: Locale): string {
+  return formatDate(date, locale, { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+/**
+ * The pill label: «12.03.2026 – 18.04.2026» for a custom range (ordered, UTC days), otherwise
+ * the name of the preset from `presetLabel` (the component passes `t`; the default is the preset
+ * id). `locale` defaults to Ukrainian only for the Ukrainian e2e helpers; the app passes the UI language.
+ */
+export function formatPeriodLabel(
+  selection: PeriodSelection,
+  locale: Locale = 'uk',
+  presetLabel: (preset: PeriodPreset) => string = (preset) => preset,
+): string {
   if (selection.preset === 'custom' && selection.start && selection.end) {
     const range = resolvePeriod(selection, selection.start)
-    return `${formatDateUtc(range.start!)} – ${formatDateUtc(range.end!)}`
+    return `${formatPeriodDay(range.start!, locale)} – ${formatPeriodDay(range.end!, locale)}`
   }
-  return PERIOD_LABELS[selection.preset]
+  return presetLabel(selection.preset)
 }
 
 const PRESET_SLUGS: Record<Exclude<PeriodPreset, 'custom'>, string> = {

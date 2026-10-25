@@ -1,23 +1,23 @@
 "use client"
 
 // FinFlow (S01A): hand-written date range picker (no dependency). One month, Monday first,
-// Ukrainian names; the first click sets the start, the second the end (with a hover/focus preview
-// in between), «Застосувати» hands the range over. Dates are UTC calendar days (00:00 UTC), like
-// the app's day grouping; the helpers live in lib/utils/calendar-grid.ts (unit-tested).
+// month and weekday names from Intl in the UI language; the first click sets the start, the second
+// the end (with a hover/focus preview in between), the apply button hands the range over. Dates
+// are UTC calendar days (00:00 UTC), like the app's day grouping; the helpers live in
+// lib/utils/calendar-grid.ts (unit-tested).
 // Keyboard: the grid is one Tab stop (roving tabindex); arrows move by a day / a week, Home/End to
 // the start/end of the week, PageUp/PageDown by a month (Shift: by a year), Enter/Space choose.
 import * as React from "react"
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 import { Button } from "@/components/ui/button"
+import { useFormatters } from "@/lib/i18n/useFormatters"
 import { cn } from "@/lib/utils"
 import {
-  UA_WEEKDAYS_FULL,
-  UA_WEEKDAYS_SHORT,
   addDaysUtc,
   addMonthsUtc,
   buildMonthGrid,
-  formatDateUtc,
   formatDayLongUtc,
   formatMonthTitle,
   isDayBetweenUtc,
@@ -27,15 +27,17 @@ import {
   startOfDayUtc,
   startOfWeekUtc,
   utcDay,
+  weekdayHeaders,
   weekdayMonFirst,
   type YearMonth,
 } from "@/lib/utils/calendar-grid"
+import { formatPeriodDay } from "@/lib/utils/period"
 
 export interface DateRangePickerProps {
   /** The range to start from (a custom period being edited), any time of day. */
   initialStart?: Date | null
   initialEnd?: Date | null
-  /** "Today" (its UTC day is marked and shown first when there is no initial range). */
+  /** "Today", Warsaw's date (`todayUtcDay()`); its UTC day is marked and shown first when there is no initial range. */
   today: Date
   onApply: (start: Date, end: Date) => void
   onCancel: () => void
@@ -57,6 +59,10 @@ function DateRangePicker({
   focusTargetRef,
   className,
 }: DateRangePickerProps) {
+  const t = useTranslations("periods.picker")
+  const tCommon = useTranslations("common")
+  const { locale } = useFormatters()
+  const headers = React.useMemo(() => weekdayHeaders(locale), [locale])
   const titleId = React.useId()
   const statusId = React.useId()
   const todayDay = startOfDayUtc(today)
@@ -132,28 +138,28 @@ function DateRangePicker({
   }
 
   const status = !start
-    ? "Оберіть першу дату"
+    ? t("chooseFirst")
     : !end
-      ? `Початок: ${formatDateUtc(start)}. Оберіть другу дату`
-      : `${formatDateUtc(start)} – ${formatDateUtc(end)}`
+      ? t("startChosen", { date: formatPeriodDay(start, locale) })
+      : `${formatPeriodDay(start, locale)} – ${formatPeriodDay(end, locale)}`
 
   return (
     <div data-slot="date-range-picker" className={cn("flex flex-col gap-3", className)}>
       <div className="flex items-center justify-between gap-2">
         <button
           type="button"
-          aria-label="Попередній місяць"
+          aria-label={t("prevMonth")}
           onClick={() => showMonth(-1)}
           className="inline-flex size-11 items-center justify-center rounded-control text-ink-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-2 focus-visible:outline-brand-soft-foreground sm:size-9"
         >
           <ChevronLeftIcon className="size-5" aria-hidden />
         </button>
         <h2 id={titleId} aria-live="polite" className="text-[15px] font-semibold text-ink">
-          {formatMonthTitle(visible)}
+          {formatMonthTitle(visible, locale)}
         </h2>
         <button
           type="button"
-          aria-label="Наступний місяць"
+          aria-label={t("nextMonth")}
           onClick={() => showMonth(1)}
           className="inline-flex size-11 items-center justify-center rounded-control text-ink-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-2 focus-visible:outline-brand-soft-foreground sm:size-9"
         >
@@ -171,11 +177,11 @@ function DateRangePicker({
       >
         <thead>
           <tr>
-            {UA_WEEKDAYS_SHORT.map((short, i) => (
+            {headers.map(({ short, full }, i) => (
               <th
-                key={short}
+                key={i}
                 scope="col"
-                abbr={UA_WEEKDAYS_FULL[i]}
+                abbr={full}
                 className="h-8 w-11 text-center text-xs font-semibold text-ink-muted sm:w-10"
               >
                 {short}
@@ -213,7 +219,7 @@ function DateRangePicker({
                       ref={isTabStop ? focusTargetRef : undefined}
                       type="button"
                       tabIndex={isTabStop ? 0 : -1}
-                      aria-label={formatDayLongUtc(date)}
+                      aria-label={formatDayLongUtc(date, locale)}
                       aria-current={isToday ? "date" : undefined}
                       onClick={() => choose(date)}
                       onKeyDown={(e) => onDayKeyDown(e, date)}
@@ -245,7 +251,7 @@ function DateRangePicker({
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" className="h-11 px-4 text-sm sm:h-10" onClick={onCancel}>
-          Скасувати
+          {tCommon("cancel")}
         </Button>
         <Button
           type="button"
@@ -255,7 +261,7 @@ function DateRangePicker({
             if (start && end) onApply(start, end)
           }}
         >
-          Застосувати
+          {t("apply")}
         </Button>
       </div>
     </div>

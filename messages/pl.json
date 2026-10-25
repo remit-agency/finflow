@@ -412,6 +412,25 @@
       }
     }
   },
+  "periods": {
+    "menuHeader": "WG DATY OPERACJI",
+    "srLabel": "Okres: ",
+    "currentYear": "Na bieżący rok",
+    "prevYear": "Za poprzedni rok",
+    "currentWeek": "Za bieżący tydzień",
+    "prevWeek": "Za ostatni tydzień",
+    "currentMonth": "Za bieżący miesiąc",
+    "prevMonth": "Za ostatni miesiąc",
+    "allTime": "Cały czas",
+    "custom": "Wybierz daty",
+    "picker": {
+      "prevMonth": "Poprzedni miesiąc",
+      "nextMonth": "Następny miesiąc",
+      "chooseFirst": "Wybierz pierwszą datę",
+      "startChosen": "Początek: {date}. Wybierz drugą datę",
+      "apply": "Zastosuj"
+    }
+  },
   "charts": {
     "loading": "Ładowanie...",
     "noData": "Brak danych za ten okres",

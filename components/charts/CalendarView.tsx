@@ -10,6 +10,7 @@ import { useTranslations } from 'next-intl'
 import { useShell } from '@/lib/hooks/useShell'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { TOKEN_COLORS } from '@/lib/ui/colors'
+import { todayUtcDay } from '@/lib/utils/today'
 
 interface CalendarViewProps {
   transactions: Transaction[]
@@ -63,7 +64,7 @@ function DayRow({ day, dayNum, year, month, transactions, currency }: DayRowProp
   const dayDate = new Date(Date.UTC(year, month, dayNum))
   const dow = capitalize(weekday(dayDate, 'short'))
   const isWeekend = dayDate.getUTCDay() === 0 || dayDate.getUTCDay() === 6
-  const isToday = day.date === new Date().toISOString().slice(0, 10)
+  const isToday = day.date === todayUtcDay().toISOString().slice(0, 10)
 
   return (
     <>

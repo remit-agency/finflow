@@ -8,6 +8,7 @@ import { useShell } from '@/lib/hooks/useShell'
 import { buildPL } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
 import { DEFAULT_REPORT_PERIOD, periodSlug, resolvePeriod, type PeriodSelection } from '@/lib/utils/period'
+import { todayUtcDay } from '@/lib/utils/today'
 import PLTable from '@/components/charts/PLTable'
 import PLSummaryCharts from '@/components/charts/PLSummaryCharts'
 import { ReportToolbar } from '@/components/analytics/ReportToolbar'
@@ -23,8 +24,8 @@ export default function PLPage() {
   const { incomeCategories, expenseCategories, categoriesLoading: catLoading } = useShell()
   const categories = [...incomeCategories, ...expenseCategories]
   const [period, setPeriod] = useState<PeriodSelection>(DEFAULT_REPORT_PERIOD)
-  // The browser clock, read once per visit (presets resolve against it).
-  const [now] = useState(() => new Date())
+  // Warsaw's date, read once per visit (presets resolve against it).
+  const [now] = useState(() => todayUtcDay())
 
   const loading = txLoading || catLoading
 

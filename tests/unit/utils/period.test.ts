@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_REPORT_PERIOD,
-  PERIOD_LABELS,
-  PERIOD_MENU_HEADER,
   REPORT_PERIOD_PRESETS,
   formatPeriodLabel,
   periodSlug,
   resolvePeriod,
   type PeriodSelection,
 } from '@/lib/utils/period'
+import { todayUtcDay } from '@/lib/utils/today'
+import uk from '@/messages/uk.json'
+import pl from '@/messages/pl.json'
+import en from '@/messages/en.json'
 
 const at = (iso: string) => new Date(iso)
 /** The range as ISO strings, to compare exact boundaries. */
@@ -131,7 +133,25 @@ describe('resolvePeriod', () => {
 
 describe('labels', () => {
   it('reports menu: six presets plus custom, no all-time; the default is the current year', () => {
-    expect(REPORT_PERIOD_PRESETS.map((p) => PERIOD_LABELS[p])).toEqual([
+    expect(REPORT_PERIOD_PRESETS).toEqual([
+      'currentYear',
+      'prevYear',
+      'currentWeek',
+      'prevWeek',
+      'currentMonth',
+      'prevMonth',
+      'custom',
+    ])
+    expect(REPORT_PERIOD_PRESETS).not.toContain('allTime')
+    expect(DEFAULT_REPORT_PERIOD).toEqual({ preset: 'currentYear' })
+  })
+
+  it('every preset has a name in every catalog, the Ukrainian ones unchanged', () => {
+    const presets = [...REPORT_PERIOD_PRESETS, 'allTime'] as const
+    for (const catalog of [uk, pl, en]) {
+      for (const preset of presets) expect(catalog.periods[preset]).toBeTruthy()
+    }
+    expect(REPORT_PERIOD_PRESETS.map((p) => uk.periods[p])).toEqual([
       'На поточний рік',
       'За попередній рік',
       'За поточний тиждень',
@@ -140,21 +160,44 @@ describe('labels', () => {
       'За останній місяць',
       'Обрати дати',
     ])
-    expect(REPORT_PERIOD_PRESETS).not.toContain('allTime')
-    expect(PERIOD_LABELS.allTime).toBe('Весь час')
-    expect(PERIOD_MENU_HEADER).toBe('ЗА ДАТОЮ ОПЕРАЦІЇ')
-    expect(DEFAULT_REPORT_PERIOD).toEqual({ preset: 'currentYear' })
+    expect(uk.periods.allTime).toBe('Весь час')
+    expect(uk.periods.menuHeader).toBe('ЗА ДАТОЮ ОПЕРАЦІЇ')
   })
 
-  it('a preset shows its label', () => {
-    expect(formatPeriodLabel({ preset: 'currentYear' })).toBe('На поточний рік')
-    expect(formatPeriodLabel({ preset: 'prevMonth' })).toBe('За останній місяць')
+  it('a preset shows the name the caller gives it', () => {
+    expect(formatPeriodLabel({ preset: 'currentYear' }, 'uk', (p) => uk.periods[p])).toBe('На поточний рік')
+    expect(formatPeriodLabel({ preset: 'prevMonth' }, 'pl', (p) => pl.periods[p])).toBe('Za ostatni miesiąc')
+    expect(formatPeriodLabel({ preset: 'allTime' }, 'en', (p) => en.periods[p])).toBe('All time')
   })
 
-  it('a custom range shows its UTC days, ordered', () => {
-    expect(
-      formatPeriodLabel({ preset: 'custom', start: at('2026-04-18T23:30:00Z'), end: at('2026-03-12T00:00:00Z') }),
-    ).toBe('12.03.2026 – 18.04.2026')
+  it('a custom range shows its UTC days, ordered, in the UI language', () => {
+    const selection: PeriodSelection = {
+      preset: 'custom',
+      start: at('2026-04-18T23:30:00Z'),
+      end: at('2026-03-12T00:00:00Z'),
+    }
+    expect(formatPeriodLabel(selection, 'uk')).toBe('12.03.2026 – 18.04.2026')
+    expect(formatPeriodLabel(selection, 'pl')).toBe('12.03.2026 – 18.04.2026')
+    expect(formatPeriodLabel(selection, 'en')).toBe('12/03/2026 – 18/04/2026')
+  })
+})
+
+describe('Warsaw today', () => {
+  it('currentMonth computed from the Warsaw day of 31 Jan 23:30 UTC is February 2026', () => {
+    const now = todayUtcDay(at('2026-01-31T23:30:00Z'))
+    expect(iso({ preset: 'currentMonth' }, now)).toEqual({
+      start: '2026-02-01T00:00:00.000Z',
+      end: '2026-02-28T23:59:59.999Z',
+    })
+    // The UTC day of the same instant is still January.
+    expect(iso({ preset: 'currentMonth' }, at('2026-01-31T23:30:00Z')).start).toBe('2026-01-01T00:00:00.000Z')
+  })
+
+  it('currentYear and currentWeek follow the Warsaw day across New Year', () => {
+    const now = todayUtcDay(at('2026-12-31T23:30:00Z'))
+    expect(iso({ preset: 'currentYear' }, now).start).toBe('2027-01-01T00:00:00.000Z')
+    // 1 Jan 2027 is a Friday: the week starts on Monday 28 Dec 2026.
+    expect(iso({ preset: 'currentWeek' }, now).start).toBe('2026-12-28T00:00:00.000Z')
   })
 })
 

@@ -6,12 +6,12 @@ import {
   dayKeyUtc,
   daysInMonthUtc,
   endOfDayUtc,
-  formatDateUtc,
   formatDayLongUtc,
   formatMonthTitle,
   isDayBetweenUtc,
   shiftMonth,
   startOfWeekUtc,
+  weekdayHeaders,
   weekdayMonFirst,
 } from '@/lib/utils/calendar-grid'
 
@@ -80,9 +80,35 @@ describe('day maths (UTC)', () => {
     expect(isDayBetweenUtc(d('2026-10-13'), d('2026-10-12'), d('2026-10-09'))).toBe(false)
   })
 
-  it('formats in Ukrainian from the UTC day', () => {
-    expect(formatDateUtc(new Date('2026-03-12T23:59:00Z'))).toBe('12.03.2026')
+  it('formats in Ukrainian from the UTC day (the default language)', () => {
     expect(formatDayLongUtc(d('2026-10-09'))).toBe('9 жовтня 2026')
+    expect(formatDayLongUtc(d('2026-10-09'), 'uk')).toBe('9 жовтня 2026')
     expect(formatMonthTitle({ year: 2026, month: 9 })).toBe('Жовтень 2026')
+    expect(formatDayLongUtc(new Date('2026-03-12T23:59:00Z'), 'uk')).toBe('12 березня 2026')
+  })
+
+  it('formats in Polish and English', () => {
+    expect(formatDayLongUtc(d('2026-10-09'), 'pl')).toBe('9 października 2026')
+    expect(formatMonthTitle({ year: 2026, month: 9 }, 'pl')).toBe('Październik 2026')
+    expect(formatDayLongUtc(d('2026-10-09'), 'en')).toBe('9 October 2026')
+    expect(formatMonthTitle({ year: 2026, month: 9 }, 'en')).toBe('October 2026')
+  })
+})
+
+describe('weekdayHeaders', () => {
+  it('Monday first, capitalised short names and full names', () => {
+    const uk = weekdayHeaders('uk')
+    expect(uk.map((h) => h.short)).toEqual(['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'])
+    expect(uk[0].full).toBe('понеділок')
+    expect(uk[6].full).toBe('неділя')
+    expect(weekdayHeaders().map((h) => h.short)).toEqual(uk.map((h) => h.short))
+  })
+
+  it('Polish and English', () => {
+    expect(weekdayHeaders('pl').map((h) => h.full)).toEqual([
+      'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota', 'niedziela',
+    ])
+    expect(weekdayHeaders('pl')[0].short).toMatch(/^Pon/)
+    expect(weekdayHeaders('en').map((h) => h.short)).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
   })
 })

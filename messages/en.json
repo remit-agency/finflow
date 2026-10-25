@@ -412,6 +412,25 @@
       }
     }
   },
+  "periods": {
+    "menuHeader": "BY TRANSACTION DATE",
+    "srLabel": "Period: ",
+    "currentYear": "Current year",
+    "prevYear": "Previous year",
+    "currentWeek": "Current week",
+    "prevWeek": "Last week",
+    "currentMonth": "Current month",
+    "prevMonth": "Last month",
+    "allTime": "All time",
+    "custom": "Choose dates",
+    "picker": {
+      "prevMonth": "Previous month",
+      "nextMonth": "Next month",
+      "chooseFirst": "Choose the first date",
+      "startChosen": "Start: {date}. Choose the second date",
+      "apply": "Apply"
+    }
+  },
   "charts": {
     "loading": "Loading...",
     "noData": "No data for this period",

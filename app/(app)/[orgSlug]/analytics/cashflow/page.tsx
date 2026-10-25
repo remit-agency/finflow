@@ -5,6 +5,7 @@ import { useTransactions } from '@/lib/hooks/useTransactions'
 import { buildCashFlow } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
 import { DEFAULT_REPORT_PERIOD, periodSlug, resolvePeriod, type PeriodSelection } from '@/lib/utils/period'
+import { todayUtcDay } from '@/lib/utils/today'
 import { cn } from '@/lib/utils'
 import CashFlowChart from '@/components/charts/CashFlowChart'
 import { ReportToolbar } from '@/components/analytics/ReportToolbar'
@@ -26,8 +27,8 @@ export default function CashFlowPage() {
   const { can } = useShell()
   const { transactions, loading } = useTransactions(orgId)
   const [period, setPeriod] = useState<PeriodSelection>(DEFAULT_REPORT_PERIOD)
-  // The browser clock, read once per visit (presets resolve against it).
-  const [now] = useState(() => new Date())
+  // Warsaw's date, read once per visit (presets resolve against it).
+  const [now] = useState(() => todayUtcDay())
 
   const { granularity, buckets: data } = useMemo(
     () => buildCashFlow(transactions, resolvePeriod(period, now), locale),

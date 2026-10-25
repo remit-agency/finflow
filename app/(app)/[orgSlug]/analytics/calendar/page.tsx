@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import { useShell } from '@/lib/hooks/useShell'
 import { useTransactions } from '@/lib/hooks/useTransactions'
 import CalendarView from '@/components/charts/CalendarView'
+import { todayUtcDay } from '@/lib/utils/today'
 
 export default function CalendarPage() {
   const t = useTranslations('analytics')
@@ -18,9 +19,10 @@ export default function CalendarPage() {
   const { org } = useShell()
   const loading = txLoading || !org
 
-  const today = new Date()
-  const [year, setYear] = useState(today.getFullYear())
-  const [month, setMonth] = useState(today.getMonth())
+  // Warsaw's date: the month shown first is the one Poland is in.
+  const [today] = useState(() => todayUtcDay())
+  const [year, setYear] = useState(today.getUTCFullYear())
+  const [month, setMonth] = useState(today.getUTCMonth())
 
   const handleNavigate = (dir: 'prev' | 'next') => {
     if (dir === 'prev') {
