@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import { useTranslations } from 'next-intl'
 import { Search, X, SlidersHorizontal } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -29,6 +30,7 @@ export function TransactionFiltersBar({
   onChange,
   accessory,
 }: TransactionFiltersProps) {
+  const t = useTranslations('journal.filters')
   const [showExtra, setShowExtra] = useState(false)
   const allCategories = [...incomeCategories, ...expenseCategories]
 
@@ -62,8 +64,8 @@ export function TransactionFiltersBar({
           <Input
             value={filters.search ?? ''}
             onChange={(e) => onChange({ ...filters, search: e.target.value || undefined })}
-            placeholder="Пошук по опису..."
-            aria-label="Пошук по опису"
+            placeholder={t('searchPlaceholder')}
+            aria-label={t('search')}
             className={cn(FIELD_CLASS, 'pl-9')}
           />
         </div>
@@ -72,11 +74,11 @@ export function TransactionFiltersBar({
         <NativeSelect
           value={filters.accountId ?? '_all'}
           onChange={(e) => onChange({ ...filters, accountId: e.target.value === '_all' ? undefined : e.target.value })}
-          aria-label="Рахунок"
+          aria-label={t('account')}
           wrapperClassName="min-w-0 flex-1 sm:flex-none"
           className="border-line sm:min-w-[160px]"
         >
-          <option value="_all">Всі рахунки</option>
+          <option value="_all">{t('allAccounts')}</option>
           {accounts.map((a) => (
             <option key={a.id} value={a.id}>{a.name}</option>
           ))}
@@ -86,11 +88,11 @@ export function TransactionFiltersBar({
         <NativeSelect
           value={filters.categoryId ?? '_all'}
           onChange={(e) => onChange({ ...filters, categoryId: e.target.value === '_all' ? undefined : e.target.value })}
-          aria-label="Категорія"
+          aria-label={t('category')}
           wrapperClassName="min-w-0 flex-1 sm:flex-none"
           className="border-line sm:min-w-[160px]"
         >
-          <option value="_all">Всі категорії</option>
+          <option value="_all">{t('allCategories')}</option>
           {allCategories.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
@@ -101,7 +103,7 @@ export function TransactionFiltersBar({
           variant="outline"
           size="icon-lg"
           onClick={() => setShowExtra((v) => !v)}
-          aria-label="Додаткові фільтри"
+          aria-label={t('more')}
           aria-pressed={showExtra}
           className={cn(
             'border-line bg-surface text-ink-muted hover:bg-canvas',
@@ -115,7 +117,7 @@ export function TransactionFiltersBar({
         {hasActive && (
           <Button variant="ghost" size="lg" onClick={clear} className="gap-1 text-ink-muted">
             <X className="size-3.5" />
-            Очистити
+            {t('clear')}
           </Button>
         )}
 
@@ -125,7 +127,7 @@ export function TransactionFiltersBar({
       {showExtra && (
         <div className="flex flex-wrap items-center gap-3 rounded-field border border-line bg-canvas p-3">
           <div className="flex items-center gap-2">
-            <label className="whitespace-nowrap text-sm text-ink-muted">Дата від</label>
+            <label className="whitespace-nowrap text-sm text-ink-muted">{t('dateFrom')}</label>
             <Input
               type="date"
               className={cn(FIELD_CLASS, 'w-[150px]')}
@@ -139,7 +141,7 @@ export function TransactionFiltersBar({
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="whitespace-nowrap text-sm text-ink-muted">до</label>
+            <label className="whitespace-nowrap text-sm text-ink-muted">{t('dateTo')}</label>
             <Input
               type="date"
               className={cn(FIELD_CLASS, 'w-[150px]')}
@@ -153,7 +155,7 @@ export function TransactionFiltersBar({
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="whitespace-nowrap text-sm text-ink-muted">Сума від</label>
+            <label className="whitespace-nowrap text-sm text-ink-muted">{t('amountFrom')}</label>
             <Input
               type="number"
               className={cn(FIELD_CLASS, 'w-[110px] tabular-nums')}
@@ -168,7 +170,7 @@ export function TransactionFiltersBar({
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="whitespace-nowrap text-sm text-ink-muted">до</label>
+            <label className="whitespace-nowrap text-sm text-ink-muted">{t('amountTo')}</label>
             <Input
               type="number"
               className={cn(FIELD_CLASS, 'w-[110px] tabular-nums')}

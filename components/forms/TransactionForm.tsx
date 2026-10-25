@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { createTransaction, updateTransaction } from '@/lib/firebase/transactions'
+import { parseAmountInput } from '@/lib/utils/amount-input'
+import { todayUtcDay } from '@/lib/utils/today'
 import type { Transaction, Account, Category } from '@/types'
 
 const CURRENCIES = ['UAH', 'EUR', 'USD', 'PLN']
@@ -52,6 +55,9 @@ export function TransactionForm({
   open,
   onClose,
 }: TransactionFormProps) {
+  const t = useTranslations('forms.transaction')
+  const tForms = useTranslations('forms')
+  const tCommon = useTranslations('common')
   const isEdit = !!transaction
 
   const [type, setType] = useState<Transaction['type']>(transaction?.type ?? defaultType)
@@ -60,7 +66,7 @@ export function TransactionForm({
   const [amount, setAmount] = useState(transaction?.amount?.toString() ?? '')
   const [currency, setCurrency] = useState(transaction?.currency ?? 'UAH')
   const [categoryId, setCategoryId] = useState(transaction?.categoryId ?? '')
-  const [date, setDate] = useState(toInputDate(transaction?.date ?? new Date()))
+  const [date, setDate] = useState(toInputDate(transaction?.date ?? todayUtcDay()))
   const [description, setDescription] = useState(transaction?.description ?? '')
   const [isRecurring, setIsRecurring] = useState(transaction?.isRecurring ?? false)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -92,12 +98,12 @@ export function TransactionForm({
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {}
-    if (!accountId) errs.accountId = 'Оберіть рахунок'
-    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0)
-      errs.amount = 'Введіть суму > 0'
-    if (type === 'transfer' && !toAccountId) errs.toAccountId = 'Оберіть рахунок призначення'
+    if (!accountId) errs.accountId = t('errors.account')
+    const parsedAmount = parseAmountInput(amount)
+    if (parsedAmount === null || parsedAmount <= 0) errs.amount = t('errors.amount')
+    if (type === 'transfer' && !toAccountId) errs.toAccountId = t('errors.toAccount')
     if (type === 'transfer' && toAccountId === accountId)
-      errs.toAccountId = 'Рахунки мають бути різними'
+      errs.toAccountId = t('errors.sameAccount')
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -106,7 +112,8 @@ export function TransactionForm({
     const data: Omit<Transaction, 'id' | 'orgId'> = {
       type,
       accountId,
-      amount: parseFloat(amount),
+      // validate() has already refused anything parseAmountInput cannot read.
+      amount: parseAmountInput(amount) ?? 0,
       currency,
       date: new Date(date),
       isRecurring,
@@ -157,7 +164,7 @@ export function TransactionForm({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-lg" onKeyDown={handleKeyDown}>
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Редагувати транзакцію' : 'Нова транзакція'}</DialogTitle>
+          <DialogTitle>{isEdit ? t('titleEdit') : t('titleNew')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -165,27 +172,27 @@ export function TransactionForm({
           <Tabs value={type} onValueChange={(v) => setType(v as Transaction['type'])}>
             <TabsList className="w-full">
               <TabsTrigger value="income" className="flex-1 data-[state=active]:text-green-600">
-                Дохід
+                {t('income')}
               </TabsTrigger>
               <TabsTrigger value="expense" className="flex-1 data-[state=active]:text-red-500">
-                Витрата
+                {t('expense')}
               </TabsTrigger>
               <TabsTrigger value="transfer" className="flex-1 data-[state=active]:text-indigo-500">
-                Переказ
+                {t('transfer')}
               </TabsTrigger>
             </TabsList>
 
-            {(['income', 'expense', 'transfer'] as const).map((t) => (
-              <TabsContent key={t} value={t} className="space-y-4 mt-4">
+            {(['income', 'expense', 'transfer'] as const).map((panel) => (
+              <TabsContent key={panel} value={panel} className="space-y-4 mt-4">
                 {/* Account */}
                 <div className="space-y-1">
-                  <Label>Рахунок{t === 'transfer' ? ' (звідки)' : ''}</Label>
+                  <Label>{panel === 'transfer' ? t('accountFrom') : t('account')}</Label>
                   <select
                     value={accountId}
                     onChange={(e) => setAccountId(e.target.value)}
                     className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus:border-[#00c896]"
                   >
-                    <option value="">Оберіть рахунок</option>
+                    <option value="">{t('chooseAccount')}</option>
                     {accounts.map((a) => (
                       <option key={a.id} value={a.id}>{a.name}</option>
                     ))}
@@ -194,15 +201,15 @@ export function TransactionForm({
                 </div>
 
                 {/* To account (transfer only) */}
-                {t === 'transfer' && (
+                {panel === 'transfer' && (
                   <div className="space-y-1">
-                    <Label>Рахунок (куди)</Label>
+                    <Label>{t('accountTo')}</Label>
                     <select
                       value={toAccountId}
                       onChange={(e) => setToAccountId(e.target.value)}
                       className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus:border-[#00c896]"
                     >
-                      <option value="">Оберіть рахунок</option>
+                      <option value="">{t('chooseAccount')}</option>
                       {accounts.filter((a) => a.id !== accountId).map((a) => (
                         <option key={a.id} value={a.id}>{a.name}</option>
                       ))}
@@ -216,22 +223,22 @@ export function TransactionForm({
                 {/* Amount + currency */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2 space-y-1">
-                    <Label htmlFor="tx-amount">Сума</Label>
+                    <Label htmlFor="tx-amount">{t('amount')}</Label>
+                    {/* Text, not number: a number field rejects `1 234,50` and depends on the browser's locale. */}
                     <Input
                       id="tx-amount"
                       ref={amountRef}
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       className="tabular-nums text-lg font-semibold"
-                      style={{ color: TYPE_COLORS[t] }}
+                      style={{ color: TYPE_COLORS[panel] }}
                     />
                     {errors.amount && <p className="text-xs text-red-500">{errors.amount}</p>}
                   </div>
                   <div className="space-y-1">
-                    <Label>Валюта</Label>
+                    <Label>{t('currency')}</Label>
                     <Select value={currency} onValueChange={(v) => setCurrency(v ?? 'UAH')}>
                       <SelectTrigger>
                         <SelectValue />
@@ -248,15 +255,15 @@ export function TransactionForm({
                 </div>
 
                 {/* Category (not for transfer) */}
-                {t !== 'transfer' && (
+                {panel !== 'transfer' && (
                   <div className="space-y-1">
-                    <Label>Категорія</Label>
+                    <Label>{t('category')}</Label>
                     <select
                       value={categoryId}
                       onChange={(e) => setCategoryId(e.target.value)}
                       className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus:border-[#00c896]"
                     >
-                      <option value="">Без категорії</option>
+                      <option value="">{t('noCategory')}</option>
                       {categories.map((c) => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
@@ -266,7 +273,7 @@ export function TransactionForm({
 
                 {/* Date */}
                 <div className="space-y-1">
-                  <Label htmlFor="tx-date">Дата</Label>
+                  <Label htmlFor="tx-date">{t('date')}</Label>
                   <Input
                     id="tx-date"
                     type="date"
@@ -277,12 +284,12 @@ export function TransactionForm({
 
                 {/* Description */}
                 <div className="space-y-1">
-                  <Label htmlFor="tx-desc">Опис</Label>
+                  <Label htmlFor="tx-desc">{t('description')}</Label>
                   <Input
                     id="tx-desc"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Необов'язково"
+                    placeholder={t('descriptionPlaceholder')}
                   />
                 </div>
 
@@ -297,7 +304,7 @@ export function TransactionForm({
                   ) : (
                     <ChevronDown className="h-3.5 w-3.5" />
                   )}
-                  {showAdvanced ? 'Сховати' : 'Розгорнути'} додаткові поля
+                  {showAdvanced ? t('hideAdvanced') : t('showAdvanced')}
                 </button>
 
                 {showAdvanced && (
@@ -309,10 +316,10 @@ export function TransactionForm({
                         onChange={(e) => setIsRecurring(e.target.checked)}
                         className="accent-[#00c896]"
                       />
-                      <span className="text-sm">Повторювана транзакція</span>
+                      <span className="text-sm">{t('recurring')}</span>
                       {isRecurring && (
                         <Badge variant="secondary" className="text-xs">
-                          recurring
+                          {t('recurringBadge')}
                         </Badge>
                       )}
                     </label>
@@ -325,7 +332,7 @@ export function TransactionForm({
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button type="button" variant="outline" onClick={onClose} className="sm:mr-auto">
-            Скасувати
+            {tCommon('cancel')}
           </Button>
           {!isEdit && (
             <Button
@@ -334,7 +341,7 @@ export function TransactionForm({
               disabled={loading}
               onClick={() => handleSubmit(true)}
             >
-              Додати та створити подібний
+              {t('addAnother')}
             </Button>
           )}
           <Button
@@ -343,7 +350,7 @@ export function TransactionForm({
             onClick={() => handleSubmit(false)}
             style={{ backgroundColor: '#00c896' }}
           >
-            {loading ? 'Збереження...' : isEdit ? 'Зберегти' : 'Додати'}
+            {loading ? tForms('saving') : isEdit ? tCommon('save') : t('add')}
           </Button>
         </DialogFooter>
       </DialogContent>

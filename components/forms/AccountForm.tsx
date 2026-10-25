@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   Dialog,
   DialogContent,
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createAccount, updateAccount } from '@/lib/firebase/accounts'
+import { parseAmountInput } from '@/lib/utils/amount-input'
 import type { Account } from '@/types'
 
 const PRESET_COLORS = [
@@ -23,12 +25,8 @@ const PRESET_COLORS = [
   '#a855f7',
 ]
 
-const ACCOUNT_TYPES: { value: Account['type']; label: string }[] = [
-  { value: 'bank', label: 'Банківський' },
-  { value: 'cash', label: 'Готівка' },
-  { value: 'card', label: 'Карта' },
-  { value: 'crypto', label: 'Крипто' },
-]
+// The labels are `t('types.<type>')`.
+const ACCOUNT_TYPES: Account['type'][] = ['bank', 'cash', 'card', 'crypto']
 
 const CURRENCIES = ['UAH', 'EUR', 'USD', 'PLN']
 
@@ -40,6 +38,9 @@ interface AccountFormProps {
 }
 
 export function AccountForm({ orgId, account, open, onClose }: AccountFormProps) {
+  const t = useTranslations('forms.account')
+  const tForms = useTranslations('forms')
+  const tCommon = useTranslations('common')
   const isEdit = !!account
 
   const [name, setName] = useState(account?.name ?? '')
@@ -52,9 +53,10 @@ export function AccountForm({ orgId, account, open, onClose }: AccountFormProps)
 
   const validate = (): boolean => {
     const errs: typeof errors = {}
-    if (!name.trim()) errs.name = "Назва обов'язкова"
-    const bal = parseFloat(balance)
-    if (isNaN(bal) || bal < 0) errs.balance = 'Баланс повинен бути ≥ 0'
+    if (!name.trim()) errs.name = t('errors.name')
+    // parseAmountInput reads only non-negative amounts (a minus sign gives null), which is the
+    // rule this form has always had: the opening balance may be 0 but not below it.
+    if (parseAmountInput(balance) === null) errs.balance = t('errors.balance')
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -67,7 +69,8 @@ export function AccountForm({ orgId, account, open, onClose }: AccountFormProps)
       const data = {
         name: name.trim(),
         type,
-        balance: parseFloat(balance),
+        // validate() has already refused anything parseAmountInput cannot read.
+        balance: parseAmountInput(balance) ?? 0,
         currency,
         color,
       }
@@ -88,41 +91,41 @@ export function AccountForm({ orgId, account, open, onClose }: AccountFormProps)
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Редагувати рахунок' : 'Новий рахунок'}</DialogTitle>
+          <DialogTitle>{isEdit ? t('titleEdit') : t('titleNew')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <Label htmlFor="acc-name">Назва</Label>
+            <Label htmlFor="acc-name">{t('name')}</Label>
             <Input
               id="acc-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Наприклад: Монобанк"
+              placeholder={t('namePlaceholder')}
             />
             {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
           </div>
 
           <div className="space-y-1">
-            <Label>Тип</Label>
+            <Label>{t('type')}</Label>
             <select
               value={type}
               onChange={(e) => setType(e.target.value as Account['type'])}
               className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus:border-[#00c896]"
             >
-              {ACCOUNT_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
+              {ACCOUNT_TYPES.map((accountType) => (
+                <option key={accountType} value={accountType}>{t(`types.${accountType}`)}</option>
               ))}
             </select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="acc-balance">Баланс</Label>
+              <Label htmlFor="acc-balance">{t('balance')}</Label>
+              {/* Text, not number: a number field rejects `1 234,50` and depends on the browser's locale. */}
               <Input
                 id="acc-balance"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={balance}
                 onChange={(e) => setBalance(e.target.value)}
                 className="font-tabular"
@@ -130,7 +133,7 @@ export function AccountForm({ orgId, account, open, onClose }: AccountFormProps)
               {errors.balance && <p className="text-xs text-red-500">{errors.balance}</p>}
             </div>
             <div className="space-y-1">
-              <Label>Валюта</Label>
+              <Label>{t('currency')}</Label>
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
@@ -144,7 +147,7 @@ export function AccountForm({ orgId, account, open, onClose }: AccountFormProps)
           </div>
 
           <div className="space-y-1">
-            <Label>Колір</Label>
+            <Label>{t('color')}</Label>
             <div className="flex gap-2 flex-wrap">
               {PRESET_COLORS.map((c) => (
                 <button
@@ -164,10 +167,10 @@ export function AccountForm({ orgId, account, open, onClose }: AccountFormProps)
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
-              Скасувати
+              {tCommon('cancel')}
             </Button>
             <Button type="submit" disabled={loading} style={{ backgroundColor: '#00c896' }}>
-              {loading ? 'Збереження...' : isEdit ? 'Зберегти' : 'Створити'}
+              {loading ? tForms('saving') : isEdit ? tCommon('save') : t('create')}
             </Button>
           </DialogFooter>
         </form>

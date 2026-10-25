@@ -183,5 +183,106 @@
       "resendShort": "Send",
       "resendLong": "Send the email again"
     }
+  },
+  "journal": {
+    "title": "Payments",
+    "showAllAccounts": "Show all accounts",
+    "filters": {
+      "searchPlaceholder": "Search description...",
+      "search": "Search description",
+      "account": "Account",
+      "allAccounts": "All accounts",
+      "category": "Category",
+      "allCategories": "All categories",
+      "more": "More filters",
+      "clear": "Clear",
+      "dateFrom": "Date from",
+      "dateTo": "to",
+      "amountFrom": "Amount from",
+      "amountTo": "to"
+    },
+    "list": {
+      "emptyTitle": "No transactions yet",
+      "emptyBody": "Click “Income”, “Expense” or “Transfer” in the header to add your first transaction",
+      "date": "Date",
+      "amount": "Amount",
+      "account": "Account",
+      "category": "Category",
+      "comment": "Comment",
+      "transfer": "Transfer",
+      "noCategory": "No category",
+      "rowEdit": "{account}: {amount}, {date}, edit"
+    }
+  },
+  "forms": {
+    "transaction": {
+      "titleNew": "New transaction",
+      "titleEdit": "Edit transaction",
+      "income": "Income",
+      "expense": "Expense",
+      "transfer": "Transfer",
+      "account": "Account",
+      "accountFrom": "Account (from)",
+      "accountTo": "Account (to)",
+      "chooseAccount": "Choose an account",
+      "amount": "Amount",
+      "currency": "Currency",
+      "category": "Category",
+      "noCategory": "No category",
+      "date": "Date",
+      "description": "Description",
+      "descriptionPlaceholder": "Optional",
+      "showAdvanced": "Show additional fields",
+      "hideAdvanced": "Hide additional fields",
+      "recurring": "Recurring transaction",
+      "recurringBadge": "recurring",
+      "addAnother": "Add and create similar",
+      "add": "Add",
+      "errors": {
+        "account": "Choose an account",
+        "amount": "Enter an amount > 0",
+        "toAccount": "Choose a destination account",
+        "sameAccount": "The accounts must be different"
+      }
+    },
+    "account": {
+      "titleNew": "New account",
+      "titleEdit": "Edit account",
+      "name": "Name",
+      "namePlaceholder": "For example: Barclays",
+      "type": "Type",
+      "types": {
+        "bank": "Bank",
+        "cash": "Cash",
+        "card": "Card",
+        "crypto": "Crypto"
+      },
+      "balance": "Balance",
+      "currency": "Currency",
+      "color": "Color",
+      "create": "Create",
+      "errors": {
+        "name": "Name is required",
+        "balance": "Balance must be ≥ 0"
+      }
+    },
+    "saving": "Saving..."
+  },
+  "defaultCategories": {
+    "income": {
+      "sales": "Sales",
+      "services": "Services",
+      "investments": "Investments",
+      "other": "Other (income)"
+    },
+    "expense": {
+      "salary": "Salaries",
+      "rent": "Rent",
+      "marketing": "Marketing",
+      "utilities": "Utilities",
+      "equipment": "Equipment",
+      "taxes": "Taxes",
+      "other": "Other (expense)"
+    }
   }
 }

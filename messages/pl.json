@@ -183,5 +183,106 @@
       "resendShort": "Wyślij",
       "resendLong": "Wyślij wiadomość ponownie"
     }
+  },
+  "journal": {
+    "title": "Płatności",
+    "showAllAccounts": "Pokaż wszystkie konta",
+    "filters": {
+      "searchPlaceholder": "Szukaj w opisie...",
+      "search": "Szukaj w opisie",
+      "account": "Konto",
+      "allAccounts": "Wszystkie konta",
+      "category": "Kategoria",
+      "allCategories": "Wszystkie kategorie",
+      "more": "Więcej filtrów",
+      "clear": "Wyczyść",
+      "dateFrom": "Data od",
+      "dateTo": "do",
+      "amountFrom": "Kwota od",
+      "amountTo": "do"
+    },
+    "list": {
+      "emptyTitle": "Nie ma jeszcze operacji",
+      "emptyBody": "Kliknij «Wpływ», «Wydatek» lub «Przelew» w nagłówku, aby dodać pierwszą operację",
+      "date": "Data",
+      "amount": "Kwota",
+      "account": "Konto",
+      "category": "Kategoria",
+      "comment": "Komentarz",
+      "transfer": "Przelew",
+      "noCategory": "Bez kategorii",
+      "rowEdit": "{account}: {amount}, {date}, edytuj"
+    }
+  },
+  "forms": {
+    "transaction": {
+      "titleNew": "Nowa operacja",
+      "titleEdit": "Edytuj operację",
+      "income": "Wpływ",
+      "expense": "Wydatek",
+      "transfer": "Przelew",
+      "account": "Konto",
+      "accountFrom": "Konto (źródłowe)",
+      "accountTo": "Konto (docelowe)",
+      "chooseAccount": "Wybierz konto",
+      "amount": "Kwota",
+      "currency": "Waluta",
+      "category": "Kategoria",
+      "noCategory": "Bez kategorii",
+      "date": "Data",
+      "description": "Opis",
+      "descriptionPlaceholder": "Opcjonalnie",
+      "showAdvanced": "Pokaż dodatkowe pola",
+      "hideAdvanced": "Ukryj dodatkowe pola",
+      "recurring": "Operacja cykliczna",
+      "recurringBadge": "cykliczna",
+      "addAnother": "Dodaj i utwórz podobną",
+      "add": "Dodaj",
+      "errors": {
+        "account": "Wybierz konto",
+        "amount": "Wpisz kwotę > 0",
+        "toAccount": "Wybierz konto docelowe",
+        "sameAccount": "Konta muszą być różne"
+      }
+    },
+    "account": {
+      "titleNew": "Nowe konto",
+      "titleEdit": "Edytuj konto",
+      "name": "Nazwa",
+      "namePlaceholder": "Na przykład: mBank",
+      "type": "Typ",
+      "types": {
+        "bank": "Bankowe",
+        "cash": "Gotówka",
+        "card": "Karta",
+        "crypto": "Krypto"
+      },
+      "balance": "Saldo",
+      "currency": "Waluta",
+      "color": "Kolor",
+      "create": "Utwórz",
+      "errors": {
+        "name": "Nazwa jest wymagana",
+        "balance": "Saldo musi być ≥ 0"
+      }
+    },
+    "saving": "Zapisywanie..."
+  },
+  "defaultCategories": {
+    "income": {
+      "sales": "Sprzedaż",
+      "services": "Usługi",
+      "investments": "Inwestycje",
+      "other": "Inne (wpływ)"
+    },
+    "expense": {
+      "salary": "Wynagrodzenia",
+      "rent": "Czynsz",
+      "marketing": "Marketing",
+      "utilities": "Media",
+      "equipment": "Sprzęt",
+      "taxes": "Podatki",
+      "other": "Inne (wydatek)"
+    }
   }
 }

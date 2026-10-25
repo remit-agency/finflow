@@ -9,7 +9,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from './firebase'
-import { buildDefaultCategories } from './default-categories'
+import { buildDefaultCategories, type DefaultCategoryNames } from './default-categories'
 import type { Category } from '@/types'
 
 function categoriesRef(orgId: string) {
@@ -19,12 +19,12 @@ function categoriesRef(orgId: string) {
 // Idempotent: the check below is only an optimisation. Every default has a deterministic document
 // id (buildDefaultCategories), so two concurrent seeds (StrictMode double effects, two tabs) both
 // see an empty collection but write the same documents instead of adding duplicates.
-export async function seedDefaultCategories(orgId: string): Promise<void> {
+export async function seedDefaultCategories(orgId: string, names: DefaultCategoryNames): Promise<void> {
   const snap = await getDocs(categoriesRef(orgId))
   if (!snap.empty) return
 
   await Promise.all(
-    buildDefaultCategories().map(({ id, ...cat }) =>
+    buildDefaultCategories(names).map(({ id, ...cat }) =>
       setDoc(doc(categoriesRef(orgId), id), {
         ...cat,
         orgId,

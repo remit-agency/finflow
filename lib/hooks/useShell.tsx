@@ -14,6 +14,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { LazyAccountForm, LazyTransactionForm } from '@/components/forms/lazy'
+import { DEFAULT_INCOME_CATEGORIES, type DefaultCategoryNames } from '@/lib/firebase/default-categories'
 import { getMembership } from '@/lib/firebase/members'
 import { useAccounts } from '@/lib/hooks/useAccounts'
 import { useAuth } from '@/lib/hooks/useAuth'
@@ -119,8 +120,14 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
   // (a second useCategories on a fresh org would seed the default categories twice). They start only
   // once access is granted, so a foreign URL never attaches listeners or seeds default categories.
   const { accounts, loading: accountsLoading } = useAccounts(dataOrgId)
+  // The default categories are created in the language that is active when the company is first opened.
+  const tDefaultCategories = useTranslations('defaultCategories')
+  const defaultCategoryNames: DefaultCategoryNames = Object.fromEntries(
+    DEFAULT_INCOME_CATEGORIES.map(({ slug }) => [slug, tDefaultCategories(`income.${slug}`)]),
+  )
   const { incomeCategories, expenseCategories, loading: categoriesLoading } = useCategories(dataOrgId, {
     seed: canRole(role, 'data.write'),
+    names: defaultCategoryNames,
   })
 
   // A selection belongs to one org: it is ignored as soon as the URL points at another one.

@@ -183,5 +183,106 @@
       "resendShort": "Надіслати",
       "resendLong": "Надіслати лист ще раз"
     }
+  },
+  "journal": {
+    "title": "Платежі",
+    "showAllAccounts": "Показати всі рахунки",
+    "filters": {
+      "searchPlaceholder": "Пошук по опису...",
+      "search": "Пошук по опису",
+      "account": "Рахунок",
+      "allAccounts": "Всі рахунки",
+      "category": "Категорія",
+      "allCategories": "Всі категорії",
+      "more": "Додаткові фільтри",
+      "clear": "Очистити",
+      "dateFrom": "Дата від",
+      "dateTo": "до",
+      "amountFrom": "Сума від",
+      "amountTo": "до"
+    },
+    "list": {
+      "emptyTitle": "Операцій ще немає",
+      "emptyBody": "Натисніть «Дохід», «Витрата» або «Переказ» у шапці, щоб додати першу операцію",
+      "date": "Дата",
+      "amount": "Сума",
+      "account": "Рахунок",
+      "category": "Категорія",
+      "comment": "Коментар",
+      "transfer": "Переказ",
+      "noCategory": "Без категорії",
+      "rowEdit": "{account}: {amount}, {date}, редагувати"
+    }
+  },
+  "forms": {
+    "transaction": {
+      "titleNew": "Нова транзакція",
+      "titleEdit": "Редагувати транзакцію",
+      "income": "Дохід",
+      "expense": "Витрата",
+      "transfer": "Переказ",
+      "account": "Рахунок",
+      "accountFrom": "Рахунок (звідки)",
+      "accountTo": "Рахунок (куди)",
+      "chooseAccount": "Оберіть рахунок",
+      "amount": "Сума",
+      "currency": "Валюта",
+      "category": "Категорія",
+      "noCategory": "Без категорії",
+      "date": "Дата",
+      "description": "Опис",
+      "descriptionPlaceholder": "Необов'язково",
+      "showAdvanced": "Розгорнути додаткові поля",
+      "hideAdvanced": "Сховати додаткові поля",
+      "recurring": "Повторювана транзакція",
+      "recurringBadge": "recurring",
+      "addAnother": "Додати та створити подібний",
+      "add": "Додати",
+      "errors": {
+        "account": "Оберіть рахунок",
+        "amount": "Введіть суму > 0",
+        "toAccount": "Оберіть рахунок призначення",
+        "sameAccount": "Рахунки мають бути різними"
+      }
+    },
+    "account": {
+      "titleNew": "Новий рахунок",
+      "titleEdit": "Редагувати рахунок",
+      "name": "Назва",
+      "namePlaceholder": "Наприклад: Монобанк",
+      "type": "Тип",
+      "types": {
+        "bank": "Банківський",
+        "cash": "Готівка",
+        "card": "Карта",
+        "crypto": "Крипто"
+      },
+      "balance": "Баланс",
+      "currency": "Валюта",
+      "color": "Колір",
+      "create": "Створити",
+      "errors": {
+        "name": "Назва обов'язкова",
+        "balance": "Баланс повинен бути ≥ 0"
+      }
+    },
+    "saving": "Збереження..."
+  },
+  "defaultCategories": {
+    "income": {
+      "sales": "Продажі",
+      "services": "Послуги",
+      "investments": "Інвестиції",
+      "other": "Інше (дохід)"
+    },
+    "expense": {
+      "salary": "Зарплата",
+      "rent": "Оренда",
+      "marketing": "Маркетинг",
+      "utilities": "Комунальні",
+      "equipment": "Обладнання",
+      "taxes": "Податки",
+      "other": "Інше (витрата)"
+    }
   }
 }
