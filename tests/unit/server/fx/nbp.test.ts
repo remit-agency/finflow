@@ -21,7 +21,9 @@ const body = [
 ]
 
 const respond = (status: number, json?: unknown) =>
-  vi.fn(async (_url: string, _init?: unknown) => new Response(json === undefined ? 'x' : JSON.stringify(json), { status }))
+  vi.fn<(url: string, init?: unknown) => Promise<Response>>(
+    async () => new Response(json === undefined ? 'x' : JSON.stringify(json), { status }),
+  )
 
 async function code(p: Promise<unknown>): Promise<string> {
   try {
