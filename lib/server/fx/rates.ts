@@ -1,5 +1,12 @@
 import { FxError, type NbpTable } from '@/lib/server/fx/types'
 
+const CODE = /^[A-Z]{3}$/
+
+/** ISO 4217 shape only (three uppercase letters); whether NBP lists it is the resolver's call. */
+export function isCurrencyCode(s: unknown): s is string {
+  return typeof s === 'string' && CODE.test(s)
+}
+
 /** Rates are stored and returned with 8 decimals (as Finmap shows them). */
 export function round8(x: number): number {
   return Number(x.toFixed(8))

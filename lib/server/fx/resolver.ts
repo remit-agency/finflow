@@ -1,10 +1,9 @@
 import { addDays, isDay, monthBounds, monthOf, prevMonth } from '@/lib/server/fx/days'
-import { crossRate, pickTable, round8 } from '@/lib/server/fx/rates'
+import { crossRate, isCurrencyCode, pickTable, round8 } from '@/lib/server/fx/rates'
 import type { FxStore } from '@/lib/server/fx/store'
 import { FxError, type MonthDoc, type NbpTable, type RateSnapshot } from '@/lib/server/fx/types'
 
 const HOUR_MS = 3_600_000
-const CODE = /^[A-Z]{3}$/
 // First month with published tables (2002-01-02).
 const FIRST_MONTH = '2002-01'
 
@@ -47,7 +46,7 @@ export function createResolver(deps: FxDeps) {
   }
 
   return async function resolveRate(from: string, to: string, date: string): Promise<RateSnapshot> {
-    if (!CODE.test(from) || !CODE.test(to) || !isDay(date)) throw new FxError('invalid_params')
+    if (!isCurrencyCode(from) || !isCurrencyCode(to) || !isDay(date)) throw new FxError('invalid_params')
     if (date > addDays(deps.today(), 366)) throw new FxError('invalid_params')
 
     if (from === to) {
