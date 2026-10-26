@@ -11,7 +11,16 @@ export type AuthErrorKey =
   | 'tooManyRequests'
   | 'network'
   | 'popupClosed'
+  | 'loadCompanies'
   | 'generic'
+
+/** Thrown when the user's companies cannot be read after signing in (shown as `errors.auth.loadCompanies`). */
+export class CompaniesLoadError extends Error {
+  constructor() {
+    super('Could not load the companies')
+    this.name = 'CompaniesLoadError'
+  }
+}
 
 const FIREBASE_CODES: Record<string, AuthErrorKey> = {
   'auth/wrong-password': 'wrongPassword',
@@ -27,6 +36,7 @@ const FIREBASE_CODES: Record<string, AuthErrorKey> = {
 }
 
 export function authErrorKey(err: unknown): AuthErrorKey {
+  if (err instanceof CompaniesLoadError) return 'loadCompanies'
   if (typeof err === 'object' && err !== null && 'code' in err) {
     const code = (err as { code: unknown }).code
     if (typeof code === 'string' && code in FIREBASE_CODES) return FIREBASE_CODES[code]

@@ -1,4 +1,5 @@
 import { collectionGroup, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
+import { CompaniesLoadError } from './auth-errors'
 import { db } from './firebase'
 import { getOrganization } from './firestore'
 import { isValidOrgId } from '@/lib/shell/org-id'
@@ -43,17 +44,15 @@ export async function getMemberships(uid: string): Promise<Membership[]> {
   return result
 }
 
-export const COMPANIES_LOAD_ERROR = 'Could not load your companies. Please try again.'
-
 /**
- * For the login and register pages: like getMyOrganizations, but a failed read becomes a friendly
- * message instead of the raw Firestore error (shown as a toast).
+ * For the login and register pages: like getMyOrganizations, but a failed read becomes a
+ * CompaniesLoadError (the page shows its localized message) instead of the raw Firestore error.
  */
 export async function getMyOrganizationsForAuthPage(uid: string): Promise<Organization[]> {
   try {
     return await getMyOrganizations(uid)
   } catch {
-    throw new Error(COMPANIES_LOAD_ERROR)
+    throw new CompaniesLoadError()
   }
 }
 

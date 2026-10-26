@@ -154,6 +154,7 @@ export default function EnableBankingConnect({ orgId }: Props) {
             </div>
           </div>
           <Button variant="ghost" size="icon" className="w-8 h-8 text-red-500 hover:text-red-600"
+            aria-label={t('disconnect', { name: conn.institutionName })}
             onClick={() => handleDisconnect(conn.sessionId)}>
             <Trash2 className="w-4 h-4" />
           </Button>

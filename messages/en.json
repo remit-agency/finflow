@@ -37,6 +37,7 @@
       "tooManyRequests": "Too many attempts. Try again in a few minutes.",
       "network": "Network error. Check your connection and try again.",
       "popupClosed": "The sign-in window was closed before it finished.",
+      "loadCompanies": "Could not load your companies. Please try again.",
       "generic": "Something went wrong. Please try again."
     },
     "orgCreate": {
@@ -307,6 +308,7 @@
       "connectedOn": "Connected {date}",
       "connected": "{name} connected",
       "disconnected": "Bank disconnected",
+      "disconnect": "Disconnect {name}",
       "defaultInstitution": "Bank",
       "countries": {
         "PL": "🇵🇱 Poland",

@@ -37,6 +37,7 @@
       "tooManyRequests": "Zbyt wiele prób. Spróbuj ponownie za kilka minut.",
       "network": "Błąd sieci. Sprawdź połączenie i spróbuj ponownie.",
       "popupClosed": "Okno logowania zostało zamknięte przed zakończeniem.",
+      "loadCompanies": "Nie udało się wczytać Twoich firm. Spróbuj ponownie.",
       "generic": "Coś poszło nie tak. Spróbuj ponownie."
     },
     "orgCreate": {
@@ -307,6 +308,7 @@
       "connectedOn": "Połączono {date}",
       "connected": "Połączono z bankiem {name}",
       "disconnected": "Bank został rozłączony",
+      "disconnect": "Rozłącz {name}",
       "defaultInstitution": "Bank",
       "countries": {
         "PL": "🇵🇱 Polska",
