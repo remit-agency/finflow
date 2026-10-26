@@ -97,3 +97,15 @@ export async function createDocAs(
   })
   return res.status()
 }
+
+/** Lists the documents of a collection as admin: each entry is the document id plus its raw `fields`. */
+export async function listDocs(
+  request: APIRequestContext,
+  collectionPath: string,
+): Promise<{ id: string; fields: Record<string, FirestoreValue> }[]> {
+  const url = `http://${firestoreHost()}/v1/projects/${PROJECT}/databases/(default)/documents/${collectionPath}?pageSize=300`
+  const res = await request.get(url, { headers: { Authorization: 'Bearer owner' } })
+  if (!res.ok()) throw new Error(`list ${collectionPath} failed: ${res.status()} ${await res.text()}`)
+  const body = (await res.json()) as { documents?: { name: string; fields?: Record<string, FirestoreValue> }[] }
+  return (body.documents ?? []).map((d) => ({ id: d.name.split('/').pop() ?? '', fields: d.fields ?? {} }))
+}
