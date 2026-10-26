@@ -143,6 +143,59 @@ test.describe('language switching (emulators)', () => {
       .toBe(1234.5)
   })
 
+  test('a default category stored in Ukrainian is shown in the active language, a user category as stored', async ({ page, request, context }) => {
+    const user = await registerViaUi(page, 'i18ncat')
+    await waitForShell(page, user.companyName)
+    await seedDoc(request, `organizations/${user.orgId}/accounts`, 'cat-acc', {
+      name: 'Konto kat',
+      type: 'bank',
+      balance: 0,
+      currency: 'PLN',
+      color: '#00c896',
+      orgId: user.orgId,
+      createdAt: new Date(),
+    })
+    const rentStoredInUkrainian = uk.defaultCategories.expense.rent
+    const userCategory = 'My shop'
+    for (const [id, name] of [['cat-rent', rentStoredInUkrainian], ['cat-shop', userCategory]]) {
+      await seedDoc(request, `organizations/${user.orgId}/categories`, id, {
+        name,
+        type: 'expense',
+        color: '#ef4444',
+        orgId: user.orgId,
+        createdAt: new Date(),
+      })
+    }
+    for (const [id, categoryId, description] of [['cat-tx-rent', 'cat-rent', 'Rata za biuro'], ['cat-tx-shop', 'cat-shop', 'Zakupy sklep']]) {
+      await seedDoc(request, `organizations/${user.orgId}/transactions`, id, {
+        type: 'expense',
+        accountId: 'cat-acc',
+        categoryId,
+        amount: 10,
+        currency: 'PLN',
+        date: new Date(),
+        description,
+        isRecurring: false,
+        tags: [],
+        fileUrls: [],
+        orgId: user.orgId,
+        createdAt: new Date(),
+      })
+    }
+    await context.addCookies([{ name: 'NEXT_LOCALE', value: 'pl', url: ORIGIN }])
+    await page.goto(`/${user.orgId}/transactions`)
+    await waitForShell(page, user.companyName)
+
+    const rentRow = page.getByRole('row').filter({ hasText: 'Rata za biuro' })
+    await expect(rentRow).toContainText(pl.defaultCategories.expense.rent)
+    await expect(rentRow).not.toContainText(rentStoredInUkrainian)
+    await expect(page.getByRole('row').filter({ hasText: 'Zakupy sklep' })).toContainText(userCategory)
+
+    // Nothing is renamed in Firestore: the stored name is still the Ukrainian one.
+    const stored = (await listDocs(request, `organizations/${user.orgId}/categories`)).find((d) => d.id === 'cat-rent')
+    expect(stored?.fields.name).toEqual({ stringValue: rentStoredInUkrainian })
+  })
+
   test('the register form preselects the Polish zloty', async ({ page }) => {
     await page.goto('/register')
     await waitForHydration(page, '#name')

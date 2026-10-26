@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useTransactions } from '@/lib/hooks/useTransactions'
 import { useShell } from '@/lib/hooks/useShell'
+import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { buildPL } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
 import { DEFAULT_REPORT_PERIOD, periodSlug, resolvePeriod, type PeriodSelection } from '@/lib/utils/period'
@@ -16,6 +17,7 @@ import { ReportToolbar } from '@/components/analytics/ReportToolbar'
 export default function PLPage() {
   const t = useTranslations('analytics')
   const noCategory = useTranslations('journal.list')('noCategory')
+  const categoryName = useCategoryName()
   const params = useParams()
   const orgSlug = params.orgSlug as string
   const orgId = orgSlug
@@ -30,8 +32,8 @@ export default function PLPage() {
   const loading = txLoading || catLoading
 
   const { monthKeys, rows } = useMemo(
-    () => buildPL(transactions, categories, resolvePeriod(period, now), noCategory),
-    [transactions, categories, period, now, noCategory]
+    () => buildPL(transactions, categories, resolvePeriod(period, now), noCategory, categoryName),
+    [transactions, categories, period, now, noCategory, categoryName]
   )
 
   const handleExport = () => {

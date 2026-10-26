@@ -24,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { createTransaction, updateTransaction } from '@/lib/firebase/transactions'
+import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { formatAmountInput, parseAmountInput, roundAmount } from '@/lib/utils/amount-input'
 import { todayUtcDay } from '@/lib/utils/today'
@@ -66,6 +67,7 @@ export function TransactionForm({
   const tForms = useTranslations('forms')
   const tCommon = useTranslations('common')
   const { locale } = useFormatters()
+  const categoryName = useCategoryName()
   const isEdit = !!transaction
   const currencyOf = (id: string) => accounts.find((a) => a.id === id)?.currency ?? defaultCurrency ?? FALLBACK_CURRENCY
 
@@ -284,7 +286,7 @@ export function TransactionForm({
                     >
                       <option value="">{t('noCategory')}</option>
                       {categories.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
+                        <option key={c.id} value={c.id}>{categoryName(c)}</option>
                       ))}
                     </select>
                   </div>

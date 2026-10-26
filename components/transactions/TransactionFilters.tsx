@@ -6,6 +6,7 @@ import { Search, X, SlidersHorizontal } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { NativeSelect } from '@/components/ui/native-select'
+import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { cn } from '@/lib/utils'
 import type { Account, Category } from '@/types'
 import type { TransactionFilters } from '@/lib/firebase/transactions'
@@ -31,6 +32,7 @@ export function TransactionFiltersBar({
   accessory,
 }: TransactionFiltersProps) {
   const t = useTranslations('journal.filters')
+  const categoryName = useCategoryName()
   const [showExtra, setShowExtra] = useState(false)
   const allCategories = [...incomeCategories, ...expenseCategories]
 
@@ -94,7 +96,7 @@ export function TransactionFiltersBar({
         >
           <option value="_all">{t('allCategories')}</option>
           {allCategories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+            <option key={c.id} value={c.id}>{categoryName(c)}</option>
           ))}
         </NativeSelect>
 

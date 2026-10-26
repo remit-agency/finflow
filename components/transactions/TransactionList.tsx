@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { LazyTransactionForm } from '@/components/forms/lazy'
 import { useShell } from '@/lib/hooks/useShell'
+import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { cn } from '@/lib/utils'
 import { formatDayShortUtc, formatWeekdayShortUtc, summarizeDay } from '@/lib/utils/journal'
@@ -43,6 +44,7 @@ export function TransactionList({
   const t = useTranslations('journal.list')
   const tAccountTypes = useTranslations('common.accountTypes')
   const { locale, money, date: formatDate } = useFormatters()
+  const categoryLabel = useCategoryName()
   const { can } = useShell()
   const canEdit = can('data.write')
   const [editTx, setEditTx] = useState<Transaction | null>(null)
@@ -131,7 +133,11 @@ export function TransactionList({
                   const toAccount =
                     tx.type === 'transfer' && tx.counterpartyId ? accountMap[tx.counterpartyId] : null
                   const category = tx.categoryId ? categoryMap[tx.categoryId] : null
-                  const categoryName = category?.name ?? (tx.type === 'transfer' ? t('transfer') : t('noCategory'))
+                  const categoryName = category
+                    ? categoryLabel(category)
+                    : tx.type === 'transfer'
+                      ? t('transfer')
+                      : t('noCategory')
                   const accountLabel = toAccount ? `${account?.name ?? '—'} → ${toAccount.name}` : (account?.name ?? '—')
 
                   return (
@@ -182,7 +188,7 @@ export function TransactionList({
                         {category ? (
                           <Badge variant="chip">
                             <span className="size-2 rounded-full" style={{ backgroundColor: category.color }} />
-                            {category.name}
+                            {categoryName}
                           </Badge>
                         ) : tx.type === 'transfer' ? (
                           <Badge variant="chip">{t('transfer')}</Badge>

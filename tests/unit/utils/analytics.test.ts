@@ -195,4 +195,18 @@ describe('buildPL over a period', () => {
   it('all time without transactions is empty', () => {
     expect(buildPL([], categories, resolvePeriod({ preset: 'allTime' }, NOW), NONE)).toEqual({ monthKeys: [], rows: [] })
   })
+
+  it('names the rows with nameOf when given and with the stored name otherwise', () => {
+    const range = resolvePeriod({ preset: 'currentWeek' }, NOW)
+    const txs = [tx('income', 100, '2026-10-19T00:00:00Z', 'sales'), tx('expense', 40, '2026-10-20T12:00:00Z', 'rent')]
+    const stored = buildPL(txs, categories, range, NONE)
+    expect(stored.rows.map((r) => r.categoryName)).toEqual(['Продажі', 'Оренда'])
+
+    const shown = buildPL(txs, categories, range, NONE, (cat) => `${cat.type}:${cat.name}`)
+    expect(shown.rows.map((r) => r.categoryName)).toEqual(['income:Продажі', 'expense:Оренда'])
+    // Only the label changes: ids, types and sums are the same.
+    expect(shown.rows.map((r) => [r.categoryId, r.type, r.total])).toEqual(
+      stored.rows.map((r) => [r.categoryId, r.type, r.total]),
+    )
+  })
 })
