@@ -6,6 +6,7 @@ const DOC: MonthDoc = {
   month: '2026-10',
   tables: [{ no: '207/A/NBP/2026', effectiveDate: '2026-10-23', rates: { EUR: 4.4 } }],
   fetchedAt: 1_700_000_000_000,
+  fetchedDay: '2026-10-26',
   complete: false,
 }
 
@@ -34,6 +35,8 @@ describe('parseMonthDoc', () => {
     ['a table with a bad date', { ...DOC, tables: [{ no: 'x', effectiveDate: 'nope', rates: {} }] }],
     ['a bad rate', { ...DOC, tables: [{ no: 'x', effectiveDate: '2026-10-23', rates: { EUR: 'a' } }] }],
     ['no fetchedAt', { ...DOC, fetchedAt: undefined }],
+    ['no fetchedDay', { ...DOC, fetchedDay: undefined }],
+    ['a fetchedDay that is not a real day', { ...DOC, fetchedDay: '2026-02-30' }],
     ['no complete flag', { ...DOC, complete: 'yes' }],
     ['null', null],
   ])('rejects %s', (_label, value) => expect(parseMonthDoc(value, '2026-10')).toBeNull())

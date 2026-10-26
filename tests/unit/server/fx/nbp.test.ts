@@ -43,6 +43,15 @@ describe('fetchNbpTables', () => {
     expect(tables[1]).toEqual({ no: '207/A/NBP/2026', effectiveDate: '2026-10-23', rates: { EUR: 4.4, USD: 3.9 } })
   })
 
+  it('accepts tables dated exactly on the range ends', async () => {
+    const edge = [
+      { table: 'A', no: '1/A/NBP/2026', effectiveDate: '2026-10-01', rates: [{ code: 'EUR', mid: 4 }] },
+      { table: 'A', no: '2/A/NBP/2026', effectiveDate: '2026-10-26', rates: [{ code: 'EUR', mid: 4 }] },
+    ]
+    const tables = await fetchNbpTables('2026-10-01', '2026-10-26', respond(200, edge))
+    expect(tables.map((t) => t.effectiveDate)).toEqual(['2026-10-01', '2026-10-26'])
+  })
+
   it('404 means no tables in the range', async () => {
     expect(await fetchNbpTables('2026-10-03', '2026-10-04', respond(404))).toEqual([])
   })
@@ -66,6 +75,17 @@ describe('fetchNbpTables', () => {
     ['a lowercase code', [{ no: 'x', effectiveDate: '2026-10-23', rates: [{ code: 'eur', mid: 4 }] }]],
     ['a zero rate', [{ no: 'x', effectiveDate: '2026-10-23', rates: [{ code: 'EUR', mid: 0 }] }]],
     ['a string rate', [{ no: 'x', effectiveDate: '2026-10-23', rates: [{ code: 'EUR', mid: '4' }] }]],
+    ['a table B', [{ table: 'B', no: '43/B/NBP/2026', effectiveDate: '2026-10-21', rates: [{ code: 'EUR', mid: 4 }] }]],
+    ['a table without a table field', [{ no: 'x', effectiveDate: '2026-10-21', rates: [{ code: 'EUR', mid: 4 }] }]],
+    ['a day before the range', [{ table: 'A', no: 'x', effectiveDate: '2026-09-30', rates: [{ code: 'EUR', mid: 4 }] }]],
+    ['a day after the range', [{ table: 'A', no: 'x', effectiveDate: '2026-10-27', rates: [{ code: 'EUR', mid: 4 }] }]],
+    [
+      'a duplicated day',
+      [
+        { table: 'A', no: '1/A/NBP/2026', effectiveDate: '2026-10-21', rates: [{ code: 'EUR', mid: 4 }] },
+        { table: 'A', no: '2/A/NBP/2026', effectiveDate: '2026-10-21', rates: [{ code: 'EUR', mid: 4 }] },
+      ],
+    ],
   ])('rejects %s as provider_unavailable', async (_label, json) => {
     expect(await code(fetchNbpTables('2026-10-01', '2026-10-26', respond(200, json)))).toBe('provider_unavailable')
   })

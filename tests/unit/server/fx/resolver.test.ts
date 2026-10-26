@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest'
-import { createResolver } from '@/lib/server/fx/resolver'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createResolver, type FxDeps } from '@/lib/server/fx/resolver'
 import { round8 } from '@/lib/server/fx/rates'
-import { FxError, type NbpTable } from '@/lib/server/fx/types'
+import type { FxStore } from '@/lib/server/fx/store'
+import { FxError, type MonthDoc, type NbpTable } from '@/lib/server/fx/types'
 import { fakeNbp, fixtureTables, memoryStore } from '@/tests/unit/server/fx/helpers'
 
 const TODAY = '2026-10-26'
-const NOW = Date.parse('2026-10-26T10:00:00Z')
+// After NBP publishes the table of the day (about 12:00 Warsaw), so the clock agrees with TODAY.
+const NOW = Date.parse('2026-10-26T12:30:00Z')
 const HOUR = 3_600_000
 const ALL = fixtureTables()
 const table = (effectiveDate: string): NbpTable => {
@@ -14,18 +16,37 @@ const table = (effectiveDate: string): NbpTable => {
   return t
 }
 
-function setup(opts: { tables?: NbpTable[]; now?: () => number; today?: string } = {}) {
+function setup(opts: { tables?: NbpTable[]; today?: string; store?: FxStore; fetchTables?: FxDeps['fetchTables'] } = {}) {
   const today = opts.today ?? TODAY
   const nbp = fakeNbp(opts.tables ?? ALL, today)
   const mem = memoryStore()
   let clock = NOW
-  const resolve = createResolver({
-    store: mem.store,
-    fetchTables: nbp.fn,
-    now: opts.now ?? (() => clock),
+  const deps: FxDeps = {
+    store: opts.store ?? mem.store,
+    fetchTables: opts.fetchTables ?? nbp.fn,
+    now: () => clock,
     today: () => today,
-  })
-  return { resolve, nbp, mem, advance: (ms: number) => (clock += ms) }
+  }
+  return {
+    resolve: createResolver(deps),
+    /** A resolver with empty in-memory caches over the same store, NBP and clock. */
+    fresh: (override: Partial<FxDeps> = {}) => createResolver({ ...deps, ...override }),
+    nbp,
+    mem,
+    advance: (ms: number) => (clock += ms),
+  }
+}
+
+/** A cached month document as an earlier fetch would have left it. */
+function cachedDoc(month: string, days: string[], over: Partial<MonthDoc> = {}): MonthDoc {
+  return {
+    month,
+    tables: days.map(table),
+    fetchedAt: NOW - 2 * HOUR,
+    fetchedDay: TODAY,
+    complete: false,
+    ...over,
+  }
 }
 
 async function codeOf(p: Promise<unknown>): Promise<string> {
@@ -78,6 +99,7 @@ describe('currencies', () => {
       rateDate: '2026-10-20',
       tableNo: null,
       source: 'identity',
+      final: true,
     })
     expect(nbp.calls).toHaveLength(0)
   })
@@ -132,16 +154,56 @@ describe('cache', () => {
     expect(nbp.calls).toHaveLength(1)
   })
 
-  it('the current month is stored as not complete and refreshed after an hour', async () => {
+  it('the current month is stored as not complete and a later day refreshes it after an hour', async () => {
     const { resolve, nbp, mem, advance } = setup()
-    await resolve('EUR', 'PLN', '2026-10-20')
-    expect(mem.docs.get('2026-10')?.complete).toBe(false)
+    await resolve('EUR', 'PLN', '2026-10-28')
+    expect(mem.docs.get('2026-10')).toMatchObject({ complete: false, fetchedDay: TODAY, fetchedAt: NOW })
     advance(HOUR - 1)
-    await resolve('EUR', 'PLN', '2026-10-20')
+    await resolve('EUR', 'PLN', '2026-10-28')
     expect(nbp.calls).toHaveLength(1)
     advance(2)
-    await resolve('EUR', 'PLN', '2026-10-20')
+    await resolve('EUR', 'PLN', '2026-10-28')
     expect(nbp.calls).toHaveLength(2)
+  })
+
+  it('a day up to the fetch day never refetches, however old the fetch is', async () => {
+    const { resolve, nbp, advance } = setup()
+    await resolve('EUR', 'PLN', '2026-10-28')
+    advance(5 * HOUR)
+    await resolve('EUR', 'PLN', '2026-10-20')
+    await resolve('EUR', 'PLN', TODAY)
+    expect(nbp.calls).toHaveLength(1)
+  })
+
+  it('stores the fetch day with the month', async () => {
+    const { resolve, mem } = setup()
+    await resolve('EUR', 'PLN', '2025-04-22')
+    expect(mem.docs.get('2025-04')).toMatchObject({ complete: true, fetchedDay: TODAY })
+  })
+
+  it('a finished month is kept in memory: the store is read once', async () => {
+    const mem = memoryStore()
+    const get = vi.fn(mem.store.get)
+    const { resolve } = setup({ store: { get, set: mem.store.set } })
+    await resolve('EUR', 'PLN', '2025-04-22')
+    await resolve('USD', 'PLN', '2025-04-23')
+    expect(get).toHaveBeenCalledTimes(1)
+  })
+
+  it('an unreadable cache is a miss, not an error', async () => {
+    const mem = memoryStore()
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { resolve, nbp } = setup({
+      store: {
+        get: async () => {
+          throw new TypeError('firestore down with secrets')
+        },
+        set: mem.store.set,
+      },
+    })
+    expect((await resolve('EUR', 'PLN', '2026-10-20')).rateDate).toBe('2026-10-19')
+    expect(nbp.calls).toHaveLength(1)
+    expect(err).toHaveBeenCalledWith('fx cache read failed', { name: 'TypeError' })
   })
 
   it('a month walk fetches the previous month when the day is early in the month', async () => {
@@ -166,37 +228,192 @@ describe('cache', () => {
     expect(mem.sets).toHaveLength(0)
   })
 
-  it('a month missing from the store is fetched again', async () => {
-    const { resolve, nbp, mem } = setup()
+  it('a month missing from the store is fetched again (by a resolver with empty memory)', async () => {
+    const { resolve, fresh, nbp, mem } = setup()
     await resolve('EUR', 'PLN', '2025-04-22')
     mem.docs.delete('2025-04')
-    await resolve('EUR', 'PLN', '2025-04-22')
+    await fresh()('EUR', 'PLN', '2025-04-22')
     expect(nbp.calls).toHaveLength(2)
   })
 })
 
-describe('NBP outage', () => {
-  async function stale() {
+describe('clock: the day table is not published yet', () => {
+  it('today and tomorrow take the last published table; a later fetch picks the new one up', async () => {
+    const published = ALL.filter((t) => t.effectiveDate < TODAY)
+    const { resolve, nbp, advance } = setup({ tables: published })
+    expect((await resolve('EUR', 'PLN', TODAY)).rateDate).toBe('2026-10-23')
+    expect((await resolve('EUR', 'PLN', '2026-10-27')).rateDate).toBe('2026-10-23')
+    expect(nbp.calls).toHaveLength(1)
+
+    published.push(table(TODAY)) // NBP publishes
+    advance(2 * HOUR)
+    expect((await resolve('EUR', 'PLN', '2026-10-27')).rateDate).toBe('2026-10-26')
+    expect(nbp.calls).toHaveLength(2)
+    // today's own answer never depended on today's table
+    expect((await resolve('EUR', 'PLN', TODAY)).rateDate).toBe('2026-10-23')
+    expect(nbp.calls).toHaveLength(2)
+  })
+})
+
+describe('final', () => {
+  it.each([
+    ['a date after today is not final', '2026-10-27', false],
+    ['a far future date is not final', '2027-03-01', false],
+    ['today is final', TODAY, true],
+    ['a past date is final', '2026-10-20', true],
+  ])('%s', async (_label, day, final) => {
+    const { resolve } = setup()
+    expect((await resolve('EUR', 'PLN', day)).final).toBe(final)
+  })
+
+  it('identical currencies are final even for a future date', async () => {
+    const { resolve } = setup()
+    expect((await resolve('EUR', 'EUR', '2026-12-01')).final).toBe(true)
+  })
+})
+
+describe('refreshed months are validated before they are stored', () => {
+  const OCT = ['2026-10-16', '2026-10-19']
+
+  it('an empty NBP reply never replaces a cached month (the reviewer scenario)', async () => {
+    // October was cached on 20 October with 10-16 and 10-19; NBP now answers 404 (empty).
+    const s = setup({ tables: [] })
+    const doc = cachedDoc('2026-10', OCT, { fetchedDay: '2026-10-20' })
+    s.mem.docs.set('2026-10', doc)
+    expect((await s.resolve('EUR', 'PLN', '2026-10-20')).rateDate).toBe('2026-10-19')
+    expect(s.mem.docs.get('2026-10')).toBe(doc)
+    expect(s.mem.sets).toHaveLength(0)
+  })
+
+  it('a refresh that is forced and gets an empty reply fails without touching the cache', async () => {
+    const s = setup({ tables: [] })
+    const doc = cachedDoc('2026-10', OCT, { fetchedDay: '2026-10-20' })
+    s.mem.docs.set('2026-10', doc)
+    // 10-28 is after the fetch day, so the stale month cannot answer it and NBP is asked
+    expect(await codeOf(s.resolve('EUR', 'PLN', '2026-10-28'))).toBe('provider_unavailable')
+    expect(s.nbp.calls).toHaveLength(1)
+    expect(s.mem.docs.get('2026-10')).toBe(doc)
+    expect(s.mem.sets).toHaveLength(0)
+  })
+
+  it('a reply that lost a cached day is not stored', async () => {
+    const s = setup({ tables: ALL.filter((t) => t.effectiveDate !== '2026-10-22') })
+    const doc = cachedDoc('2026-10', ['2026-10-21', '2026-10-22', '2026-10-23'], { fetchedDay: '2026-10-23' })
+    s.mem.docs.set('2026-10', doc)
+    expect(await codeOf(s.resolve('EUR', 'PLN', '2026-10-28'))).toBe('provider_unavailable')
+    expect(s.mem.docs.get('2026-10')).toBe(doc)
+  })
+
+  it('a reply with a gap in the table numbers is not stored', async () => {
+    const s = setup({ tables: ALL.filter((t) => t.effectiveDate !== '2026-10-21') })
+    expect(await codeOf(s.resolve('EUR', 'PLN', '2026-10-20'))).toBe('provider_unavailable')
+    expect(s.mem.sets).toHaveLength(0)
+  })
+})
+
+describe('shared work and the failure memo', () => {
+  it('20 simultaneous resolves on an empty store make one NBP call and one store.set', async () => {
+    const { resolve, nbp, mem } = setup()
+    const results = await Promise.all(Array.from({ length: 20 }, () => resolve('EUR', 'PLN', '2026-10-20')))
+    expect(new Set(results.map((r) => r.rateDate))).toEqual(new Set(['2026-10-19']))
+    expect(nbp.calls).toHaveLength(1)
+    expect(mem.sets).toEqual(['2026-10'])
+  })
+
+  it('simultaneous resolves share one failed NBP call', async () => {
+    const fetchTables = vi.fn(async () => {
+      throw new FxError('provider_unavailable')
+    })
+    const { resolve } = setup({ fetchTables })
+    const codes = await Promise.all(Array.from({ length: 20 }, () => codeOf(resolve('EUR', 'PLN', '2026-10-20'))))
+    expect(new Set(codes)).toEqual(new Set(['provider_unavailable']))
+    expect(fetchTables).toHaveBeenCalledTimes(1)
+  })
+
+  it('after a failed fetch NBP is not called again for 30 seconds', async () => {
+    let down = true
+    const nbp = fakeNbp(ALL, TODAY)
+    const fetchTables = vi.fn((a: string, b: string) => {
+      if (down) throw new FxError('provider_unavailable')
+      return nbp.fn(a, b)
+    })
+    const { resolve, advance } = setup({ fetchTables })
+    expect(await codeOf(resolve('EUR', 'PLN', '2026-10-20'))).toBe('provider_unavailable')
+    advance(29_000)
+    expect(await codeOf(resolve('EUR', 'PLN', '2026-10-20'))).toBe('provider_unavailable')
+    expect(fetchTables).toHaveBeenCalledTimes(1)
+
+    down = false
+    advance(2_000) // 31 s after the failure
+    expect((await resolve('EUR', 'PLN', '2026-10-20')).rateDate).toBe('2026-10-19')
+    expect(fetchTables).toHaveBeenCalledTimes(2)
+  })
+
+  it('a failed refresh is remembered for the month while days the cache can answer are still served', async () => {
     const s = setup()
-    await s.resolve('EUR', 'PLN', '2026-10-20') // cache the current month
-    s.advance(2 * HOUR) // stale
-    return s
-  }
-  const down = async () => {
+    await s.resolve('EUR', 'PLN', '2026-10-20')
+    s.advance(2 * HOUR)
+    let calls = 0
+    const down = async (): Promise<NbpTable[]> => {
+      calls++
+      throw new FxError('provider_unavailable')
+    }
+    const resolve = s.fresh({ fetchTables: down })
+    expect(await codeOf(resolve('EUR', 'PLN', '2026-10-28'))).toBe('provider_unavailable')
+    expect(await codeOf(resolve('EUR', 'PLN', '2026-10-28'))).toBe('provider_unavailable')
+    expect(calls).toBe(1)
+    // a day the cache can answer is still served while NBP is being avoided
+    expect((await resolve('EUR', 'PLN', '2026-10-21')).rateDate).toBe('2026-10-20')
+  })
+})
+
+describe('NBP outage', () => {
+  const downCalls: string[] = []
+  beforeEach(() => {
+    downCalls.length = 0
+  })
+  const down = async (from: string): Promise<NbpTable[]> => {
+    downCalls.push(from)
     throw new FxError('provider_unavailable')
   }
 
-  it('serves a stale month when it already holds a table on or after the day (result is certain)', async () => {
-    const s = await stale()
-    const resolve = createResolver({ store: s.mem.store, fetchTables: down, now: () => NOW + 2 * HOUR, today: () => TODAY })
+  /** The current month cached earlier today with tables up to 10-23, then two hours pass. */
+  async function cachedEarlierToday() {
+    const s = setup({ tables: ALL.filter((t) => t.effectiveDate <= '2026-10-23') })
+    await s.resolve('EUR', 'PLN', '2026-10-20')
+    s.advance(2 * HOUR)
+    downCalls.length = 0
+    return s
+  }
+
+  it('serves today from a month fetched earlier today: every table before today is in it', async () => {
+    const s = await cachedEarlierToday()
+    const resolve = s.fresh({ fetchTables: down })
+    expect((await resolve('EUR', 'PLN', TODAY)).rateDate).toBe('2026-10-23')
+    expect(downCalls).toHaveLength(0)
+  })
+
+  it('fails for a future day: a newer table may exist upstream', async () => {
+    const s = await cachedEarlierToday()
+    const resolve = s.fresh({ fetchTables: down })
+    expect(await codeOf(resolve('EUR', 'PLN', '2026-10-28'))).toBe('provider_unavailable')
+    expect(downCalls).toHaveLength(1)
+  })
+
+  it('serves a stale month fetched on an earlier day when it holds a table on or after the day', async () => {
+    const s = setup()
+    s.mem.docs.set('2026-10', cachedDoc('2026-10', ['2026-10-16', '2026-10-19', '2026-10-20'], { fetchedDay: '2026-10-20' }))
+    const resolve = s.fresh({ fetchTables: down })
     expect((await resolve('EUR', 'PLN', '2026-10-20')).rateDate).toBe('2026-10-19')
   })
 
-  it('fails when the stale month could be missing a newer table', async () => {
-    const s = await stale()
-    const resolve = createResolver({ store: s.mem.store, fetchTables: down, now: () => NOW + 2 * HOUR, today: () => TODAY })
-    // the cached month ends on 2026-10-26; a day after that may have a newer table upstream
-    expect(await codeOf(resolve('EUR', 'PLN', '2026-10-27'))).toBe('provider_unavailable')
+  it('fails during a month walk when the previous month is not cached', async () => {
+    const s = setup()
+    // 2025-11 is cached but has no table before 2025-11-03; 2025-10 is not cached
+    s.mem.docs.set('2025-11', cachedDoc('2025-11', ['2025-11-03', '2025-11-04'], { fetchedDay: '2025-11-30', complete: true }))
+    const resolve = s.fresh({ fetchTables: down })
+    expect(await codeOf(resolve('EUR', 'PLN', '2025-11-03'))).toBe('provider_unavailable')
+    expect(downCalls).toContain('2025-10-01')
   })
 
   it('a failed cache write still returns the rate', async () => {

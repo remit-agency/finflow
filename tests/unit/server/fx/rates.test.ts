@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { crossRate, pickTable, round8 } from '@/lib/server/fx/rates'
+import { crossRate, pickTable, round8, validateRefresh } from '@/lib/server/fx/rates'
 import { FxError, type NbpTable } from '@/lib/server/fx/types'
 
 const t = (effectiveDate: string, eur: number): NbpTable => ({
@@ -46,5 +46,48 @@ describe('crossRate', () => {
   })
   it('does not read inherited object keys as currencies', () => {
     expect(() => crossRate(table, 'EUR', 'toString')).toThrow(FxError)
+  })
+})
+
+describe('validateRefresh', () => {
+  const n = (effectiveDate: string, no: string): NbpTable => ({ no, effectiveDate, rates: { EUR: 4 } })
+  const OCT = [n('2026-10-15', '199/A/NBP/2026'), n('2026-10-16', '200/A/NBP/2026'), n('2026-10-19', '201/A/NBP/2026')]
+  const codeOf = (fn: () => void): string => {
+    try {
+      fn()
+    } catch (e) {
+      return e instanceof FxError ? e.code : 'other'
+    }
+    return 'none'
+  }
+
+  it('accepts a reply that keeps every cached day and has no gaps', () => {
+    expect(codeOf(() => validateRefresh([...OCT, n('2026-10-20', '202/A/NBP/2026')], OCT, false))).toBe('none')
+  })
+
+  it('accepts a first fetch (nothing cached) and an empty unfinished month', () => {
+    expect(codeOf(() => validateRefresh(OCT, [], true))).toBe('none')
+    expect(codeOf(() => validateRefresh([], [], false))).toBe('none')
+  })
+
+  it('rejects an empty reply when the cache holds tables (NBP answered 404 after the fact)', () => {
+    expect(codeOf(() => validateRefresh([], OCT, false))).toBe('provider_unavailable')
+  })
+
+  it('rejects a reply that lost a cached day', () => {
+    expect(codeOf(() => validateRefresh([OCT[0], OCT[2]], OCT, false))).toBe('provider_unavailable')
+  })
+
+  it('rejects an empty finished month', () => {
+    expect(codeOf(() => validateRefresh([], [], true))).toBe('provider_unavailable')
+  })
+
+  it('rejects a gap in the table numbers of one year', () => {
+    expect(codeOf(() => validateRefresh([OCT[0], OCT[2]], [], false))).toBe('provider_unavailable')
+  })
+
+  it('ignores an unparsable number and a change of year', () => {
+    expect(codeOf(() => validateRefresh([n('2026-10-15', 'garbage'), n('2026-10-16', '200/A/NBP/2026')], [], false))).toBe('none')
+    expect(codeOf(() => validateRefresh([n('2025-12-31', '251/A/NBP/2025'), n('2026-01-02', '1/A/NBP/2026')], [], true))).toBe('none')
   })
 })

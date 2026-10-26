@@ -21,6 +21,7 @@ const SNAPSHOT = {
   rateDate: '2026-10-26',
   tableNo: '208/A/NBP/2026',
   source: 'NBP_A',
+  final: false,
 }
 
 function req(query: string, token: string | null = 'token-alice'): Request {
