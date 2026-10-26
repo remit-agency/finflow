@@ -41,7 +41,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [orgName, setOrgName] = useState('')
-  const [currency, setCurrency] = useState('UAH')
+  const [currency, setCurrency] = useState('PLN')
   const [loading, setLoading] = useState(false)
   // True while a company-only submit runs, so that form does not flip while it is busy.
   const [companyOnlySubmit, setCompanyOnlySubmit] = useState(false)

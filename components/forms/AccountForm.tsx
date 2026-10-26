@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createAccount, updateAccount } from '@/lib/firebase/accounts'
-import { parseAmountInput } from '@/lib/utils/amount-input'
+import { useFormatters } from '@/lib/i18n/useFormatters'
+import { formatAmountInput, parseAmountInput, roundAmount } from '@/lib/utils/amount-input'
 import type { Account } from '@/types'
 
 const PRESET_COLORS = [
@@ -30,23 +31,29 @@ const ACCOUNT_TYPES: Account['type'][] = ['bank', 'cash', 'card', 'crypto']
 
 const CURRENCIES = ['UAH', 'EUR', 'USD', 'PLN']
 
+/** Used when the company currency is not known. */
+const FALLBACK_CURRENCY = 'PLN'
+
 interface AccountFormProps {
   orgId: string
   account?: Account
+  /** The company currency, preselected for a new account. */
+  defaultCurrency?: string
   open: boolean
   onClose: () => void
 }
 
-export function AccountForm({ orgId, account, open, onClose }: AccountFormProps) {
+export function AccountForm({ orgId, account, defaultCurrency, open, onClose }: AccountFormProps) {
   const t = useTranslations('forms.account')
   const tForms = useTranslations('forms')
   const tCommon = useTranslations('common')
+  const { locale } = useFormatters()
   const isEdit = !!account
 
   const [name, setName] = useState(account?.name ?? '')
   const [type, setType] = useState<Account['type']>(account?.type ?? 'bank')
-  const [balance, setBalance] = useState(account?.balance?.toString() ?? '0')
-  const [currency, setCurrency] = useState(account?.currency ?? 'UAH')
+  const [balance, setBalance] = useState(formatAmountInput(account?.balance ?? 0, locale))
+  const [currency, setCurrency] = useState(account?.currency ?? defaultCurrency ?? FALLBACK_CURRENCY)
   const [color, setColor] = useState(account?.color ?? PRESET_COLORS[0])
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<{ name?: string; balance?: string }>({})
@@ -70,7 +77,7 @@ export function AccountForm({ orgId, account, open, onClose }: AccountFormProps)
         name: name.trim(),
         type,
         // validate() has already refused anything parseAmountInput cannot read.
-        balance: parseAmountInput(balance) ?? 0,
+        balance: roundAmount(parseAmountInput(balance) ?? 0),
         currency,
         color,
       }

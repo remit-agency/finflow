@@ -143,6 +143,57 @@ test.describe('language switching (emulators)', () => {
       .toBe(1234.5)
   })
 
+  test('the register form preselects the Polish zloty', async ({ page }) => {
+    await page.goto('/register')
+    await waitForHydration(page, '#name')
+    await expect(page.getByLabel(uk.auth.register.currency, { exact: true })).toHaveText(/^PLN/)
+  })
+
+  test('an amount with more than 2 decimals opens rounded, with the Polish comma, and a new operation takes its account currency', async ({ page, request, context }) => {
+    const user = await registerViaUi(page, 'i18nprefill')
+    await waitForShell(page, user.companyName)
+    await seedDoc(request, `organizations/${user.orgId}/accounts`, 'pln-acc', {
+      name: 'Konto PLN',
+      type: 'bank',
+      balance: 0,
+      currency: 'PLN',
+      color: '#00c896',
+      orgId: user.orgId,
+      createdAt: new Date(),
+    })
+    await seedDoc(request, `organizations/${user.orgId}/transactions`, 'prefill-tx', {
+      type: 'income',
+      accountId: 'pln-acc',
+      amount: 12.345,
+      currency: 'PLN',
+      date: new Date(),
+      description: 'Ułamki',
+      isRecurring: false,
+      tags: [],
+      fileUrls: [],
+      orgId: user.orgId,
+      createdAt: new Date(),
+    })
+    await context.addCookies([{ name: 'NEXT_LOCALE', value: 'pl', url: ORIGIN }])
+    await page.goto(`/${user.orgId}/transactions`)
+    await waitForShell(page, user.companyName)
+
+    const form = pl.forms.transaction
+    const row = page.getByRole('row').filter({ hasText: 'Ułamki' })
+    await row.getByRole('button', { name: /edytuj$/ }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByText(form.titleEdit, { exact: true })).toBeVisible()
+    // 12.345 used to be prefilled as "12.345", which the parser reads as twelve thousand.
+    await expect(dialog.getByRole('tabpanel').getByLabel(form.amount, { exact: true })).toHaveValue('12,35')
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+
+    // A new operation starts in the currency of the first account (here PLN), not in UAH.
+    await page.getByRole('button', { name: pl.shell.header.expense, exact: true }).click()
+    await expect(dialog.getByText(form.titleNew, { exact: true })).toBeVisible()
+    await expect(dialog.getByRole('tabpanel').locator('[data-slot="select-trigger"]')).toHaveText(/^PLN/)
+  })
+
   test('the language persists across a sign-out / sign-in cycle', async ({ page, context }) => {
     const user = await registerViaUi(page, 'i18ncycle')
     await waitForShell(page, user.companyName)

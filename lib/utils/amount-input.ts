@@ -1,3 +1,5 @@
+import type { Locale } from '@/lib/i18n/config'
+
 /**
  * Parses what a person types into an amount field, whatever their keyboard or habit:
  * `1 234,50`, `1234.5`, `1.234,50`, `1,234.50`, `0,125`. Returns null for anything else
@@ -50,4 +52,56 @@ export function parseAmountInput(text: string): number | null {
   if (!/^\d*$/.test(integer) || !/^\d*$/.test(fraction)) return null
   const value = Number(`${integer || '0'}${fraction ? `.${fraction}` : ''}`)
   return Number.isFinite(value) ? value : null
+}
+
+interface DecimalParts {
+  negative: boolean
+  /** Digits before the decimal mark, no leading zeros (`0` for none). */
+  integer: string
+  /** Exactly two digits. */
+  cents: string
+}
+
+/**
+ * `value` rounded to 2 decimals, half away from zero, by its written decimal digits (so 1.005 is
+ * 1.01 as typed, not 1.00 as the binary double would suggest), or null when it is not finite. From
+ * 2^53 up a double has no fractional part: its exact integer value is returned.
+ */
+function decimalParts(value: number): DecimalParts | null {
+  if (!Number.isFinite(value)) return null
+  const abs = Math.abs(value)
+  if (abs >= Number.MAX_SAFE_INTEGER) return { negative: value < 0, integer: BigInt(abs).toString(), cents: '00' }
+  const written = String(abs)
+  // Only values below 1e-6 are written with an exponent, and they round to zero.
+  if (written.includes('e')) return { negative: false, integer: '0', cents: '00' }
+  const [whole, fraction = ''] = written.split('.')
+  const digits = (fraction + '000').slice(0, 3)
+  let hundredths = BigInt(whole + digits.slice(0, 2))
+  if (digits[2] >= '5') hundredths += BigInt(1)
+  const text = hundredths.toString().padStart(3, '0')
+  return { negative: value < 0 && hundredths !== BigInt(0), integer: text.slice(0, -2), cents: text.slice(-2) }
+}
+
+/** `value` rounded to 2 decimals (half away from zero), the precision money is stored with. A non-finite value is returned as it is. */
+export function roundAmount(value: number): number {
+  const parts = decimalParts(value)
+  if (!parts || Math.abs(value) >= Number.MAX_SAFE_INTEGER) return value
+  return (parts.negative ? -1 : 1) * Number(`${parts.integer}.${parts.cents}`)
+}
+
+/**
+ * The text an amount field is prefilled with, the inverse of `parseAmountInput` for any amount
+ * with at most 2 decimals: no thousands grouping (a grouped `1 234,50` would be fine to read back,
+ * but a person editing it should not have to delete spaces), no exponent, at most 2 decimals
+ * (rounded half away from zero, so a stored 12.345 shows `12,35`), trailing zeros trimmed, and the
+ * decimal mark of the UI language: `,` for Polish and Ukrainian, `.` for English. Sub-cent values
+ * show as `0`; a value that is not finite shows as an empty field.
+ */
+export function formatAmountInput(value: number, locale: Locale): string {
+  const parts = decimalParts(value)
+  if (!parts) return ''
+  const fraction = parts.cents.replace(/0$/, '')
+  const mark = locale === 'en' ? '.' : ','
+  const body = parts.cents === '00' ? parts.integer : `${parts.integer}${mark}${fraction}`
+  return parts.negative ? `-${body}` : body
 }

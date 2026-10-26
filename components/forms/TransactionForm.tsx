@@ -24,11 +24,15 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { createTransaction, updateTransaction } from '@/lib/firebase/transactions'
-import { parseAmountInput } from '@/lib/utils/amount-input'
+import { useFormatters } from '@/lib/i18n/useFormatters'
+import { formatAmountInput, parseAmountInput, roundAmount } from '@/lib/utils/amount-input'
 import { todayUtcDay } from '@/lib/utils/today'
 import type { Transaction, Account, Category } from '@/types'
 
 const CURRENCIES = ['UAH', 'EUR', 'USD', 'PLN']
+
+/** Used when neither the account nor the company says which currency to preselect. */
+const FALLBACK_CURRENCY = 'PLN'
 
 function toInputDate(d: Date): string {
   return d.toISOString().split('T')[0]
@@ -41,6 +45,8 @@ interface TransactionFormProps {
   expenseCategories: Category[]
   transaction?: Transaction
   defaultType?: Transaction['type']
+  /** The company currency: preselected when the chosen account has none to offer. */
+  defaultCurrency?: string
   open: boolean
   onClose: () => void
 }
@@ -52,19 +58,25 @@ export function TransactionForm({
   expenseCategories,
   transaction,
   defaultType = 'income',
+  defaultCurrency,
   open,
   onClose,
 }: TransactionFormProps) {
   const t = useTranslations('forms.transaction')
   const tForms = useTranslations('forms')
   const tCommon = useTranslations('common')
+  const { locale } = useFormatters()
   const isEdit = !!transaction
+  const currencyOf = (id: string) => accounts.find((a) => a.id === id)?.currency ?? defaultCurrency ?? FALLBACK_CURRENCY
 
   const [type, setType] = useState<Transaction['type']>(transaction?.type ?? defaultType)
   const [accountId, setAccountId] = useState(transaction?.accountId ?? accounts[0]?.id ?? '')
   const [toAccountId, setToAccountId] = useState(transaction?.counterpartyId ?? '')
-  const [amount, setAmount] = useState(transaction?.amount?.toString() ?? '')
-  const [currency, setCurrency] = useState(transaction?.currency ?? 'UAH')
+  const [amount, setAmount] = useState(transaction ? formatAmountInput(transaction.amount, locale) : '')
+  // A new operation starts in the currency of its account (else the company's); picking another
+  // account moves it along until the person has chosen a currency themselves.
+  const [currency, setCurrency] = useState(transaction?.currency ?? currencyOf(transaction?.accountId ?? accounts[0]?.id ?? ''))
+  const [currencyChosen, setCurrencyChosen] = useState(false)
   const [categoryId, setCategoryId] = useState(transaction?.categoryId ?? '')
   const [date, setDate] = useState(toInputDate(transaction?.date ?? todayUtcDay()))
   const [description, setDescription] = useState(transaction?.description ?? '')
@@ -113,7 +125,8 @@ export function TransactionForm({
       type,
       accountId,
       // validate() has already refused anything parseAmountInput cannot read.
-      amount: parseAmountInput(amount) ?? 0,
+      // Sub-cent values are not money: store what the prefill would show.
+      amount: roundAmount(parseAmountInput(amount) ?? 0),
       currency,
       date: new Date(date),
       isRecurring,
@@ -189,7 +202,10 @@ export function TransactionForm({
                   <Label>{panel === 'transfer' ? t('accountFrom') : t('account')}</Label>
                   <select
                     value={accountId}
-                    onChange={(e) => setAccountId(e.target.value)}
+                    onChange={(e) => {
+                      setAccountId(e.target.value)
+                      if (!isEdit && !currencyChosen) setCurrency(currencyOf(e.target.value))
+                    }}
                     className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus:border-[#00c896]"
                   >
                     <option value="">{t('chooseAccount')}</option>
@@ -239,7 +255,10 @@ export function TransactionForm({
                   </div>
                   <div className="space-y-1">
                     <Label>{t('currency')}</Label>
-                    <Select value={currency} onValueChange={(v) => setCurrency(v ?? 'UAH')}>
+                    <Select value={currency} onValueChange={(v) => {
+                        setCurrencyChosen(true)
+                        setCurrency((current) => v ?? current)
+                      }}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>

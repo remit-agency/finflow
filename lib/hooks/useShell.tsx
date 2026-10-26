@@ -187,9 +187,11 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
     })
   }
 
+  const org = loadedOrg && loadedOrg.id === orgId ? loadedOrg : null
+
   const value: ShellContextValue = {
     orgId,
-    org: loadedOrg && loadedOrg.id === orgId ? loadedOrg : null,
+    org,
     chooseOrg,
     access,
     role,
@@ -220,6 +222,7 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
           incomeCategories={incomeCategories}
           expenseCategories={expenseCategories}
           defaultType={transactionFormType}
+          defaultCurrency={org?.currency}
           open
           onClose={() => setTransactionFormType(null)}
         />
@@ -229,6 +232,7 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
           key={accountForm.account?.id ?? 'new'}
           orgId={orgId}
           account={accountForm.account ?? undefined}
+          defaultCurrency={org?.currency}
           open
           onClose={() => setAccountForm(null)}
         />
