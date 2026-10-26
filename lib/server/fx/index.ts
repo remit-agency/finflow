@@ -14,10 +14,19 @@ export type { RateSnapshot } from '@/lib/server/fx/types'
  * evidence a caller stores next to an amount. Throws FxError.
  */
 export function resolveRate(from: string, to: string, date: string): Promise<RateSnapshot> {
-  return createResolver({
+  return resolver()(from, to, date)
+}
+
+// Built once per server process, lazily (Admin is not touched at import time), so the resolver's
+// in-memory caches, shared refreshes and failure memo live across requests.
+let shared: ReturnType<typeof createResolver> | undefined
+
+function resolver(): ReturnType<typeof createResolver> {
+  shared ??= createResolver({
     store: firestoreFxStore(getAdmin().db),
     fetchTables: (a, b) => fetchNbpTables(a, b),
     now: () => Date.now(),
     today: () => todayUtcDay().toISOString().slice(0, 10),
-  })(from, to, date)
+  })
+  return shared
 }

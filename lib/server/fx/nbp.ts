@@ -1,3 +1,4 @@
+import 'server-only'
 import { isDay } from '@/lib/server/fx/days'
 import { FxError, type NbpTable } from '@/lib/server/fx/types'
 
@@ -6,14 +7,20 @@ const TIMEOUT_MS = 8000
 
 type FetchLike = (url: string, init?: { signal?: AbortSignal; cache?: RequestCache }) => Promise<Response>
 
-function parseTables(json: unknown): NbpTable[] {
+function parseTables(json: unknown, fromDay: string, toDay: string): NbpTable[] {
   if (!Array.isArray(json)) throw new FxError('provider_unavailable')
+  const seen = new Set<string>()
   const tables = json.map((raw): NbpTable => {
     if (typeof raw !== 'object' || raw === null) throw new FxError('provider_unavailable')
     const r = raw as Record<string, unknown>
-    if (typeof r.no !== 'string' || !isDay(r.effectiveDate) || !Array.isArray(r.rates)) {
+    if (r.table !== 'A' || typeof r.no !== 'string' || !isDay(r.effectiveDate) || !Array.isArray(r.rates)) {
       throw new FxError('provider_unavailable')
     }
+    // A table outside the requested range, or a day listed twice, means the reply is not what we asked for.
+    if (r.effectiveDate < fromDay || r.effectiveDate > toDay || seen.has(r.effectiveDate)) {
+      throw new FxError('provider_unavailable')
+    }
+    seen.add(r.effectiveDate)
     const rates: Record<string, number> = {}
     for (const item of r.rates) {
       const it = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>
@@ -23,7 +30,7 @@ function parseTables(json: unknown): NbpTable[] {
     }
     return { no: r.no, effectiveDate: r.effectiveDate, rates }
   })
-  return tables.sort((a, b) => (a.effectiveDate < b.effectiveDate ? -1 : 1))
+  return tables.sort((a, b) => (a.effectiveDate < b.effectiveDate ? -1 : a.effectiveDate > b.effectiveDate ? 1 : 0))
 }
 
 /**
@@ -53,5 +60,5 @@ export async function fetchNbpTables(
   } catch {
     throw new FxError('provider_unavailable')
   }
-  return parseTables(json)
+  return parseTables(json, fromDay, toDay)
 }

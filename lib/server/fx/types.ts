@@ -14,6 +14,11 @@ export type MonthDoc = {
   tables: NbpTable[]
   /** Epoch ms of the NBP fetch. */
   fetchedAt: number
+  /**
+   * Warsaw day (YYYY-MM-DD) of the fetch. Every table dated before a requested day D <= fetchedDay
+   * was already published when the month was fetched, so such a document answers D for good.
+   */
+  fetchedDay: string
   /** True when the month had ended before the fetch: the document never changes again. */
   complete: boolean
 }
@@ -29,6 +34,12 @@ export type RateSnapshot = {
   /** null for identical currencies. */
   tableNo: string | null
   source: 'NBP_A' | 'identity'
+  /**
+   * True when `requestedDate` is today or earlier: every table before it is already published, so
+   * the snapshot cannot change. False for a later date: a table published in the meantime would
+   * give a different rate. A non-final snapshot must be recomputed before it is persisted for good.
+   */
+  final: boolean
 }
 
 export type FxErrorCode = 'invalid_params' | 'unsupported_currency' | 'no_rate_before' | 'provider_unavailable'

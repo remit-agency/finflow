@@ -34,3 +34,28 @@ function mid(table: NbpTable, code: string): number {
 export function crossRate(table: NbpTable, from: string, to: string): number {
   return mid(table, from) / mid(table, to)
 }
+
+const TABLE_NO = /^(\d+)\/A\/NBP\/(\d{4})$/
+
+/**
+ * Checks a freshly fetched month before it replaces the cached one, so a worse NBP reply never
+ * overwrites a good document. Throws `provider_unavailable` when the reply (a) lost a day the cache
+ * already holds, (b) is empty for a finished month, or (c) skips a table number inside one year
+ * (an unparsable `no` is ignored). `newTables` must be ascending.
+ */
+export function validateRefresh(
+  newTables: readonly NbpTable[],
+  cachedTables: readonly NbpTable[],
+  finished: boolean,
+): void {
+  const days = new Set(newTables.map((t) => t.effectiveDate))
+  if (cachedTables.some((t) => !days.has(t.effectiveDate))) throw new FxError('provider_unavailable')
+  if (finished && newTables.length === 0) throw new FxError('provider_unavailable')
+  for (let i = 1; i < newTables.length; i++) {
+    const prev = TABLE_NO.exec(newTables[i - 1].no)
+    const next = TABLE_NO.exec(newTables[i].no)
+    if (prev && next && prev[2] === next[2] && Number(next[1]) !== Number(prev[1]) + 1) {
+      throw new FxError('provider_unavailable')
+    }
+  }
+}

@@ -33,8 +33,9 @@ export function parseMonthDoc(raw: unknown, month: string): MonthDoc | null {
   const d = raw as Record<string, unknown>
   if (d.month !== month || !Array.isArray(d.tables) || !d.tables.every(isTable)) return null
   if (typeof d.fetchedAt !== 'number' || !Number.isFinite(d.fetchedAt)) return null
+  if (!isDay(d.fetchedDay)) return null
   if (typeof d.complete !== 'boolean') return null
-  return { month, tables: d.tables, fetchedAt: d.fetchedAt, complete: d.complete }
+  return { month, tables: d.tables, fetchedAt: d.fetchedAt, fetchedDay: d.fetchedDay, complete: d.complete }
 }
 
 export function firestoreFxStore(db: DbLike): FxStore {
