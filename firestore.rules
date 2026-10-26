@@ -90,5 +90,10 @@ service cloud.firestore {
     match /_meta/{document=**} {
       allow read, write: if false;
     }
+
+    // Cached NBP tables (written and read by the server only, see lib/server/fx).
+    match /fxTables/{document=**} {
+      allow read, write: if false;
+    }
   }
 }

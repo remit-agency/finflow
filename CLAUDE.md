@@ -139,6 +139,13 @@ docs/            ← research, specs, plans
 - **Guard test:** `tests/unit/i18n/no-hardcoded-text.test.ts` fails on Cyrillic text or `'uk-UA'`/`toLocale*String` in `app/(app)`, `app/(auth)`, `components`, `lib`, `types` (comments are stripped; the landing and pricing pages are out of scope until S17). Extend its `ALLOW` map (file -> reason) only for a file that must legitimately contain such text, such as `lib/i18n/config.ts` with the Ukrainian label; never to hide an untranslated string.
 - **E2E default locale:** `playwright.config.ts` sets `locale: 'uk-UA'`, so the older specs and helpers (`tests/e2e/helpers/app-ui.ts`) keep matching Ukrainian labels. A spec that needs another language sets `test.use({ locale })` or adds the `NEXT_LOCALE` cookie; `tests/e2e/i18n.spec.ts` reads its expected strings from `messages/*.json` instead of retyping them.
 
+## Exchange rates (S04)
+- Rates come from `resolveRate(from, to, date)` in `lib/server/fx` (server only, `import 'server-only'`). The rule is one and has no settings: the NBP table A with the greatest `effectiveDate` strictly before `date` (`YYYY-MM-DD`, UTC day), so Monday takes Friday and a holiday or a future date takes the last published table. Identical currencies return rate 1 with `source: 'identity'`.
+- Store the returned snapshot (`rate`, `from`, `to`, `requestedDate`, `rateDate`, `tableNo`, `source`) with the amount; never recompute a stored rate. `rate` is rounded to 8 places. Persist only `final: true` snapshots (`date <= today`: every table before it is published). A `final: false` snapshot (a date after today) can still change: S05 must re-resolve it on the first save after that date and never store it for good.
+- `resolveRate` builds one resolver per process: finished months stay in memory, concurrent refreshes of a month share one NBP call, and a failed refresh is not retried for 30 s. A refreshed month is validated (`validateRefresh`) so a worse NBP reply never replaces a good cached document; cached months carry `fetchedDay` (Warsaw day of the fetch).
+- Clients get rates only through `GET /api/rates?from=&to=&date=` (session required); they never read Firestore for rates. Tables are cached per month in `fxTables`, which is server-only (explicit deny in `firestore.rules`).
+- Tests use recorded months in `tests/fixtures/nbp/` (`scripts/record-nbp-fixtures.mjs`); CI never calls NBP. `node scripts/check-nbp.mjs` is the manual live check.
+
 ## Design System (S01A: Finmap ergonomics, FinFlow look)
 
 ### Shell
