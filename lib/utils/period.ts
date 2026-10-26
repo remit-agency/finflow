@@ -104,11 +104,11 @@ export function formatPeriodDay(date: Date, locale: Locale): string {
 /**
  * The pill label: «12.03.2026 – 18.04.2026» for a custom range (ordered, UTC days), otherwise
  * the name of the preset from `presetLabel` (the component passes `t`; the default is the preset
- * id). `locale` defaults to Ukrainian only for the Ukrainian e2e helpers; the app passes the UI language.
+ * id). `locale` is the UI language and has no default: a day is written the way that language writes it.
  */
 export function formatPeriodLabel(
   selection: PeriodSelection,
-  locale: Locale = 'uk',
+  locale: Locale,
   presetLabel: (preset: PeriodPreset) => string = (preset) => preset,
 ): string {
   if (selection.preset === 'custom' && selection.start && selection.end) {

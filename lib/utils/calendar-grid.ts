@@ -13,12 +13,6 @@ import { formatWeekday } from '../i18n/format'
 
 export const DAY_MS = 24 * 60 * 60 * 1000
 
-/**
- * The language of the name helpers below when a caller passes none. The app always passes the UI
- * language; the default keeps the Ukrainian e2e helpers (`formatDayLongUtc(date)`) as they were.
- */
-const LEGACY_LOCALE: Locale = 'uk'
-
 export interface YearMonth {
   year: number
   /** 0-11 */
@@ -106,12 +100,12 @@ function capitalize(text: string, locale: Locale): string {
 }
 
 /** «9 жовтня 2026» / «9 października 2026» / «9 October 2026» (the accessible name of a day in the picker). */
-export function formatDayLongUtc(date: Date, locale: Locale = LEGACY_LOCALE): string {
+export function formatDayLongUtc(date: Date, locale: Locale): string {
   return formatUntilYear(date, locale, { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 /** «Жовтень 2026» / «Październik 2026» / «October 2026». */
-export function formatMonthTitle(ym: YearMonth, locale: Locale = LEGACY_LOCALE): string {
+export function formatMonthTitle(ym: YearMonth, locale: Locale): string {
   return capitalize(formatUntilYear(utcDay(ym.year, ym.month, 1), locale, { month: 'long', year: 'numeric' }), locale)
 }
 
@@ -123,7 +117,7 @@ export interface WeekdayHeader {
 }
 
 /** The seven weekday headers, Monday first. */
-export function weekdayHeaders(locale: Locale = LEGACY_LOCALE): WeekdayHeader[] {
+export function weekdayHeaders(locale: Locale): WeekdayHeader[] {
   // 1 Jan 2024 is a Monday.
   return Array.from({ length: 7 }, (_, i) => {
     const day = utcDay(2024, 0, 1 + i)

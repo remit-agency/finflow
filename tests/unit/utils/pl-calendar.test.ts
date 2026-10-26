@@ -91,3 +91,24 @@ describe('business day navigation', () => {
     expect(addBusinessDays(d(2026, 10, 26), 0).toISOString()).toBe(d(2026, 10, 26).toISOString())
   })
 })
+
+describe('invalid input', () => {
+  const invalid = new Date(Number.NaN)
+
+  it.each([
+    ['isBusinessDay', () => isBusinessDay(invalid)],
+    ['previousBusinessDay', () => previousBusinessDay(invalid)],
+    ['nextBusinessDay', () => nextBusinessDay(invalid)],
+    ['addBusinessDays', () => addBusinessDays(invalid, 1)],
+    ['addBusinessDays with a zero count', () => addBusinessDays(invalid, 0)],
+  ])('%s throws a RangeError for an invalid Date', (_name, call) => {
+    expect(call).toThrow(RangeError)
+  })
+
+  it.each([1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'addBusinessDays throws a RangeError for the count %s',
+    (count) => {
+      expect(() => addBusinessDays(d(2026, 10, 26), count)).toThrow(RangeError)
+    },
+  )
+})

@@ -80,10 +80,9 @@ describe('day maths (UTC)', () => {
     expect(isDayBetweenUtc(d('2026-10-13'), d('2026-10-12'), d('2026-10-09'))).toBe(false)
   })
 
-  it('formats in Ukrainian from the UTC day (the default language)', () => {
-    expect(formatDayLongUtc(d('2026-10-09'))).toBe('9 жовтня 2026')
+  it('formats in Ukrainian from the UTC day', () => {
     expect(formatDayLongUtc(d('2026-10-09'), 'uk')).toBe('9 жовтня 2026')
-    expect(formatMonthTitle({ year: 2026, month: 9 })).toBe('Жовтень 2026')
+    expect(formatMonthTitle({ year: 2026, month: 9 }, 'uk')).toBe('Жовтень 2026')
     expect(formatDayLongUtc(new Date('2026-03-12T23:59:00Z'), 'uk')).toBe('12 березня 2026')
   })
 
@@ -101,7 +100,6 @@ describe('weekdayHeaders', () => {
     expect(uk.map((h) => h.short)).toEqual(['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'])
     expect(uk[0].full).toBe('понеділок')
     expect(uk[6].full).toBe('неділя')
-    expect(weekdayHeaders().map((h) => h.short)).toEqual(uk.map((h) => h.short))
   })
 
   it('Polish and English', () => {

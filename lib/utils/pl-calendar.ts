@@ -7,6 +7,11 @@ const utc = (year: number, month: number, day: number) => new Date(Date.UTC(year
 const addDays = (date: Date, days: number) => new Date(date.getTime() + days * DAY_MS)
 const dayStart = (date: Date) => utc(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate())
 
+/** An invalid Date has no day: walking from it would loop forever or answer for no day at all. */
+function requireValidDate(date: Date): void {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) throw new RangeError('Invalid date')
+}
+
 /** Easter Sunday (Meeus/Jones/Butcher, Gregorian). */
 export function easterSunday(year: number): Date {
   const a = year % 19
@@ -64,6 +69,7 @@ function holidaySet(year: number): Set<number> {
 
 /** Monday to Friday that is not a public holiday. The time of day is ignored. */
 export function isBusinessDay(date: Date): boolean {
+  requireValidDate(date)
   const day = dayStart(date)
   const weekday = day.getUTCDay()
   if (weekday === 0 || weekday === 6) return false
@@ -72,6 +78,7 @@ export function isBusinessDay(date: Date): boolean {
 
 /** The nearest business day strictly before `date`. */
 export function previousBusinessDay(date: Date): Date {
+  requireValidDate(date)
   let day = addDays(dayStart(date), -1)
   while (!isBusinessDay(day)) day = addDays(day, -1)
   return day
@@ -79,13 +86,16 @@ export function previousBusinessDay(date: Date): Date {
 
 /** The nearest business day strictly after `date`. */
 export function nextBusinessDay(date: Date): Date {
+  requireValidDate(date)
   let day = addDays(dayStart(date), 1)
   while (!isBusinessDay(day)) day = addDays(day, 1)
   return day
 }
 
-/** Moves `count` business days (negative = back). `count` 0 returns the day itself. */
+/** Moves `count` business days (negative = back). `count` 0 returns the day itself. Throws a RangeError for an invalid Date or a non-integer `count`. */
 export function addBusinessDays(date: Date, count: number): Date {
+  requireValidDate(date)
+  if (!Number.isInteger(count)) throw new RangeError('Business day count must be an integer')
   let day = dayStart(date)
   const step = count < 0 ? -1 : 1
   for (let left = Math.abs(count); left > 0; left--) {
