@@ -379,6 +379,12 @@ describe('server-only and unknown paths', () => {
     await assertFails(setDoc(doc(as('alice'), '_meta/health'), { ok: false }))
   })
 
+  it('a signed-in user cannot read or write fxTables', async () => {
+    await assertFails(getDoc(doc(as('alice'), 'fxTables/2026-10')))
+    await assertFails(setDoc(doc(as('alice'), 'fxTables/2026-10'), { month: '2026-10' }))
+    await assertFails(getDoc(doc(anon(), 'fxTables/2026-10')))
+  })
+
   it('everything else is denied by default', async () => {
     await assertFails(getDoc(doc(as('alice'), 'users/alice')))
     await assertFails(setDoc(doc(as('alice'), 'users/alice'), { a: 1 }))
