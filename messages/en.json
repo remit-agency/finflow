@@ -53,7 +53,11 @@
       "saveFailed": "Could not save the connection",
       "loadInstitutions": "Could not load the banks",
       "emailNotVerified": "Verify your email to connect a bank",
-      "connect": "Error: {message}",
+      "connect": "Could not connect the bank. Try again.",
+      "connectForbidden": "Only the company owner can connect banks",
+      "connectInvalid": "Could not connect this bank. Pick another one or try later.",
+      "connectUnavailable": "The bank or the connection service is unavailable right now. Try later.",
+      "connectNetwork": "No connection to the server. Check your internet and try again.",
       "disconnectFailed": "Could not disconnect the bank"
     }
   },
@@ -198,7 +202,7 @@
     "title": "Payments",
     "showAllAccounts": "Show all accounts",
     "filters": {
-      "searchPlaceholder": "Search description...",
+      "searchPlaceholder": "Search description…",
       "search": "Search description",
       "account": "Account",
       "allAccounts": "All accounts",
@@ -276,7 +280,7 @@
         "balance": "Balance must be ≥ 0"
       }
     },
-    "saving": "Saving..."
+    "saving": "Saving…"
   },
   "defaultCategories": {
     "income": {
@@ -301,9 +305,9 @@
       "title": "Bank connection",
       "description": "Santander, PKO, mBank, ING and other banks through Enable Banking",
       "connect": "Connect a bank",
-      "redirecting": "Redirecting...",
-      "loading": "Loading...",
-      "searchPlaceholder": "Search for a bank...",
+      "redirecting": "Redirecting…",
+      "loading": "Loading…",
+      "searchPlaceholder": "Search for a bank…",
       "noneFound": "No banks found",
       "connectedOn": "Connected {date}",
       "connected": "{name} connected",
@@ -343,7 +347,7 @@
       "description": "Name and currency",
       "nameLabel": "Name",
       "currencyLabel": "Currency",
-      "saving": "Saving...",
+      "saving": "Saving…",
       "saved": "Saved",
       "saveFailed": "Could not save",
       "ownerOnly": "Only the owner can change the company details.",
@@ -357,9 +361,9 @@
     "subscription": {
       "title": "Subscription",
       "plans": {
-        "trial": "trial plan",
-        "pro": "pro plan",
-        "free": "free plan"
+        "trial": "Trial plan",
+        "pro": "Pro plan",
+        "free": "Free plan"
       },
       "trialUntil": "Trial until {date}",
       "upgrade": "Upgrade to Pro"
@@ -434,7 +438,7 @@
     }
   },
   "charts": {
-    "loading": "Loading...",
+    "loading": "Loading…",
     "noData": "No data for this period",
     "addTransactions": "Add transactions →",
     "cashFlow": {
@@ -470,7 +474,7 @@
     },
     "balanceSheet": {
       "assets": "Assets",
-      "liabilities": "Liabilities",
+      "liabilities": "Equity and liabilities",
       "fixedAssets": "Fixed assets",
       "realEstate": "Real estate",
       "equipment": "Equipment",
@@ -487,9 +491,9 @@
       "retainedEarnings": "Retained earnings",
       "debt": "Debt capital",
       "loans": "Loans",
-      "totalLiabilities": "Total liabilities",
+      "totalLiabilities": "Total equity and liabilities",
       "check": "Balance",
-      "balanced": "Assets = Liabilities",
+      "balanced": "Assets = Equity + Liabilities",
       "difference": "Difference: {amount}"
     }
   }

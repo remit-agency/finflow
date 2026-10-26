@@ -121,11 +121,11 @@ describe('buildCashFlow over a period', () => {
       'Sty 26', 'Lut 26', 'Mar 26', 'Kwi 26', 'Maj 26', 'Cze 26', 'Lip 26', 'Sie 26', 'Wrz 26', 'Paź 26', 'Lis 26', 'Gru 26',
     ])
     expect(month('en')).toEqual([
-      'Jan 26', 'Feb 26', 'Mar 26', 'Apr 26', 'May 26', 'Jun 26', 'Jul 26', 'Aug 26', 'Sep 26', 'Oct 26', 'Nov 26', 'Dec 26',
+      'Jan 2026', 'Feb 2026', 'Mar 2026', 'Apr 2026', 'May 2026', 'Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026', 'Dec 2026',
     ])
     const day = (locale: 'uk' | 'pl' | 'en') =>
       buildCashFlow([], resolvePeriod({ preset: 'currentMonth' }, NOW), locale).buckets[18].label
-    expect([day('uk'), day('pl'), day('en')]).toEqual(['19 жов', '19 paź', '19 oct'])
+    expect([day('uk'), day('pl'), day('en')]).toEqual(['19 жов', '19 paź', '19 Oct'])
   })
 
   it('all time spans the transactions; nothing to show without transactions', () => {

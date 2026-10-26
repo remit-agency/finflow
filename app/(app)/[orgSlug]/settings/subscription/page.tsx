@@ -25,7 +25,7 @@ export default function SubscriptionSettingsPage() {
           ) : (
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium capitalize text-ink">{t(`plans.${org.plan}`)}</p>
+                <p className="text-sm font-medium text-ink">{t(`plans.${org.plan}`)}</p>
                 {org.plan === 'trial' && (
                   <p className="mt-0.5 text-xs text-ink-muted">
                     {/* trialEndsAt is an instant: shown as the Warsaw calendar day, in the numeric form of the UI language. */}

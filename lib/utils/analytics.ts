@@ -70,14 +70,19 @@ function shortMonthName(year: number, month: number, locale: Locale): string {
   return short.charAt(0).toUpperCase() + short.slice(1)
 }
 
-/** «Січ 26» (a month bucket / a P&L column); `month` is 0-based. */
+/**
+ * «Січ 26» (a month bucket / a P&L column); `month` is 0-based. English writes the full year
+ * («Oct 2026»): «Oct 26» reads as the 26th of October.
+ */
 export function formatMonthLabel(year: number, month: number, locale: Locale): string {
-  return `${shortMonthName(year, month, locale)} ${String(year).slice(2)}`
+  const yearText = locale === 'en' ? String(year) : String(year).slice(2)
+  return `${shortMonthName(year, month, locale)} ${yearText}`
 }
 
-/** «12 жов» (a day bucket). */
+/** «12 жов» / «12 Oct» (a day bucket): lowercase month in Ukrainian and Polish, as the month name is written there. */
 function formatDayLabel(date: Date, locale: Locale): string {
-  return `${date.getUTCDate()} ${shortMonthName(date.getUTCFullYear(), date.getUTCMonth(), locale).toLowerCase()}`
+  const month = shortMonthName(date.getUTCFullYear(), date.getUTCMonth(), locale)
+  return `${date.getUTCDate()} ${locale === 'en' ? month : month.toLowerCase()}`
 }
 
 function txDate(tx: Pick<Transaction, 'date'>): Date {

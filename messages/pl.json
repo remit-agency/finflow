@@ -53,7 +53,11 @@
       "saveFailed": "Nie udało się zapisać połączenia",
       "loadInstitutions": "Nie udało się załadować banków",
       "emailNotVerified": "Potwierdź adres e-mail, aby połączyć bank",
-      "connect": "Błąd: {message}",
+      "connect": "Nie udało się połączyć banku. Spróbuj ponownie.",
+      "connectForbidden": "Banki może łączyć tylko właściciel firmy",
+      "connectInvalid": "Nie udało się połączyć tego banku. Wybierz inny lub spróbuj później.",
+      "connectUnavailable": "Bank lub usługa połączeń jest teraz niedostępna. Spróbuj później.",
+      "connectNetwork": "Brak połączenia z serwerem. Sprawdź internet i spróbuj ponownie.",
       "disconnectFailed": "Nie udało się rozłączyć banku"
     }
   },
@@ -198,12 +202,12 @@
     "title": "Płatności",
     "showAllAccounts": "Pokaż wszystkie konta",
     "filters": {
-      "searchPlaceholder": "Szukaj w opisie...",
+      "searchPlaceholder": "Szukaj w opisie…",
       "search": "Szukaj w opisie",
       "account": "Konto",
-      "allAccounts": "Wszystkie konta",
+      "allAccounts": "Konta",
       "category": "Kategoria",
-      "allCategories": "Wszystkie kategorie",
+      "allCategories": "Kategorie",
       "more": "Więcej filtrów",
       "clear": "Wyczyść",
       "dateFrom": "Data od",
@@ -213,7 +217,7 @@
     },
     "list": {
       "emptyTitle": "Nie ma jeszcze operacji",
-      "emptyBody": "Kliknij «Wpływ», «Wydatek» lub «Przelew» w nagłówku, aby dodać pierwszą operację",
+      "emptyBody": "Kliknij „Wpływ”, „Wydatek” lub „Przelew” w nagłówku, aby dodać pierwszą operację",
       "date": "Data",
       "amount": "Kwota",
       "account": "Konto",
@@ -250,7 +254,7 @@
       "add": "Dodaj",
       "errors": {
         "account": "Wybierz konto",
-        "amount": "Wpisz kwotę > 0",
+        "amount": "Podaj kwotę większą od zera",
         "toAccount": "Wybierz konto docelowe",
         "sameAccount": "Konta muszą być różne"
       }
@@ -273,10 +277,10 @@
       "create": "Utwórz",
       "errors": {
         "name": "Nazwa jest wymagana",
-        "balance": "Saldo musi być ≥ 0"
+        "balance": "Podaj poprawne saldo, np. 1 234,50"
       }
     },
-    "saving": "Zapisywanie..."
+    "saving": "Zapisywanie…"
   },
   "defaultCategories": {
     "income": {
@@ -301,9 +305,9 @@
       "title": "Połączenie z bankiem",
       "description": "Santander, PKO, mBank, ING i inne banki przez Enable Banking",
       "connect": "Połącz bank",
-      "redirecting": "Przekierowanie...",
-      "loading": "Ładowanie...",
-      "searchPlaceholder": "Szukaj banku...",
+      "redirecting": "Przekierowanie…",
+      "loading": "Ładowanie…",
+      "searchPlaceholder": "Szukaj banku…",
       "noneFound": "Nie znaleziono banków",
       "connectedOn": "Połączono {date}",
       "connected": "Połączono z bankiem {name}",
@@ -343,7 +347,7 @@
       "description": "Nazwa i waluta",
       "nameLabel": "Nazwa",
       "currencyLabel": "Waluta",
-      "saving": "Zapisywanie...",
+      "saving": "Zapisywanie…",
       "saved": "Zapisano",
       "saveFailed": "Nie udało się zapisać",
       "ownerOnly": "Dane firmy może zmieniać tylko właściciel.",
@@ -357,9 +361,9 @@
     "subscription": {
       "title": "Subskrypcja",
       "plans": {
-        "trial": "plan próbny",
-        "pro": "plan Pro",
-        "free": "plan darmowy"
+        "trial": "Plan próbny",
+        "pro": "Plan Pro",
+        "free": "Plan darmowy"
       },
       "trialUntil": "Okres próbny do {date}",
       "upgrade": "Przejdź na Pro"
@@ -373,7 +377,7 @@
       "cashflow": "Wpływy, wydatki i saldo według miesięcy na wykresie",
       "pl": "Zyski i straty według kategorii za wybrany okres",
       "calendar": "Przepływ środków dzień po dniu, wygodny przegląd według miesięcy",
-      "balance": "Aktywa, zobowiązania i kapitał własny organizacji"
+      "balance": "Aktywa, zobowiązania i kapitał własny firmy"
     },
     "columns": {
       "account": "Konto",
@@ -417,13 +421,13 @@
   "periods": {
     "menuHeader": "WG DATY OPERACJI",
     "srLabel": "Okres: ",
-    "currentYear": "Na bieżący rok",
+    "currentYear": "Za bieżący rok",
     "prevYear": "Za poprzedni rok",
     "currentWeek": "Za bieżący tydzień",
-    "prevWeek": "Za ostatni tydzień",
+    "prevWeek": "Za poprzedni tydzień",
     "currentMonth": "Za bieżący miesiąc",
-    "prevMonth": "Za ostatni miesiąc",
-    "allTime": "Cały czas",
+    "prevMonth": "Za poprzedni miesiąc",
+    "allTime": "Cały okres",
     "custom": "Wybierz daty",
     "picker": {
       "prevMonth": "Poprzedni miesiąc",
@@ -434,7 +438,7 @@
     }
   },
   "charts": {
-    "loading": "Ładowanie...",
+    "loading": "Ładowanie…",
     "noData": "Brak danych za ten okres",
     "addTransactions": "Dodaj operacje →",
     "cashFlow": {
@@ -470,7 +474,7 @@
     },
     "balanceSheet": {
       "assets": "Aktywa",
-      "liabilities": "Zobowiązania",
+      "liabilities": "Pasywa",
       "fixedAssets": "Środki trwałe",
       "realEstate": "Nieruchomości",
       "equipment": "Wyposażenie",
@@ -487,9 +491,9 @@
       "retainedEarnings": "Zysk zatrzymany",
       "debt": "Kapitał obcy",
       "loans": "Kredyty",
-      "totalLiabilities": "Razem zobowiązania",
+      "totalLiabilities": "Razem pasywa",
       "check": "Bilans",
-      "balanced": "Aktywa = Zobowiązania",
+      "balanced": "Aktywa = Pasywa",
       "difference": "Różnica: {amount}"
     }
   }

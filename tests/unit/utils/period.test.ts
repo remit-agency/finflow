@@ -166,7 +166,7 @@ describe('labels', () => {
 
   it('a preset shows the name the caller gives it', () => {
     expect(formatPeriodLabel({ preset: 'currentYear' }, 'uk', (p) => uk.periods[p])).toBe('На поточний рік')
-    expect(formatPeriodLabel({ preset: 'prevMonth' }, 'pl', (p) => pl.periods[p])).toBe('Za ostatni miesiąc')
+    expect(formatPeriodLabel({ preset: 'prevMonth' }, 'pl', (p) => pl.periods[p])).toBe('Za poprzedni miesiąc')
     expect(formatPeriodLabel({ preset: 'allTime' }, 'en', (p) => en.periods[p])).toBe('All time')
   })
 

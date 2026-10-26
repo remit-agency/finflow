@@ -14,6 +14,7 @@ import {
   type BankConnection,
 } from '@/lib/firebase/bankConnections'
 import { ebFetch } from '@/lib/enablebanking/client'
+import { connectErrorKey } from '@/lib/enablebanking/errors'
 import { EB_PENDING_KEY, acceptEbAuth } from '@/lib/enablebanking/pending'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 
@@ -89,7 +90,10 @@ export default function EnableBankingConnect({ orgId }: Props) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
       setInstitutions(data.institutions ?? [])
-    } catch { toast.error(tErrors('loadInstitutions')) }
+    } catch (e) {
+      console.error('Loading banks failed', e)
+      toast.error(tErrors('loadInstitutions'))
+    }
     finally { setLoading(false) }
   }
 
@@ -105,23 +109,25 @@ export default function EnableBankingConnect({ orgId }: Props) {
 
   const handleConnect = async (inst: Institution) => {
     setConnecting(true)
+    // The HTTP status of the failed response, null while none arrived; with the server's error code.
+    let status: number | null = null
+    let code: unknown
     try {
       const res = await ebFetch('/api/enablebanking/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ aspspName: inst.id, aspspCountry: inst.country, orgId }),
       })
-      const data = await res.json()
-      if (res.status === 403 && data.error === 'email_not_verified') {
-        toast.error(tErrors('emailNotVerified'))
-        setConnecting(false)
-        return
-      }
-      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`)
+      status = res.status
+      const data = await res.json().catch(() => null)
+      code = data?.error
+      if (!res.ok || code || !data?.url) throw new Error(typeof code === 'string' ? code : `HTTP ${res.status}`)
       sessionStorage.setItem(EB_PENDING_KEY, JSON.stringify({ name: inst.name, authorizationId: data.authorizationId }))
       window.location.href = data.url
     } catch (e) {
-      toast.error(tErrors('connect', { message: e instanceof Error ? e.message : String(e) }))
+      // The raw text is for the console; people get a message chosen by the status.
+      console.error('Bank connection failed', { status, code, error: e })
+      toast.error(tErrors(connectErrorKey(status, code)))
       setConnecting(false)
     }
   }

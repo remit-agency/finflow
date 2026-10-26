@@ -10,14 +10,14 @@ import { Toaster } from '@/components/ui/sonner'
 
 const unbounded = Unbounded({
   variable: '--font-display',
-  subsets: ['latin', 'cyrillic'],
+  subsets: ['latin', 'latin-ext', 'cyrillic'],
   weight: ['400', '600', '700', '800', '900'],
   display: 'swap',
 })
 
 const manrope = Manrope({
   variable: '--font-body',
-  subsets: ['latin', 'cyrillic'],
+  subsets: ['latin', 'latin-ext', 'cyrillic'],
   weight: ['400', '500', '600', '700'],
   display: 'swap',
 })

@@ -53,7 +53,11 @@
       "saveFailed": "Помилка збереження підключення",
       "loadInstitutions": "Не вдалось завантажити банки",
       "emailNotVerified": "Підтвердіть email, щоб підключити банк",
-      "connect": "Помилка: {message}",
+      "connect": "Не вдалося підключити банк. Спробуйте ще раз.",
+      "connectForbidden": "Підключати банки може лише власник компанії",
+      "connectInvalid": "Не вдалося підключити цей банк. Оберіть інший або спробуйте пізніше.",
+      "connectUnavailable": "Банк або сервіс підключення зараз недоступний. Спробуйте пізніше.",
+      "connectNetwork": "Немає зв’язку із сервером. Перевірте інтернет і спробуйте ще раз.",
       "disconnectFailed": "Помилка відключення банку"
     }
   },
@@ -198,7 +202,7 @@
     "title": "Платежі",
     "showAllAccounts": "Показати всі рахунки",
     "filters": {
-      "searchPlaceholder": "Пошук по опису...",
+      "searchPlaceholder": "Пошук по опису…",
       "search": "Пошук по опису",
       "account": "Рахунок",
       "allAccounts": "Всі рахунки",
@@ -276,7 +280,7 @@
         "balance": "Баланс повинен бути ≥ 0"
       }
     },
-    "saving": "Збереження..."
+    "saving": "Збереження…"
   },
   "defaultCategories": {
     "income": {
@@ -301,9 +305,9 @@
       "title": "Підключення банку",
       "description": "Santander, PKO, mBank, ING та інші банки через Enable Banking",
       "connect": "Підключити банк",
-      "redirecting": "Перенаправлення...",
-      "loading": "Завантаження...",
-      "searchPlaceholder": "Пошук банку...",
+      "redirecting": "Перенаправлення…",
+      "loading": "Завантаження…",
+      "searchPlaceholder": "Пошук банку…",
       "noneFound": "Банків не знайдено",
       "connectedOn": "Підключено {date}",
       "connected": "{name} підключено",
@@ -343,7 +347,7 @@
       "description": "Назва та валюта",
       "nameLabel": "Назва",
       "currencyLabel": "Валюта",
-      "saving": "Збереження...",
+      "saving": "Збереження…",
       "saved": "Збережено",
       "saveFailed": "Помилка збереження",
       "ownerOnly": "Змінювати дані компанії може лише власник.",
@@ -357,9 +361,9 @@
     "subscription": {
       "title": "Підписка",
       "plans": {
-        "trial": "trial plan",
-        "pro": "pro plan",
-        "free": "free plan"
+        "trial": "Trial plan",
+        "pro": "Pro plan",
+        "free": "Free plan"
       },
       "trialUntil": "Trial до {date}",
       "upgrade": "Upgrade to Pro"
@@ -434,7 +438,7 @@
     }
   },
   "charts": {
-    "loading": "Завантаження...",
+    "loading": "Завантаження…",
     "noData": "Немає даних за цей період",
     "addTransactions": "Додати транзакції →",
     "cashFlow": {
