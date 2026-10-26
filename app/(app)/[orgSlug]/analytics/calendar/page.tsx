@@ -2,11 +2,15 @@
 
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useShell } from '@/lib/hooks/useShell'
 import { useTransactions } from '@/lib/hooks/useTransactions'
 import CalendarView from '@/components/charts/CalendarView'
+import { todayUtcDay } from '@/lib/utils/today'
 
 export default function CalendarPage() {
+  const t = useTranslations('analytics')
+  const tSections = useTranslations('shell.analyticsSections')
   const params = useParams()
   const orgSlug = params.orgSlug as string
   const orgId = orgSlug
@@ -15,9 +19,10 @@ export default function CalendarPage() {
   const { org } = useShell()
   const loading = txLoading || !org
 
-  const today = new Date()
-  const [year, setYear] = useState(today.getFullYear())
-  const [month, setMonth] = useState(today.getMonth())
+  // Warsaw's date: the month shown first is the one Poland is in.
+  const [today] = useState(() => todayUtcDay())
+  const [year, setYear] = useState(today.getUTCFullYear())
+  const [month, setMonth] = useState(today.getUTCMonth())
 
   const handleNavigate = (dir: 'prev' | 'next') => {
     if (dir === 'prev') {
@@ -34,8 +39,8 @@ export default function CalendarPage() {
     // day list keeps a narrower, readable width inside it.
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="font-display text-xl font-semibold text-ink">Календар</h1>
-        <p className="text-sm text-ink-muted">Щоденний рух грошей</p>
+        <h1 className="font-display text-xl font-semibold text-ink">{tSections('calendar')}</h1>
+        <p className="text-sm text-ink-muted">{t('calendar.subtitle')}</p>
       </div>
 
       <CalendarView

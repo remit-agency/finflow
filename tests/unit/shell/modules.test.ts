@@ -3,9 +3,9 @@ import { MODULE_TABS, activeModule, isJournalPath } from '@/lib/shell/modules'
 
 describe('MODULE_TABS', () => {
   it('has only the shipped modules, in order', () => {
-    expect(MODULE_TABS.map((t) => [t.key, t.label, t.href('org1')])).toEqual([
-      ['transactions', 'Платежі', '/org1/transactions'],
-      ['analytics', 'Аналітика', '/org1/analytics/cashflow'],
+    expect(MODULE_TABS.map((t) => [t.key, t.href('org1')])).toEqual([
+      ['transactions', '/org1/transactions'],
+      ['analytics', '/org1/analytics/cashflow'],
     ])
   })
 })

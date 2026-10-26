@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { ArrowLeft } from 'lucide-react'
 import { useShell } from '@/lib/hooks/useShell'
 import { activeSettingsSection, settingsPath, visibleSettingsSections } from '@/lib/shell/settings-sections'
@@ -14,6 +15,7 @@ const FOCUS = 'focus-visible:outline-2 focus-visible:outline-brand-soft-foregrou
 // settings content (settings/layout.tsx, below 1024 px). Only one of them is displayed at a time,
 // so there is always exactly one visible «Розділи налаштувань» landmark.
 export function SettingsMenu({ variant }: { variant: 'panel' | 'pills' }) {
+  const t = useTranslations('shell')
   const { orgId, role } = useShell()
   const pathname = usePathname()
   const active = activeSettingsSection(pathname, orgId)
@@ -31,7 +33,7 @@ export function SettingsMenu({ variant }: { variant: 'panel' | 'pills' }) {
       )}
     >
       <ArrowLeft className="size-4" aria-hidden />
-      До платежів
+      {t('settingsMenu.back')}
     </Link>
   )
 
@@ -39,7 +41,7 @@ export function SettingsMenu({ variant }: { variant: 'panel' | 'pills' }) {
     return (
       <div className="space-y-3 lg:hidden">
         {back}
-        <nav aria-label="Розділи налаштувань" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
+        <nav aria-label={t('nav.settings')} className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
           {sections.map((section) => {
             const isActive = section.slug === active
             return (
@@ -53,7 +55,7 @@ export function SettingsMenu({ variant }: { variant: 'panel' | 'pills' }) {
                   FOCUS,
                 )}
               >
-                {section.label}
+                {t(`settingsSections.${section.slug}`)}
               </Link>
             )
           })}
@@ -65,8 +67,8 @@ export function SettingsMenu({ variant }: { variant: 'panel' | 'pills' }) {
   return (
     <div data-testid="settings-menu" className="flex h-full w-72 flex-col overflow-y-auto border-r border-line p-3">
       {back}
-      <p className="mt-4 mb-1 px-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Налаштування</p>
-      <nav aria-label="Розділи налаштувань" className="flex flex-col gap-0.5">
+      <p className="mt-4 mb-1 px-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t('settingsMenu.title')}</p>
+      <nav aria-label={t('nav.settings')} className="flex flex-col gap-0.5">
         {sections.map((section) => {
           const isActive = section.slug === active
           return (
@@ -80,7 +82,7 @@ export function SettingsMenu({ variant }: { variant: 'panel' | 'pills' }) {
                 FOCUS,
               )}
             >
-              {section.label}
+              {t(`settingsSections.${section.slug}`)}
             </Link>
           )
         })}

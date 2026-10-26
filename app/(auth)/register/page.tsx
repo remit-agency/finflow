@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,24 +16,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useOrg } from '@/lib/hooks/useOrg'
 import { auth } from '@/lib/firebase/firebase'
 import { getMyOrganizationsForAuthPage } from '@/lib/firebase/members'
 import { createOrgViaApi } from '@/lib/firebase/orgs-client'
+import { classifyAuthFailure } from '@/lib/firebase/auth-errors'
 
-const CURRENCIES = [
-  { value: 'UAH', label: 'UAH — Ukrainian Hryvnia' },
-  { value: 'EUR', label: 'EUR — Euro' },
-  { value: 'USD', label: 'USD — US Dollar' },
-  { value: 'PLN', label: 'PLN — Polish Zloty' },
-]
+const CURRENCIES = ['UAH', 'EUR', 'USD', 'PLN'] as const
 
 async function hasNoCompany(uid: string): Promise<boolean> {
   return (await getMyOrganizationsForAuthPage(uid)).length === 0
 }
 
 export default function RegisterPage() {
+  const t = useTranslations('auth.register')
+  const tAuth = useTranslations('auth')
+  const tErr = useTranslations('errors')
   const router = useRouter()
   const { user, loading: authLoading, signUp, signInGoogle, signOut } = useAuth()
   const { orgId: currentOrgId, loading: orgLoading, switchOrg } = useOrg()
@@ -40,7 +41,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [orgName, setOrgName] = useState('')
-  const [currency, setCurrency] = useState('UAH')
+  const [currency, setCurrency] = useState('PLN')
   const [loading, setLoading] = useState(false)
   // True while a company-only submit runs, so that form does not flip while it is busy.
   const [companyOnlySubmit, setCompanyOnlySubmit] = useState(false)
@@ -56,6 +57,11 @@ export default function RegisterPage() {
   // OrgProvider's own load started when the user appeared, before a new org existed, so load the
   // org explicitly. The account, org and session already exist at this point: if that load fails,
   // still leave, with a full page load that rebuilds the org state from scratch.
+  const showFailure = (err: unknown) => {
+    const failure = classifyAuthFailure(err)
+    toast.error(failure.kind === 'orgCreate' ? tErr(`orgCreate.${failure.code}`) : tErr(`auth.${failure.key}`))
+  }
+
   const goToOrg = async (orgId: string) => {
     const ok = await switchOrg(orgId).then(() => true, () => false)
     if (ok) {
@@ -90,8 +96,7 @@ export default function RegisterPage() {
       const { orgId } = await signUp(email, password, name, orgName, currency)
       await goToOrg(orgId)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Registration failed'
-      toast.error(message)
+      showFailure(err)
     } finally {
       setLoading(false)
       setCompanyOnlySubmit(false)
@@ -100,7 +105,7 @@ export default function RegisterPage() {
 
   const handleGoogle = async () => {
     if (!orgName) {
-      toast.error('Please enter your company name first')
+      toast.error(t('googleNeedsCompany'))
       return
     }
     setLoading(true)
@@ -114,8 +119,7 @@ export default function RegisterPage() {
       const orgId = await createOrgViaApi(orgName, currency)
       await goToOrg(orgId)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Google registration failed'
-      toast.error(message)
+      showFailure(err)
     } finally {
       setLoading(false)
     }
@@ -128,7 +132,10 @@ export default function RegisterPage() {
   const fromLogin = companyOnly && new URLSearchParams(window.location.search).get('step') === 'org'
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0f0f0f] px-4 py-8">
+    <div className="relative min-h-screen flex items-center justify-center bg-[#0f0f0f] px-4 py-8">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher variant="select" />
+      </div>
       <Card className="w-full max-w-[440px] bg-white rounded-[12px] shadow-lg">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2 mb-2">
@@ -138,14 +145,18 @@ export default function RegisterPage() {
             <span className="text-[#111111] font-semibold text-lg">FinFlow</span>
           </div>
           <CardTitle className="text-[#111111] text-xl font-semibold">
-            {companyOnly ? (fromLogin ? 'Create your company' : 'Finish setting up') : 'Start free trial'}
+            {companyOnly
+              ? fromLogin
+                ? t('companyOnlyFromLoginTitle')
+                : t('companyOnlyTitle')
+              : t('title')}
           </CardTitle>
           <CardDescription className="text-[#6b7280]">
             {companyOnly
               ? fromLogin
-                ? 'You are signed in, but you do not have a company yet.'
-                : 'Your account is ready. Add your company to continue.'
-              : '14 days free — no credit card required'}
+                ? t('companyOnlyFromLoginDescription')
+                : t('companyOnlyDescription')
+              : t('description')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -154,12 +165,12 @@ export default function RegisterPage() {
               <>
                 <div className="space-y-1.5">
                   <Label htmlFor="name" className="text-[#111111] text-sm font-medium">
-                    Your name
+                    {t('name')}
                   </Label>
                   <Input
                     id="name"
                     type="text"
-                    placeholder="John Smith"
+                    placeholder={t('namePlaceholder')}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="rounded-[6px] border-[#e5e7eb] text-[#111111] focus-visible:ring-[#00c896]"
@@ -169,12 +180,12 @@ export default function RegisterPage() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="email" className="text-[#111111] text-sm font-medium">
-                    Email
+                    {t('email')}
                   </Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="you@company.com"
+                    placeholder={t('emailPlaceholder')}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="rounded-[6px] border-[#e5e7eb] text-[#111111] focus-visible:ring-[#00c896]"
@@ -184,12 +195,12 @@ export default function RegisterPage() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="password" className="text-[#111111] text-sm font-medium">
-                    Password
+                    {t('password')}
                   </Label>
                   <Input
                     id="password"
                     type="password"
-                    placeholder="At least 6 characters"
+                    placeholder={t('passwordPlaceholder')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="rounded-[6px] border-[#e5e7eb] text-[#111111] focus-visible:ring-[#00c896]"
@@ -203,18 +214,18 @@ export default function RegisterPage() {
             <div className={companyOnly ? 'space-y-4' : 'border-t border-[#e5e7eb] pt-4 space-y-4'}>
               {!companyOnly && (
                 <p className="text-xs text-[#6b7280] font-medium uppercase tracking-wide">
-                  Company
+                  {t('companySection')}
                 </p>
               )}
 
               <div className="space-y-1.5">
                 <Label htmlFor="orgName" className="text-[#111111] text-sm font-medium">
-                  Company name
+                  {t('orgName')}
                 </Label>
                 <Input
                   id="orgName"
                   type="text"
-                  placeholder="My Company LLC"
+                  placeholder={t('orgNamePlaceholder')}
                   value={orgName}
                   onChange={(e) => setOrgName(e.target.value)}
                   className="rounded-[6px] border-[#e5e7eb] text-[#111111] focus-visible:ring-[#00c896]"
@@ -224,19 +235,19 @@ export default function RegisterPage() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="currency" className="text-[#111111] text-sm font-medium">
-                  Primary currency
+                  {t('currency')}
                 </Label>
                 <Select value={currency} onValueChange={(v) => v && setCurrency(v)}>
                   <SelectTrigger
                     id="currency"
                     className="rounded-[6px] border-[#e5e7eb] text-[#111111] focus:ring-[#00c896]"
                   >
-                    <SelectValue placeholder="Select currency" />
+                    <SelectValue placeholder={t('currencyPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
                     {CURRENCIES.map((c) => (
-                      <SelectItem key={c.value} value={c.value}>
-                        {c.label}
+                      <SelectItem key={c} value={c}>
+                        {tAuth(`currencies.${c}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -250,20 +261,20 @@ export default function RegisterPage() {
               className="w-full bg-[#00c896] hover:bg-[#00b584] text-white rounded-[8px] font-medium disabled:opacity-50"
             >
               {companyOnly
-                ? loading ? 'Creating company...' : 'Create company'
-                : loading ? 'Creating account...' : 'Try 14 days free'}
+                ? loading ? t('creatingCompany') : t('createCompany')
+                : loading ? t('submitting') : t('submit')}
             </Button>
           </form>
 
           {companyOnly ? (
             <p className="text-center text-sm text-[#6b7280] mt-4">
-              Not you?{' '}
+              {t('notYou')}{' '}
               <button
                 type="button"
                 onClick={() => void signOut()}
                 className="text-[#00c896] hover:underline font-medium"
               >
-                Sign out
+                {t('signOut')}
               </button>
             </p>
           ) : (
@@ -273,7 +284,7 @@ export default function RegisterPage() {
                   <div className="w-full border-t border-[#e5e7eb]" />
                 </div>
                 <div className="relative flex justify-center text-xs">
-                  <span className="bg-white px-2 text-[#6b7280]">or</span>
+                  <span className="bg-white px-2 text-[#6b7280]">{tAuth('or')}</span>
                 </div>
               </div>
 
@@ -302,13 +313,13 @@ export default function RegisterPage() {
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                   />
                 </svg>
-                Continue with Google
+                {t('google')}
               </Button>
 
               <p className="text-center text-sm text-[#6b7280] mt-4">
-                Already have an account?{' '}
+                {t('haveAccount')}{' '}
                 <Link href="/login" className="text-[#00c896] hover:underline font-medium">
-                  Sign in
+                  {t('toLogin')}
                 </Link>
               </p>
             </>

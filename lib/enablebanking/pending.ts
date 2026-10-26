@@ -9,7 +9,8 @@
 
 export const EB_PENDING_KEY = 'eb_pending'
 const MAX_SESSION_ID_LENGTH = 200
-const DEFAULT_INSTITUTION_NAME = 'Банк'
+// Used only when the pending entry has no name; callers pass the translated word for "Bank".
+const DEFAULT_INSTITUTION_NAME = 'Bank'
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -43,6 +44,7 @@ function decodePayload(payload: string): unknown {
 export function acceptEbAuth(
   payload: string | null,
   storage: Pick<Storage, 'getItem' | 'removeItem'>,
+  fallbackName: string = DEFAULT_INSTITUTION_NAME,
 ): { sessionId: string; institutionName: string } | null {
   if (!payload) return null
 
@@ -62,6 +64,6 @@ export function acceptEbAuth(
   const name = pending.name
   return {
     sessionId,
-    institutionName: typeof name === 'string' && name.length > 0 ? name : DEFAULT_INSTITUTION_NAME,
+    institutionName: typeof name === 'string' && name.length > 0 ? name : fallbackName,
   }
 }

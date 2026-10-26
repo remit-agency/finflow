@@ -1,47 +1,33 @@
 import Link from 'next/link'
+import { getTranslations } from 'next-intl/server'
 import { BarChart2, TrendingUp, Calendar, BookOpen } from 'lucide-react'
+import type { AnalyticsSection } from '@/lib/shell/analytics-sections'
 
 interface Props {
   params: Promise<{ orgSlug: string }>
 }
 
-const CARDS = [
-  {
-    key: 'cashflow',
-    title: 'Cash Flow',
-    description: 'Доходи, витрати та баланс по місяцях у вигляді графіку',
-    icon: BarChart2,
-  },
-  {
-    key: 'pl',
-    title: 'P&L',
-    description: 'Прибутки та збитки по категоріях за обраний період',
-    icon: TrendingUp,
-  },
-  {
-    key: 'calendar',
-    title: 'Календар',
-    description: 'Рух коштів по днях — зручний перегляд по місяцях',
-    icon: Calendar,
-  },
-  {
-    key: 'balance',
-    title: 'Баланс',
-    description: "Активи, зобов’язання та власний капітал організації",
-    icon: BookOpen,
-  },
+// The title of a card is the section's name (`shell.analyticsSections.<key>`), the description is
+// `analytics.cards.<key>`.
+const CARDS: ReadonlyArray<{ key: AnalyticsSection; icon: typeof BarChart2 }> = [
+  { key: 'cashflow', icon: BarChart2 },
+  { key: 'pl', icon: TrendingUp },
+  { key: 'calendar', icon: Calendar },
+  { key: 'balance', icon: BookOpen },
 ]
 
 export default async function AnalyticsPage({ params }: Props) {
   const { orgSlug } = await params
+  const t = await getTranslations('analytics')
+  const tSections = await getTranslations('shell.analyticsSections')
 
   return (
     // The shared container and the reports' sub-navigation come from analytics/layout.tsx.
     <div>
       <div className="max-w-4xl space-y-8">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Аналітика</h1>
-          <p className="mt-1 text-ink-muted">Оберіть розділ для перегляду звітів</p>
+          <h1 className="font-display text-2xl font-semibold text-ink">{t('title')}</h1>
+          <p className="mt-1 text-ink-muted">{t('subtitle')}</p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -57,9 +43,9 @@ export default async function AnalyticsPage({ params }: Props) {
                   <Icon className="size-6 text-brand-soft-foreground" />
                 </div>
                 <h2 className="text-lg font-semibold text-ink transition-colors group-hover:text-brand-soft-foreground">
-                  {card.title}
+                  {tSections(card.key)}
                 </h2>
-                <p className="mt-1 text-sm leading-relaxed text-ink-muted">{card.description}</p>
+                <p className="mt-1 text-sm leading-relaxed text-ink-muted">{t(`cards.${card.key}`)}</p>
               </Link>
             )
           })}

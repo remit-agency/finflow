@@ -7,25 +7,37 @@ describe('formatDayShortUtc', () => {
   // The journal groups by the UTC day (toISOString), so a row must read the same UTC day
   // whatever the browser's time zone is (run with TZ=America/Los_Angeles to check).
   it('reads the UTC day for a date at the start of the UTC day', () => {
-    expect(formatDayShortUtc(new Date('2026-10-23T00:00:00Z'))).toBe('23 жовт.')
+    expect(formatDayShortUtc(new Date('2026-10-23T00:00:00Z'), 'uk')).toBe('23 жовт.')
   })
 
   it('reads the UTC day for a date at the end of the UTC day', () => {
-    expect(formatDayShortUtc(new Date('2026-10-23T23:59:59Z'))).toBe('23 жовт.')
+    expect(formatDayShortUtc(new Date('2026-10-23T23:59:59Z'), 'uk')).toBe('23 жовт.')
   })
 
   it('agrees with the group key', () => {
     const date = new Date('2026-01-05T01:00:00Z')
     expect(date.toISOString().split('T')[0]).toBe('2026-01-05')
-    expect(formatDayShortUtc(date)).toBe('5 січ.')
+    expect(formatDayShortUtc(date, 'uk')).toBe('5 січ.')
+  })
+
+  it('follows the UI language', () => {
+    const date = new Date('2026-10-23T00:00:00Z')
+    expect(formatDayShortUtc(date, 'pl')).toBe('23 paź')
+    expect(formatDayShortUtc(date, 'en')).toBe('23 Oct')
   })
 })
 
 describe('formatWeekdayShortUtc', () => {
   it('reads the UTC weekday at both ends of the UTC day', () => {
     // 2026-10-23 is a Friday.
-    expect(formatWeekdayShortUtc(new Date('2026-10-23T00:00:00Z'))).toBe('пт')
-    expect(formatWeekdayShortUtc(new Date('2026-10-23T23:59:59Z'))).toBe('пт')
+    expect(formatWeekdayShortUtc(new Date('2026-10-23T00:00:00Z'), 'uk')).toBe('пт')
+    expect(formatWeekdayShortUtc(new Date('2026-10-23T23:59:59Z'), 'uk')).toBe('пт')
+  })
+
+  it('follows the UI language', () => {
+    const date = new Date('2026-10-23T12:00:00Z')
+    expect(formatWeekdayShortUtc(date, 'pl')).toBe('pt.')
+    expect(formatWeekdayShortUtc(date, 'en')).toBe('Fri')
   })
 })
 

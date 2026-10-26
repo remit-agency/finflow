@@ -1,14 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { ReceiptText } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { LazyTransactionForm } from '@/components/forms/lazy'
 import { useShell } from '@/lib/hooks/useShell'
+import { useFormatters } from '@/lib/i18n/useFormatters'
 import { cn } from '@/lib/utils'
-import { ACCOUNT_TYPE_LABELS } from '@/lib/utils/accounts'
-import { formatCurrency } from '@/lib/utils/currency'
 import { formatDayShortUtc, formatWeekdayShortUtc, summarizeDay } from '@/lib/utils/journal'
 import type { Transaction, Account, Category } from '@/types'
 
@@ -22,24 +22,6 @@ const AMOUNT_STYLE: Record<Transaction['type'], { sign: string; className: strin
 // Date, Amount, Account, Category, Comment, plus the phone-only trailing Amount cell.
 // The day header spans all of them; the browser clamps it to the columns that are visible.
 const COLUMN_COUNT = 6
-
-// The amount cell exists twice (a column from `sm`, a trailing cell below it) and both read from here.
-function amountLabel(tx: Transaction): string {
-  const { sign } = AMOUNT_STYLE[tx.type]
-  return `${sign}${formatCurrency(tx.amount, tx.currency)}`
-}
-
-function formatGroupKey(key: string): string {
-  const date = new Date(key + 'T12:00:00')
-  const label = new Intl.DateTimeFormat('uk-UA', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    weekday: 'short',
-  }).format(date)
-  // Capitalise only the first letter: the CSS `capitalize` class would also uppercase the month and «р.».
-  return label.charAt(0).toUpperCase() + label.slice(1)
-}
 
 interface TransactionListProps {
   grouped: Record<string, Transaction[]>
@@ -58,9 +40,27 @@ export function TransactionList({
   orgId,
   loading,
 }: TransactionListProps) {
+  const t = useTranslations('journal.list')
+  const tAccountTypes = useTranslations('common.accountTypes')
+  const { locale, money, date: formatDate } = useFormatters()
   const { can } = useShell()
   const canEdit = can('data.write')
   const [editTx, setEditTx] = useState<Transaction | null>(null)
+
+  // The amount cell exists twice (a column from `sm`, a trailing cell below it) and both read from here.
+  const amountLabel = (tx: Transaction): string => `${AMOUNT_STYLE[tx.type].sign}${money(tx.amount, tx.currency)}`
+
+  // The group key is a UTC calendar day (`2026-10-23`), formatted in UTC like every stored date.
+  const formatGroupKey = (key: string): string => {
+    const label = formatDate(new Date(`${key}T00:00:00Z`), {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      weekday: 'short',
+    })
+    // Capitalise only the first letter: the CSS `capitalize` class would also uppercase the month and «р.».
+    return label.charAt(0).toUpperCase() + label.slice(1)
+  }
 
   const accountMap = Object.fromEntries(accounts.map((a) => [a.id, a]))
   const allCategories = [...incomeCategories, ...expenseCategories]
@@ -82,10 +82,8 @@ export function TransactionList({
     return (
       <div className="flex flex-col items-center justify-center rounded-panel border border-dashed border-line bg-surface py-16 text-center">
         <ReceiptText className="mb-4 size-12 text-ink-subtle" />
-        <p className="font-medium text-ink">Операцій ще немає</p>
-        <p className="mt-1 max-w-sm text-sm text-ink-muted">
-          Натисніть «Дохід», «Витрата» або «Переказ» у шапці, щоб додати першу операцію
-        </p>
+        <p className="font-medium text-ink">{t('emptyTitle')}</p>
+        <p className="mt-1 max-w-sm text-sm text-ink-muted">{t('emptyBody')}</p>
       </div>
     )
   }
@@ -97,12 +95,12 @@ export function TransactionList({
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="hidden w-32 pl-4 sm:table-cell sm:pl-2">Дата</TableHead>
-              <TableHead className="hidden w-40 text-right sm:table-cell">Сума</TableHead>
-              <TableHead className="pl-4 sm:pl-6">Рахунок</TableHead>
-              <TableHead className="hidden md:table-cell">Категорія</TableHead>
-              <TableHead className="hidden pr-2 md:table-cell">Коментар</TableHead>
-              <TableHead className="pr-4 text-right sm:hidden">Сума</TableHead>
+              <TableHead className="hidden w-32 pl-4 sm:table-cell sm:pl-2">{t('date')}</TableHead>
+              <TableHead className="hidden w-40 text-right sm:table-cell">{t('amount')}</TableHead>
+              <TableHead className="pl-4 sm:pl-6">{t('account')}</TableHead>
+              <TableHead className="hidden md:table-cell">{t('category')}</TableHead>
+              <TableHead className="hidden pr-2 md:table-cell">{t('comment')}</TableHead>
+              <TableHead className="pr-4 text-right sm:hidden">{t('amount')}</TableHead>
             </TableRow>
           </TableHeader>
           {keys.map((dateKey) => {
@@ -121,7 +119,7 @@ export function TransactionList({
                       {day && (
                         <span className={cn('text-xs font-semibold tabular-nums', dayStyle.className)}>
                           {dayStyle.sign}
-                          {formatCurrency(Math.abs(day.total), day.currency)}
+                          {money(Math.abs(day.total), day.currency)}
                         </span>
                       )}
                     </div>
@@ -133,7 +131,7 @@ export function TransactionList({
                   const toAccount =
                     tx.type === 'transfer' && tx.counterpartyId ? accountMap[tx.counterpartyId] : null
                   const category = tx.categoryId ? categoryMap[tx.categoryId] : null
-                  const categoryName = category?.name ?? (tx.type === 'transfer' ? 'Переказ' : 'Без категорії')
+                  const categoryName = category?.name ?? (tx.type === 'transfer' ? t('transfer') : t('noCategory'))
                   const accountLabel = toAccount ? `${account?.name ?? '—'} → ${toAccount.name}` : (account?.name ?? '—')
 
                   return (
@@ -145,8 +143,8 @@ export function TransactionList({
                       className={canEdit ? 'cursor-pointer hover:bg-canvas has-[button:focus-visible]:bg-brand-soft' : 'hover:bg-transparent'}
                     >
                       <TableCell className="hidden py-3.5 pl-4 tabular-nums sm:table-cell sm:pl-2">
-                        <span className="block text-ink">{formatDayShortUtc(tx.date)}</span>
-                        <span className="block text-xs text-ink-muted">{formatWeekdayShortUtc(tx.date)}</span>
+                        <span className="block text-ink">{formatDayShortUtc(tx.date, locale)}</span>
+                        <span className="block text-xs text-ink-muted">{formatWeekdayShortUtc(tx.date, locale)}</span>
                       </TableCell>
                       <TableCell className={cn('hidden py-3.5 text-right font-semibold tabular-nums sm:table-cell', amount.className)}>
                         {amountLabel(tx)}
@@ -158,7 +156,11 @@ export function TransactionList({
                         {canEdit ? (
                           <button
                             type="button"
-                            aria-label={`${accountLabel}: ${amountLabel(tx)}, ${formatDayShortUtc(tx.date)}, редагувати`}
+                            aria-label={t('rowEdit', {
+                              account: accountLabel,
+                              amount: amountLabel(tx),
+                              date: formatDayShortUtc(tx.date, locale),
+                            })}
                             onClick={(event) => {
                               event.stopPropagation()
                               setEditTx(tx)
@@ -173,7 +175,7 @@ export function TransactionList({
                         {/* Second line: the category below md (its column is hidden there), the account type above. */}
                         <span className="block max-w-44 truncate text-xs text-ink-muted md:hidden">{categoryName}</span>
                         <span className="hidden max-w-56 truncate text-xs text-ink-muted md:block">
-                          {account ? ACCOUNT_TYPE_LABELS[account.type] ?? '' : ''}
+                          {account ? tAccountTypes(account.type) : ''}
                         </span>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
@@ -183,9 +185,9 @@ export function TransactionList({
                             {category.name}
                           </Badge>
                         ) : tx.type === 'transfer' ? (
-                          <Badge variant="chip">Переказ</Badge>
+                          <Badge variant="chip">{t('transfer')}</Badge>
                         ) : (
-                          <span className="text-ink-subtle">Без категорії</span>
+                          <span className="text-ink-subtle">{t('noCategory')}</span>
                         )}
                       </TableCell>
                       <TableCell className="hidden pr-2 text-ink-muted md:table-cell">

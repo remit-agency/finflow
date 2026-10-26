@@ -13,7 +13,9 @@ import {
 } from 'recharts'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useShell } from '@/lib/hooks/useShell'
+import { useFormatters } from '@/lib/i18n/useFormatters'
 import type { CashFlowBucket } from '@/lib/utils/analytics'
 import { TOKEN_COLORS } from '@/lib/ui/colors'
 
@@ -23,11 +25,10 @@ interface CashFlowChartProps {
   loading?: boolean
 }
 
-function formatNumber(n: number): string {
-  return new Intl.NumberFormat('uk-UA', {
-    maximumFractionDigits: 0,
-    minimumFractionDigits: 0,
-  }).format(n)
+/** Whole numbers in the UI language (axis ticks and tooltip). */
+function useWholeNumber(): (n: number) => string {
+  const { number } = useFormatters()
+  return (n) => number(n, { maximumFractionDigits: 0, minimumFractionDigits: 0 })
 }
 
 interface TooltipEntry {
@@ -42,6 +43,8 @@ interface CustomTooltipProps {
 }
 
 function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
+  const t = useTranslations('charts.cashFlow')
+  const formatNumber = useWholeNumber()
   if (!active || !payload?.length) return null
 
   const income = Number(payload.find((p) => p.dataKey === 'income')?.value ?? 0)
@@ -54,16 +57,16 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
       <div className="space-y-1 tabular-nums">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-income" />
-          <span className="text-ink-muted">Дохід:</span>
+          <span className="text-ink-muted">{t('income')}:</span>
           <span className="ml-auto font-medium text-income">+{formatNumber(income)}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-expense" />
-          <span className="text-ink-muted">Витрата:</span>
+          <span className="text-ink-muted">{t('expense')}:</span>
           <span className="ml-auto font-medium text-expense">−{formatNumber(expense)}</span>
         </div>
         <div className="border-t border-line pt-1 mt-1 flex items-center gap-2">
-          <span className="text-ink-muted">Різниця:</span>
+          <span className="text-ink-muted">{t('net')}:</span>
           <span className={net >= 0 ? 'ml-auto font-semibold text-income' : 'ml-auto font-semibold text-expense'}>
             {net >= 0 ? '+' : ''}{formatNumber(net)}
           </span>
@@ -74,9 +77,10 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
 }
 
 function ChartSkeleton() {
+  const t = useTranslations('charts')
   return (
     <div className="w-full h-[400px] rounded-xl bg-canvas animate-pulse flex items-center justify-center">
-      <span className="text-ink-muted text-sm">Завантаження...</span>
+      <span className="text-ink-muted text-sm">{t('loading')}</span>
     </div>
   )
 }
@@ -84,16 +88,19 @@ function ChartSkeleton() {
 export default function CashFlowChart({ data, loading }: CashFlowChartProps) {
   const { orgSlug } = useParams<{ orgSlug: string }>()
   const { can } = useShell()
+  const t = useTranslations('charts')
+  const tSeries = useTranslations('charts.cashFlow')
+  const formatNumber = useWholeNumber()
 
   if (loading) return <ChartSkeleton />
 
   if (!data.length) {
     return (
       <div className="w-full h-[400px] rounded-xl border border-line flex flex-col items-center justify-center gap-2">
-        <p className="text-ink-muted">Немає даних за цей період</p>
+        <p className="text-ink-muted">{t('noData')}</p>
         {can('data.write') && (
           <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground text-sm underline underline-offset-2">
-            Додати транзакції →
+            {t('addTransactions')}
           </Link>
         )}
       </div>
@@ -123,9 +130,9 @@ export default function CashFlowChart({ data, loading }: CashFlowChartProps) {
           wrapperStyle={{ fontSize: 12, color: TOKEN_COLORS.inkMuted, paddingTop: 8 }}
           formatter={(value) => {
             const labels: Record<string, string> = {
-              income: 'Дохід',
-              expense: 'Витрата',
-              balance: 'Баланс',
+              income: tSeries('income'),
+              expense: tSeries('expense'),
+              balance: tSeries('balance'),
             }
             return labels[value] ?? value
           }}

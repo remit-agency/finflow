@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Check, ChevronDown } from 'lucide-react'
 import {
   DropdownMenu,
@@ -22,6 +23,9 @@ type OrgList =
 // Company switcher. The list is fetched each time the menu opens (from the event handler, not an
 // effect). Creating a company is S16.
 export function OrgSwitcher() {
+  const t = useTranslations('shell.orgSwitcher')
+  const tCommon = useTranslations('common')
+  const tErrors = useTranslations('errors')
   const { user } = useAuth()
   // chooseOrg navigates and loads the org in an order that keeps the shell's "URL org wins" sync quiet.
   const { orgId, org, chooseOrg } = useShell()
@@ -51,7 +55,7 @@ export function OrgSwitcher() {
           {org ? org.name.charAt(0).toUpperCase() : 'F'}
         </span>
         <span className="min-w-0">
-          <span className="block text-xs text-ink-muted">Компанія</span>
+          <span className="block text-xs text-ink-muted">{t('company')}</span>
           {org ? (
             <span data-testid="org-switcher-name" className="block truncate text-sm font-semibold text-ink">
               {org.name}
@@ -64,17 +68,17 @@ export function OrgSwitcher() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Ваші компанії</DropdownMenuLabel>
+          <DropdownMenuLabel>{t('yourCompanies')}</DropdownMenuLabel>
           {(list.status === 'idle' || list.status === 'loading') && (
-            <DropdownMenuItem disabled>Завантаження…</DropdownMenuItem>
+            <DropdownMenuItem disabled>{tCommon('loading')}</DropdownMenuItem>
           )}
-          {list.status === 'error' && <DropdownMenuItem disabled>Не вдалося завантажити компанії</DropdownMenuItem>}
+          {list.status === 'error' && <DropdownMenuItem disabled>{tErrors('loadOrgs')}</DropdownMenuItem>}
           {list.status === 'ready' &&
             list.orgs.map((o) => (
               <DropdownMenuItem key={o.id} onClick={() => chooseOrg(o.id)}>
                 <span className="min-w-0 flex-1 truncate">{o.name}</span>
                 <span className="text-xs text-ink-muted">{o.currency}</span>
-                {o.id === orgId && <Check className="text-brand" aria-label="Поточна компанія" />}
+                {o.id === orgId && <Check className="text-brand" aria-label={t('current')} />}
               </DropdownMenuItem>
             ))}
         </DropdownMenuGroup>

@@ -11,8 +11,10 @@ import {
   type ReactNode,
 } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { LazyAccountForm, LazyTransactionForm } from '@/components/forms/lazy'
+import { DEFAULT_INCOME_CATEGORIES, type DefaultCategoryNames } from '@/lib/firebase/default-categories'
 import { getMembership } from '@/lib/firebase/members'
 import { useAccounts } from '@/lib/hooks/useAccounts'
 import { useAuth } from '@/lib/hooks/useAuth'
@@ -71,6 +73,7 @@ const ShellContext = createContext<ShellContextValue | null>(null)
 const sidebarStore = createCollapsedStore(browserLocalStorage)
 
 export function ShellProvider({ orgId, children }: { orgId: string; children: ReactNode }) {
+  const tErrors = useTranslations('errors')
   const router = useRouter()
   const { org: loadedOrg, switchOrg } = useOrg()
   const { user } = useAuth()
@@ -117,8 +120,14 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
   // (a second useCategories on a fresh org would seed the default categories twice). They start only
   // once access is granted, so a foreign URL never attaches listeners or seeds default categories.
   const { accounts, loading: accountsLoading } = useAccounts(dataOrgId)
+  // The default categories are created in the language that is active when the company is first opened.
+  const tDefaultCategories = useTranslations('defaultCategories')
+  const defaultCategoryNames: DefaultCategoryNames = Object.fromEntries(
+    DEFAULT_INCOME_CATEGORIES.map(({ slug }) => [slug, tDefaultCategories(`income.${slug}`)]),
+  )
   const { incomeCategories, expenseCategories, loading: categoriesLoading } = useCategories(dataOrgId, {
     seed: canRole(role, 'data.write'),
+    names: defaultCategoryNames,
   })
 
   // A selection belongs to one org: it is ignored as soon as the URL points at another one.
@@ -164,8 +173,8 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
     }
     if (!orgIdValid || !loadedOrg || loadedOrg.id === orgId || requestedOrgId.current === orgId) return
     requestedOrgId.current = orgId
-    switchOrg(orgId).catch(() => toast.error('Не вдалося переключити компанію'))
-  }, [loadedOrg, orgId, orgIdValid, switchOrg])
+    switchOrg(orgId).catch(() => toast.error(tErrors('switchOrg')))
+  }, [loadedOrg, orgId, orgIdValid, switchOrg, tErrors])
 
   const chooseOrg = (id: string) => {
     if (id === orgId) return
@@ -174,13 +183,15 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
     router.push(`/${id}/transactions`)
     switchOrg(id).catch(() => {
       chosenOrgId.current = null
-      toast.error('Не вдалося переключити компанію')
+      toast.error(tErrors('switchOrg'))
     })
   }
 
+  const org = loadedOrg && loadedOrg.id === orgId ? loadedOrg : null
+
   const value: ShellContextValue = {
     orgId,
-    org: loadedOrg && loadedOrg.id === orgId ? loadedOrg : null,
+    org,
     chooseOrg,
     access,
     role,
@@ -211,6 +222,7 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
           incomeCategories={incomeCategories}
           expenseCategories={expenseCategories}
           defaultType={transactionFormType}
+          defaultCurrency={org?.currency}
           open
           onClose={() => setTransactionFormType(null)}
         />
@@ -220,6 +232,7 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
           key={accountForm.account?.id ?? 'new'}
           orgId={orgId}
           account={accountForm.account ?? undefined}
+          defaultCurrency={org?.currency}
           open
           onClose={() => setAccountForm(null)}
         />

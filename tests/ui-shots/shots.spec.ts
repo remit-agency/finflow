@@ -4,6 +4,8 @@ import { test, expect, type APIRequestContext, type Page } from '@playwright/tes
 import { registerViaUi, waitForShell } from '../e2e/helpers/app-ui'
 import { seedDoc } from '../e2e/helpers/emulator-firestore'
 import { formatDayLongUtc } from '../../lib/utils/calendar-grid'
+import en from '../../messages/en.json'
+import pl from '../../messages/pl.json'
 
 const OUT_DIR = join(process.cwd(), 'ui-shots')
 const VIEWPORTS = [
@@ -92,15 +94,17 @@ test.describe('ui shots', () => {
     'Run with `npm run ui:shots` (it starts the Auth + Firestore emulators)',
   )
 
-  test('key screens at 1440x900 and 390x844 with a dark <html>', async ({ page, request }) => {
-    test.setTimeout(300_000)
+  test.beforeAll(() => {
     mkdirSync(OUT_DIR, { recursive: true })
     // Start from an empty folder: no stale images from an older list of screens. Removing also
     // avoids a Windows quirk where overwriting a PNG that an image viewer holds open fails.
     for (const old of readdirSync(OUT_DIR)) {
       if (old.endsWith('.png')) rmSync(join(OUT_DIR, old), { force: true })
     }
+  })
 
+  test('key screens at 1440x900 and 390x844 with a dark <html>', async ({ page, request }) => {
+    test.setTimeout(300_000)
     await page.setViewportSize({ width: 1440, height: 900 })
     const user = await registerViaUi(page, 'shots')
     await waitForShell(page, user.companyName)
@@ -161,8 +165,8 @@ test.describe('ui shots', () => {
           await expect(picker).toBeVisible()
           const today = new Date()
           const first = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1))
-          await picker.getByRole('button', { name: formatDayLongUtc(first), exact: true }).click()
-          await picker.getByRole('button', { name: formatDayLongUtc(today), exact: true }).click()
+          await picker.getByRole('button', { name: formatDayLongUtc(first, 'uk'), exact: true }).click()
+          await picker.getByRole('button', { name: formatDayLongUtc(today, 'uk'), exact: true }).click()
           await shot('analytics-cashflow-period-picker')
           await page.keyboard.press('Escape')
           await expect(picker).toBeHidden()
@@ -187,4 +191,68 @@ test.describe('ui shots', () => {
       }
     }
   })
+
+  // S03: the same shell in Polish and English, to look for truncated or overflowing labels.
+  // The user is registered in Ukrainian (the helpers match Ukrainian labels), then the NEXT_LOCALE cookie
+  // switches the UI. Files: <screen>-<desktop|phone>-<pl|en>.png.
+  for (const [locale, messages] of [['pl', pl], ['en', en]] as const) {
+    test(`key screens in ${locale}`, async ({ page, request, context }) => {
+      test.setTimeout(300_000)
+      await page.setViewportSize({ width: 1440, height: 900 })
+      const user = await registerViaUi(page, `shots${locale}`)
+      await waitForShell(page, user.companyName)
+      await seedDemoData(request, user.orgId)
+      await context.addCookies([{ name: 'NEXT_LOCALE', value: locale, url: 'http://localhost:3000' }])
+
+      const shot = async (name: string, form: 'desktop' | 'phone') => {
+        await assertLightShellUnderDarkRoot(page)
+        await page.screenshot({ path: join(OUT_DIR, `${name}-${form}-${locale}.png`), animations: 'disabled' })
+      }
+      const open = async (path: string) => {
+        await page.goto(`/${user.orgId}/${path}`)
+        await waitForShell(page, user.companyName)
+      }
+
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await open('transactions')
+      await expect(page.getByRole('row').filter({ hasText: 'Оренда офісу' }).first()).toBeVisible()
+      await shot('payments', 'desktop')
+
+      await page.getByRole('button', { name: messages.shell.header.expense, exact: true }).click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+      await shot('expense-form', 'desktop')
+      await page.keyboard.press('Escape')
+      await expect(page.getByRole('dialog')).toBeHidden()
+
+      await open('settings/company')
+      await expect(page.getByRole('navigation', { name: messages.shell.nav.settings })).toBeVisible()
+      await shot('settings-company', 'desktop')
+
+      await open('analytics/pl')
+      await expect(page.getByRole('navigation', { name: messages.shell.nav.analytics })).toBeVisible()
+      await page.waitForTimeout(1500)
+      await shot('analytics-pnl', 'desktop')
+
+      await page.setViewportSize({ width: 390, height: 844 })
+      await open('transactions')
+      await expect(page.getByRole('row').filter({ hasText: 'Оренда офісу' }).first()).toBeVisible()
+      await shot('payments', 'phone')
+
+      await page.getByRole('button', { name: messages.shell.header.openAccounts }).click()
+      await expect(page.getByTestId('accounts-drawer')).toBeVisible()
+      await shot('accounts-drawer', 'phone')
+      await page.keyboard.press('Escape')
+      await expect(page.getByTestId('accounts-drawer')).toBeHidden()
+
+      await page.getByRole('button', { name: messages.shell.header.income, exact: true }).click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+      await shot('income-form', 'phone')
+      await page.keyboard.press('Escape')
+
+      await open('analytics/pl')
+      await expect(page.getByRole('navigation', { name: messages.shell.nav.analytics })).toBeVisible()
+      await page.waitForTimeout(1500)
+      await shot('analytics-pnl', 'phone')
+    })
+  }
 })

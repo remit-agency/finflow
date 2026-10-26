@@ -1,12 +1,7 @@
 import type { Account } from '@/types'
 
-/** How an account type reads in lists (the journal's second line under the account name). */
-export const ACCOUNT_TYPE_LABELS: Record<Account['type'], string> = {
-  bank: 'Банківський рахунок',
-  cash: 'Готівка',
-  card: 'Карта',
-  crypto: 'Крипто',
-}
+// How an account type reads in lists (the journal's second line under the account name) is
+// `t('common.accountTypes.<type>')`.
 
 export interface AccountsSummary {
   /** The company currency the total is expressed in. */

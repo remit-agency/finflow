@@ -1,0 +1,500 @@
+{
+  "meta": {
+    "title": "FinFlow — Business Finance Manager",
+    "description": "Track income, expenses and cash flow for your business. 14-day free trial."
+  },
+  "common": {
+    "language": "Language",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "close": "Close",
+    "loading": "Loading…",
+    "edit": "Edit",
+    "toggleTheme": "Toggle theme",
+    "accountTypes": {
+      "bank": "Bank account",
+      "cash": "Cash",
+      "card": "Card",
+      "crypto": "Crypto"
+    }
+  },
+  "roles": {
+    "owner": "Owner",
+    "accountant": "Accountant",
+    "viewer": "Viewer"
+  },
+  "errors": {
+    "signOut": "Could not sign out",
+    "switchOrg": "Could not switch company",
+    "deleteAccount": "Could not delete the account",
+    "loadOrgs": "Could not load companies",
+    "auth": {
+      "wrongPassword": "Incorrect email or password.",
+      "userNotFound": "No user found with this email.",
+      "emailInUse": "An account with this email already exists.",
+      "weakPassword": "The password is too weak. Use at least 6 characters.",
+      "tooManyRequests": "Too many attempts. Try again in a few minutes.",
+      "network": "Network error. Check your connection and try again.",
+      "popupClosed": "The sign-in window was closed before it finished.",
+      "loadCompanies": "Could not load your companies. Please try again.",
+      "generic": "Something went wrong. Please try again."
+    },
+    "orgCreate": {
+      "org_limit_reached": "You can own at most 3 companies.",
+      "unauthorized": "Your session has expired. Please sign in again.",
+      "invalid": "Please check the company name and currency.",
+      "network": "Network error. Check your connection and try again.",
+      "server": "Could not create the company. Please try again."
+    },
+    "bank": {
+      "connectFailed": "Could not connect the bank",
+      "notConfirmed": "The connection was not confirmed",
+      "saveFailed": "Could not save the connection",
+      "loadInstitutions": "Could not load the banks",
+      "emailNotVerified": "Verify your email to connect a bank",
+      "connect": "Could not connect the bank. Try again.",
+      "connectForbidden": "Only the company owner can connect banks",
+      "connectInvalid": "Could not connect this bank. Pick another one or try later.",
+      "connectUnavailable": "The bank or the connection service is unavailable right now. Try later.",
+      "connectNetwork": "No connection to the server. Check your internet and try again.",
+      "disconnectFailed": "Could not disconnect the bank"
+    }
+  },
+  "auth": {
+    "or": "or",
+    "login": {
+      "title": "Sign in",
+      "description": "Enter your credentials to access your account",
+      "email": "Email",
+      "emailPlaceholder": "you@company.com",
+      "password": "Password",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "google": "Sign in with Google",
+      "noAccount": "Don't have an account?",
+      "toRegister": "Create one"
+    },
+    "register": {
+      "title": "Start free trial",
+      "description": "14 days free, no credit card required",
+      "companyOnlyTitle": "Finish setting up",
+      "companyOnlyDescription": "Your account is ready. Add your company to continue.",
+      "companyOnlyFromLoginTitle": "Create your company",
+      "companyOnlyFromLoginDescription": "You are signed in, but you do not have a company yet.",
+      "name": "Your name",
+      "namePlaceholder": "John Smith",
+      "email": "Email",
+      "emailPlaceholder": "you@company.com",
+      "password": "Password",
+      "passwordPlaceholder": "At least 6 characters",
+      "companySection": "Company",
+      "orgName": "Company name",
+      "orgNamePlaceholder": "My Company LLC",
+      "currency": "Primary currency",
+      "currencyPlaceholder": "Select currency",
+      "submit": "Try 14 days free",
+      "submitting": "Creating account…",
+      "createCompany": "Create company",
+      "creatingCompany": "Creating company…",
+      "google": "Sign up with Google",
+      "googleNeedsCompany": "Please enter your company name first",
+      "haveAccount": "Already have an account?",
+      "toLogin": "Sign in",
+      "notYou": "Not you?",
+      "signOut": "Sign out"
+    },
+    "currencies": {
+      "UAH": "UAH — Ukrainian Hryvnia",
+      "EUR": "EUR — Euro",
+      "USD": "USD — US Dollar",
+      "PLN": "PLN — Polish Zloty"
+    }
+  },
+  "shell": {
+    "modules": {
+      "transactions": "Payments",
+      "analytics": "Analytics"
+    },
+    "analyticsSections": {
+      "cashflow": "Cash Flow",
+      "pl": "Profit & Loss (P&L)",
+      "balance": "Balance",
+      "calendar": "Calendar"
+    },
+    "settingsSections": {
+      "company": "Company",
+      "categories": "Categories",
+      "banks": "Banks",
+      "subscription": "Subscription"
+    },
+    "nav": {
+      "modules": "Modules",
+      "analytics": "Analytics sections",
+      "settings": "Settings sections"
+    },
+    "header": {
+      "openAccounts": "Open accounts",
+      "income": "Income",
+      "expense": "Expense",
+      "transfer": "Transfer"
+    },
+    "frame": {
+      "settings": "Settings",
+      "accounts": "Accounts"
+    },
+    "insufficientRights": {
+      "title": "Insufficient permissions",
+      "body": "This section is available to the company owner only."
+    },
+    "noAccess": {
+      "deniedTitle": "No access to this company",
+      "errorTitle": "Could not verify access",
+      "deniedBody": "This company does not belong to your account, or it does not exist.",
+      "errorBody": "Check your connection and try again.",
+      "toMyCompany": "Go to my company",
+      "retry": "Try again",
+      "signOut": "Sign out"
+    },
+    "orgSwitcher": {
+      "company": "Company",
+      "yourCompanies": "Your companies",
+      "current": "Current company"
+    },
+    "profile": {
+      "label": "Profile",
+      "settings": "Settings",
+      "signOut": "Sign out"
+    },
+    "settingsMenu": {
+      "back": "Back to payments",
+      "title": "Settings"
+    },
+    "accounts": {
+      "expand": "Expand sidebar",
+      "collapse": "Collapse sidebar",
+      "collapsedList": "Accounts (collapsed)",
+      "add": "Add account",
+      "connectBank": "Connect a bank",
+      "openBanking": "Open Banking, beta",
+      "totalIn": "Total in {currency}",
+      "mine": "My accounts",
+      "all": "All accounts",
+      "none": "No accounts yet",
+      "list": "Accounts list",
+      "actionsFor": "Actions for account {name}",
+      "confirmDelete": "Delete account “{name}”?"
+    },
+    "verifyEmail": {
+      "alreadySent": "The email has already been sent. Please wait a minute.",
+      "sent": "Email sent",
+      "tooMany": "Too many attempts. Try again in a few minutes.",
+      "sendFailed": "Could not send the email. Try again later.",
+      "short": "Confirm your email to connect banks",
+      "long": "Confirm your email <strong>{email}</strong> to connect banks. Did not get the email? Send it again.",
+      "sending": "Sending…",
+      "resendShort": "Send",
+      "resendLong": "Send the email again"
+    }
+  },
+  "journal": {
+    "title": "Payments",
+    "showAllAccounts": "Show all accounts",
+    "filters": {
+      "searchPlaceholder": "Search description…",
+      "search": "Search description",
+      "account": "Account",
+      "allAccounts": "All accounts",
+      "category": "Category",
+      "allCategories": "All categories",
+      "more": "More filters",
+      "clear": "Clear",
+      "dateFrom": "Date from",
+      "dateTo": "to",
+      "amountFrom": "Amount from",
+      "amountTo": "to"
+    },
+    "list": {
+      "emptyTitle": "No transactions yet",
+      "emptyBody": "Click “Income”, “Expense” or “Transfer” in the header to add your first transaction",
+      "date": "Date",
+      "amount": "Amount",
+      "account": "Account",
+      "category": "Category",
+      "comment": "Comment",
+      "transfer": "Transfer",
+      "noCategory": "No category",
+      "rowEdit": "{account}: {amount}, {date}, edit"
+    }
+  },
+  "forms": {
+    "transaction": {
+      "titleNew": "New transaction",
+      "titleEdit": "Edit transaction",
+      "income": "Income",
+      "expense": "Expense",
+      "transfer": "Transfer",
+      "account": "Account",
+      "accountFrom": "Account (from)",
+      "accountTo": "Account (to)",
+      "chooseAccount": "Choose an account",
+      "amount": "Amount",
+      "currency": "Currency",
+      "category": "Category",
+      "noCategory": "No category",
+      "date": "Date",
+      "description": "Description",
+      "descriptionPlaceholder": "Optional",
+      "showAdvanced": "Show additional fields",
+      "hideAdvanced": "Hide additional fields",
+      "recurring": "Recurring transaction",
+      "recurringBadge": "recurring",
+      "addAnother": "Add and create similar",
+      "add": "Add",
+      "errors": {
+        "account": "Choose an account",
+        "amount": "Enter an amount > 0",
+        "toAccount": "Choose a destination account",
+        "sameAccount": "The accounts must be different"
+      }
+    },
+    "account": {
+      "titleNew": "New account",
+      "titleEdit": "Edit account",
+      "name": "Name",
+      "namePlaceholder": "For example: Barclays",
+      "type": "Type",
+      "types": {
+        "bank": "Bank",
+        "cash": "Cash",
+        "card": "Card",
+        "crypto": "Crypto"
+      },
+      "balance": "Balance",
+      "currency": "Currency",
+      "color": "Color",
+      "create": "Create",
+      "errors": {
+        "name": "Name is required",
+        "balance": "Balance must be ≥ 0"
+      }
+    },
+    "saving": "Saving…"
+  },
+  "defaultCategories": {
+    "income": {
+      "sales": "Sales",
+      "services": "Services",
+      "investments": "Investments",
+      "other": "Other (income)"
+    },
+    "expense": {
+      "salary": "Salaries",
+      "rent": "Rent",
+      "marketing": "Marketing",
+      "utilities": "Utilities",
+      "equipment": "Equipment",
+      "taxes": "Taxes",
+      "other": "Other (expense)"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "banks": {
+      "title": "Bank connection",
+      "description": "Santander, PKO, mBank, ING and other banks through Enable Banking",
+      "connect": "Connect a bank",
+      "redirecting": "Redirecting…",
+      "loading": "Loading…",
+      "searchPlaceholder": "Search for a bank…",
+      "noneFound": "No banks found",
+      "connectedOn": "Connected {date}",
+      "connected": "{name} connected",
+      "disconnected": "Bank disconnected",
+      "disconnect": "Disconnect {name}",
+      "defaultInstitution": "Bank",
+      "countries": {
+        "PL": "🇵🇱 Poland",
+        "DE": "🇩🇪 Germany",
+        "GB": "🇬🇧 United Kingdom",
+        "FR": "🇫🇷 France",
+        "NL": "🇳🇱 Netherlands",
+        "LT": "🇱🇹 Lithuania",
+        "UA": "🇺🇦 Ukraine"
+      }
+    },
+    "categories": {
+      "title": "Categories",
+      "description": "Income and expenses",
+      "income": "Income",
+      "expense": "Expenses",
+      "none": "No categories",
+      "addTitle": "Add a category",
+      "nameLabel": "Category name",
+      "typeLabel": "Category type",
+      "typeIncome": "Income",
+      "typeExpense": "Expense",
+      "colorLabel": "Color {color}",
+      "deleteLabel": "Delete category {name}",
+      "submit": "Add",
+      "added": "Category added",
+      "deleted": "Deleted",
+      "failed": "Error"
+    },
+    "company": {
+      "title": "Company",
+      "description": "Name and currency",
+      "nameLabel": "Name",
+      "currencyLabel": "Currency",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "saveFailed": "Could not save",
+      "ownerOnly": "Only the owner can change the company details.",
+      "currencies": {
+        "UAH": "UAH — Ukrainian Hryvnia",
+        "EUR": "EUR — Euro",
+        "USD": "USD — US Dollar",
+        "PLN": "PLN — Polish Zloty"
+      }
+    },
+    "subscription": {
+      "title": "Subscription",
+      "plans": {
+        "trial": "Trial plan",
+        "pro": "Pro plan",
+        "free": "Free plan"
+      },
+      "trialUntil": "Trial until {date}",
+      "upgrade": "Upgrade to Pro"
+    }
+  },
+  "analytics": {
+    "title": "Analytics",
+    "subtitle": "Choose a section to view reports",
+    "exportCsv": "Export CSV",
+    "cards": {
+      "cashflow": "Income, expenses and balance by month as a chart",
+      "pl": "Profit and loss by category for the selected period",
+      "calendar": "Cash movement day by day, easy to browse by month",
+      "balance": "Assets, liabilities and equity of the organisation"
+    },
+    "columns": {
+      "account": "Account",
+      "type": "Type",
+      "category": "Category",
+      "month": "Month",
+      "day": "Day",
+      "income": "Income",
+      "expense": "Expense",
+      "net": "Difference",
+      "balance": "Balance",
+      "currency": "Currency",
+      "total": "Total"
+    },
+    "cashflow": {
+      "subtitle": "Cash movement for the selected period",
+      "totalIncome": "Income",
+      "totalExpense": "Expenses",
+      "detailMonths": "Breakdown by month",
+      "detailDays": "Breakdown by day",
+      "empty": "No data for this period."
+    },
+    "pl": {
+      "title": "Profit & Loss (P&L)",
+      "subtitle": "By category for the selected period"
+    },
+    "calendar": {
+      "subtitle": "Daily cash movement"
+    },
+    "balance": {
+      "subtitle": "Assets and equity",
+      "asOf": "As of:",
+      "asOfLabel": "As of",
+      "periods": {
+        "currentMonth": "Current month",
+        "quarter": "Quarter",
+        "year": "Year"
+      }
+    }
+  },
+  "periods": {
+    "menuHeader": "BY TRANSACTION DATE",
+    "srLabel": "Period: ",
+    "currentYear": "Current year",
+    "prevYear": "Previous year",
+    "currentWeek": "Current week",
+    "prevWeek": "Last week",
+    "currentMonth": "Current month",
+    "prevMonth": "Last month",
+    "allTime": "All time",
+    "custom": "Choose dates",
+    "picker": {
+      "prevMonth": "Previous month",
+      "nextMonth": "Next month",
+      "chooseFirst": "Choose the first date",
+      "startChosen": "Start: {date}. Choose the second date",
+      "apply": "Apply"
+    }
+  },
+  "charts": {
+    "loading": "Loading…",
+    "noData": "No data for this period",
+    "addTransactions": "Add transactions →",
+    "cashFlow": {
+      "income": "Income",
+      "expense": "Expense",
+      "balance": "Balance",
+      "net": "Difference"
+    },
+    "plSummary": {
+      "profit": "Profit / loss for the period",
+      "margin": "Profit margin",
+      "incomeByCategory": "Income by category",
+      "expenseByCategory": "Expenses by category"
+    },
+    "plTable": {
+      "category": "Category",
+      "total": "Total",
+      "income": "Income",
+      "expense": "Expenses",
+      "totalIncome": "Total income",
+      "totalExpense": "Total expenses",
+      "profit": "Profit / loss"
+    },
+    "calendar": {
+      "previousMonth": "Previous month",
+      "nextMonth": "Next month",
+      "empty": "No transactions this month",
+      "day": "Day",
+      "income": "Income",
+      "expense": "Expense",
+      "transfer": "Transfer",
+      "balance": "Balance"
+    },
+    "balanceSheet": {
+      "assets": "Assets",
+      "liabilities": "Equity and liabilities",
+      "fixedAssets": "Fixed assets",
+      "realEstate": "Real estate",
+      "equipment": "Equipment",
+      "crypto": "Investments (crypto)",
+      "currentAssets": "Current assets",
+      "inventory": "Inventory",
+      "receivables": "Accounts receivable",
+      "money": "Cash",
+      "noAccounts": "No accounts",
+      "totalAssets": "Total assets",
+      "equity": "Equity",
+      "charterCapital": "Share capital",
+      "additionalCapital": "Additional capital",
+      "retainedEarnings": "Retained earnings",
+      "debt": "Debt capital",
+      "loans": "Loans",
+      "totalLiabilities": "Total equity and liabilities",
+      "check": "Balance",
+      "balanced": "Assets = Equity + Liabilities",
+      "difference": "Difference: {amount}"
+    }
+  }
+}

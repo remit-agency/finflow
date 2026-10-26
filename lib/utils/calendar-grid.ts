@@ -4,32 +4,14 @@
  *
  * Every date here is a UTC calendar day: the app groups transactions by their UTC day
  * (`toDateKey` in lib/utils/date.ts), so the picker and the period maths read the same day the
- * journal shows. Europe/Warsaw handling arrives with S03. Weeks start on Monday (Poland).
- * Month and weekday names are constants, not `Intl`, so the output does not depend on the ICU
- * data of the browser or of Node.
+ * journal shows. "Today" is Warsaw's date (`todayUtcDay` in lib/utils/today.ts); the callers
+ * pass it in. Weeks start on Monday (Poland). Month and weekday names come from `Intl` through
+ * the UI language (S03).
  */
+import { INTL_LOCALE, type Locale } from '../i18n/config'
+import { formatWeekday } from '../i18n/format'
 
 export const DAY_MS = 24 * 60 * 60 * 1000
-
-/** Nominative month names (calendar title: «Жовтень 2026»). */
-export const UA_MONTHS_NOMINATIVE = [
-  'Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень',
-  'Липень', 'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень',
-] as const
-
-/** Genitive month names (a day: «9 жовтня 2026»). */
-export const UA_MONTHS_GENITIVE = [
-  'січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
-  'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня',
-] as const
-
-/** Short weekday names, Monday first. */
-export const UA_WEEKDAYS_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'] as const
-
-/** Full weekday names, Monday first. */
-export const UA_WEEKDAYS_FULL = [
-  'понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота', 'неділя',
-] as const
 
 export interface YearMonth {
   year: number
@@ -106,21 +88,41 @@ export function dayKeyUtc(date: Date): string {
   return date.toISOString().slice(0, 10)
 }
 
-/** `dd.mm.yyyy` of the UTC day. */
-export function formatDateUtc(date: Date): string {
-  const d = String(date.getUTCDate()).padStart(2, '0')
-  const m = String(date.getUTCMonth() + 1).padStart(2, '0')
-  return `${d}.${m}.${date.getUTCFullYear()}`
+/** `Intl` output of the UTC day, cut after the year: Ukrainian appends « р.» to it. */
+function formatUntilYear(date: Date, locale: Locale, options: Intl.DateTimeFormatOptions): string {
+  const parts = new Intl.DateTimeFormat(INTL_LOCALE[locale], { timeZone: 'UTC', ...options }).formatToParts(date)
+  const year = parts.findIndex((part) => part.type === 'year')
+  return (year === -1 ? parts : parts.slice(0, year + 1)).map((part) => part.value).join('')
 }
 
-/** «9 жовтня 2026» (the accessible name of a day in the picker). */
-export function formatDayLongUtc(date: Date): string {
-  return `${date.getUTCDate()} ${UA_MONTHS_GENITIVE[date.getUTCMonth()]} ${date.getUTCFullYear()}`
+function capitalize(text: string, locale: Locale): string {
+  return text.charAt(0).toLocaleUpperCase(INTL_LOCALE[locale]) + text.slice(1)
 }
 
-/** «Жовтень 2026». */
-export function formatMonthTitle(ym: YearMonth): string {
-  return `${UA_MONTHS_NOMINATIVE[ym.month]} ${ym.year}`
+/** «9 жовтня 2026» / «9 października 2026» / «9 October 2026» (the accessible name of a day in the picker). */
+export function formatDayLongUtc(date: Date, locale: Locale): string {
+  return formatUntilYear(date, locale, { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+/** «Жовтень 2026» / «Październik 2026» / «October 2026». */
+export function formatMonthTitle(ym: YearMonth, locale: Locale): string {
+  return capitalize(formatUntilYear(utcDay(ym.year, ym.month, 1), locale, { month: 'long', year: 'numeric' }), locale)
+}
+
+export interface WeekdayHeader {
+  /** Column header: «Пн». */
+  short: string
+  /** Full name for the header's `abbr`: «понеділок». */
+  full: string
+}
+
+/** The seven weekday headers, Monday first. */
+export function weekdayHeaders(locale: Locale): WeekdayHeader[] {
+  // 1 Jan 2024 is a Monday.
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = utcDay(2024, 0, 1 + i)
+    return { short: capitalize(formatWeekday(day, locale, 'short'), locale), full: formatWeekday(day, locale, 'long') }
+  })
 }
 
 export interface MonthGridCell {

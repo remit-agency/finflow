@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getCategories, seedDefaultCategories } from '@/lib/firebase/categories'
+import type { DefaultCategoryNames } from '@/lib/firebase/default-categories'
 import type { Category } from '@/types'
 
 interface UseCategoriesResult {
@@ -19,20 +20,34 @@ interface UseCategoriesOptions {
    * (the rules refuse everyone else), so a viewer passes false and never even tries.
    */
   seed?: boolean
+  /**
+   * Display names of the default categories in the active UI language (slug -> name). Seeding
+   * needs them: without names nothing is seeded. Switching the language later does not re-seed or
+   * rename anything; the categories keep the language they were created in.
+   */
+  names?: DefaultCategoryNames
 }
 
-export function useCategories(orgId: string | null, { seed = true }: UseCategoriesOptions = {}): UseCategoriesResult {
+export function useCategories(orgId: string | null, { seed = true, names }: UseCategoriesOptions = {}): UseCategoriesResult {
   // The data is stored with the company it belongs to, so a company switch never shows the
   // previous company's categories while the new subscription waits for its first snapshot.
   const [snapshot, setSnapshot] = useState<{ orgId: string; categories: Category[] } | null>(null)
   const [error] = useState<string | null>(null)
 
+  // The seeding effect reads the latest names without depending on them, so a language switch
+  // neither re-subscribes nor seeds again. (Declared first: effects run in declaration order.)
+  const namesRef = useRef(names)
+  useEffect(() => {
+    namesRef.current = names
+  })
+
   useEffect(() => {
     if (!orgId) return
 
     // Seed defaults on first load
-    if (seed) {
-      seedDefaultCategories(orgId).catch(() => {
+    const seedNames = namesRef.current
+    if (seed && seedNames) {
+      seedDefaultCategories(orgId, seedNames).catch(() => {
         // silently ignore if already seeded
       })
     }

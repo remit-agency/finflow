@@ -5,41 +5,45 @@ import { useTransactions } from '@/lib/hooks/useTransactions'
 import { buildCashFlow } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
 import { DEFAULT_REPORT_PERIOD, periodSlug, resolvePeriod, type PeriodSelection } from '@/lib/utils/period'
+import { todayUtcDay } from '@/lib/utils/today'
 import { cn } from '@/lib/utils'
 import CashFlowChart from '@/components/charts/CashFlowChart'
 import { ReportToolbar } from '@/components/analytics/ReportToolbar'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useShell } from '@/lib/hooks/useShell'
-
-function formatNum(n: number): string {
-  return new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(n)
-}
+import { useTranslations } from 'next-intl'
+import { useFormatters } from '@/lib/i18n/useFormatters'
 
 export default function CashFlowPage() {
+  const t = useTranslations('analytics')
+  const tCharts = useTranslations('charts')
+  const tSections = useTranslations('shell.analyticsSections')
+  const { locale, number } = useFormatters()
+  const formatNum = (n: number) => number(n, { maximumFractionDigits: 0 })
   const params = useParams()
   const orgSlug = params.orgSlug as string
   const orgId = orgSlug
   const { can } = useShell()
   const { transactions, loading } = useTransactions(orgId)
   const [period, setPeriod] = useState<PeriodSelection>(DEFAULT_REPORT_PERIOD)
-  // The browser clock, read once per visit (presets resolve against it).
-  const [now] = useState(() => new Date())
+  // Warsaw's date, read once per visit (presets resolve against it).
+  const [now] = useState(() => todayUtcDay())
 
   const { granularity, buckets: data } = useMemo(
-    () => buildCashFlow(transactions, resolvePeriod(period, now)),
-    [transactions, period, now]
+    () => buildCashFlow(transactions, resolvePeriod(period, now), locale),
+    [transactions, period, now, locale]
   )
-  const unitLabel = granularity === 'month' ? 'Місяць' : 'День'
+  const unitLabel = granularity === 'month' ? t('columns.month') : t('columns.day')
 
   const handleExport = () => {
     exportToCSV(
       data.map((row) => ({
         [unitLabel]: row.label,
-        Дохід: row.income,
-        Витрата: row.expense,
-        Різниця: row.net,
-        Баланс: row.balance,
+        [t('columns.income')]: row.income,
+        [t('columns.expense')]: row.expense,
+        [t('columns.net')]: row.net,
+        [t('columns.balance')]: row.balance,
       })),
       `cashflow-${periodSlug(period)}`
     )
@@ -51,8 +55,8 @@ export default function CashFlowPage() {
         {/* Header and the report toolbar (period first, then the actions), as in Finmap */}
         <div className="space-y-4">
           <div>
-            <h1 className="font-display text-xl font-semibold text-ink">Cash Flow</h1>
-            <p className="text-sm text-ink-muted">Рух коштів за обраний період</p>
+            <h1 className="font-display text-xl font-semibold text-ink">{tSections('cashflow')}</h1>
+            <p className="text-sm text-ink-muted">{t('cashflow.subtitle')}</p>
           </div>
           <ReportToolbar period={period} onPeriodChange={setPeriod} onExport={handleExport} />
         </div>
@@ -65,14 +69,14 @@ export default function CashFlowPage() {
           return (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {[
-                { id: 'income', label: 'Доходи', value: totalIncome, tone: 'text-income' },
-                { id: 'expense', label: 'Витрати', value: totalExpense, tone: 'text-expense' },
-                { id: 'net', label: 'Різниця', value: net, tone: net >= 0 ? 'text-income' : 'text-expense' },
+                { id: 'income', label: t('cashflow.totalIncome'), value: totalIncome, tone: 'text-income' },
+                { id: 'expense', label: t('cashflow.totalExpense'), value: totalExpense, tone: 'text-expense' },
+                { id: 'net', label: t('columns.net'), value: net, tone: net >= 0 ? 'text-income' : 'text-expense' },
               ].map((card) => (
-                <div key={card.label} className="rounded-panel border border-line bg-surface px-5 py-4">
+                <div key={card.id} className="rounded-panel border border-line bg-surface px-5 py-4">
                   <p className="mb-1 text-xs text-ink-muted">{card.label}</p>
                   <p data-testid={`cashflow-total-${card.id}`} className={cn('text-xl font-bold tabular-nums', card.tone)}>
-                    {card.value >= 0 && card.label === 'Різниця' ? '+' : ''}{formatNum(card.value)}
+                    {card.value >= 0 && card.id === 'net' ? '+' : ''}{formatNum(card.value)}
                   </p>
                 </div>
               ))}
@@ -89,7 +93,7 @@ export default function CashFlowPage() {
         <div className="overflow-hidden rounded-panel border border-line bg-surface">
           <div className="border-b border-line px-6 py-4">
             <h2 className="text-sm font-semibold text-ink">
-              {granularity === 'month' ? 'Деталізація по місяцях' : 'Деталізація по днях'}
+              {granularity === 'month' ? t('cashflow.detailMonths') : t('cashflow.detailDays')}
             </h2>
           </div>
           {loading ? (
@@ -100,10 +104,10 @@ export default function CashFlowPage() {
             </div>
           ) : data.length === 0 ? (
             <div className="p-6 text-center text-sm text-ink-muted">
-              Немає даних за цей період.{' '}
+              {t('cashflow.empty')}{' '}
               {can('data.write') && (
                 <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground underline">
-                  Додати транзакції →
+                  {tCharts('addTransactions')}
                 </Link>
               )}
             </div>
@@ -113,10 +117,10 @@ export default function CashFlowPage() {
                 <thead>
                   <tr className="bg-canvas text-xs uppercase tracking-wide text-ink-muted">
                     <th className="px-6 py-3 text-left font-semibold">{unitLabel}</th>
-                    <th className="px-6 py-3 text-right font-semibold">Дохід</th>
-                    <th className="px-6 py-3 text-right font-semibold">Витрата</th>
-                    <th className="px-6 py-3 text-right font-semibold">Різниця</th>
-                    <th className="px-6 py-3 text-right font-semibold">Баланс</th>
+                    <th className="px-6 py-3 text-right font-semibold">{t('columns.income')}</th>
+                    <th className="px-6 py-3 text-right font-semibold">{t('columns.expense')}</th>
+                    <th className="px-6 py-3 text-right font-semibold">{t('columns.net')}</th>
+                    <th className="px-6 py-3 text-right font-semibold">{t('columns.balance')}</th>
                   </tr>
                 </thead>
                 <tbody>

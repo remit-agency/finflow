@@ -3,16 +3,16 @@
 export type ModuleKey = 'transactions' | 'analytics'
 
 export interface ModuleTab {
+  /** Also the slug of the label: the UI shows `t('shell.modules.<key>')`. */
   key: ModuleKey
-  label: string
   /** First path segment after the org id that belongs to this module. */
   segment: string
   href: (orgId: string) => string
 }
 
 export const MODULE_TABS: readonly ModuleTab[] = [
-  { key: 'transactions', label: 'Платежі', segment: 'transactions', href: (orgId) => `/${orgId}/transactions` },
-  { key: 'analytics', label: 'Аналітика', segment: 'analytics', href: (orgId) => `/${orgId}/analytics/cashflow` },
+  { key: 'transactions', segment: 'transactions', href: (orgId) => `/${orgId}/transactions` },
+  { key: 'analytics', segment: 'analytics', href: (orgId) => `/${orgId}/analytics/cashflow` },
 ]
 
 /** The module a pathname belongs to: the whole first segment after `/<orgId>/`, or null. */

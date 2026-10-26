@@ -9,6 +9,8 @@ import {
   type YearMonth,
 } from '@/lib/utils/calendar-grid'
 import type { PeriodRange } from '@/lib/utils/period'
+import { formatDate } from '@/lib/i18n/format'
+import type { Locale } from '@/lib/i18n/config'
 
 /** Cash Flow buckets are months for a range longer than this many days, days otherwise. */
 export const CASHFLOW_DAY_BUCKETS_MAX_DAYS = 31
@@ -16,7 +18,7 @@ export const CASHFLOW_DAY_BUCKETS_MAX_DAYS = 31
 export type CashFlowGranularity = 'month' | 'day'
 
 export interface CashFlowBucket {
-  label: string       // month: "Січ 26"; day: "12 жов"
+  label: string       // month: "Січ 26"; day: "12 жов" (in the UI language)
   key: string         // month: "2026-01"; day: "2026-01-12" (UTC)
   income: number
   expense: number
@@ -57,18 +59,30 @@ export interface BalanceData {
   accounts: Account[]
 }
 
-const UA_MONTHS = ['Січ', 'Лют', 'Бер', 'Кві', 'Тра', 'Чер', 'Лип', 'Сер', 'Вер', 'Жов', 'Лис', 'Гру']
-
 function formatMonthKey(year: number, month: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}`
 }
 
-function formatMonthLabel(year: number, month: number): string {
-  return `${UA_MONTHS[month]} ${String(year).slice(2)}`
+/** «Січ» / «Sty» / «Jan»: the first three letters of the language's month name, capitalised. */
+function shortMonthName(year: number, month: number, locale: Locale): string {
+  const name = formatDate(new Date(Date.UTC(year, month, 1)), locale, { month: 'long' })
+  const short = name.slice(0, 3)
+  return short.charAt(0).toUpperCase() + short.slice(1)
 }
 
-function formatDayLabel(date: Date): string {
-  return `${date.getUTCDate()} ${UA_MONTHS[date.getUTCMonth()].toLowerCase()}`
+/**
+ * «Січ 26» (a month bucket / a P&L column); `month` is 0-based. English writes the full year
+ * («Oct 2026»): «Oct 26» reads as the 26th of October.
+ */
+export function formatMonthLabel(year: number, month: number, locale: Locale): string {
+  const yearText = locale === 'en' ? String(year) : String(year).slice(2)
+  return `${shortMonthName(year, month, locale)} ${yearText}`
+}
+
+/** «12 жов» / «12 Oct» (a day bucket): lowercase month in Ukrainian and Polish, as the month name is written there. */
+function formatDayLabel(date: Date, locale: Locale): string {
+  const month = shortMonthName(date.getUTCFullYear(), date.getUTCMonth(), locale)
+  return `${date.getUTCDate()} ${locale === 'en' ? month : month.toLowerCase()}`
 }
 
 function txDate(tx: Pick<Transaction, 'date'>): Date {
@@ -129,8 +143,9 @@ function daysOf(range: { start: Date; end: Date }): number {
  * Cash Flow over a resolved period (`resolvePeriod`): transactions outside the range are left
  * out; buckets are UTC months when the range is longer than 31 days and UTC days otherwise.
  * Transfers do not count. `balance` is the running total of `net` from the start of the range.
+ * `locale` (the UI language) only decides the bucket labels.
  */
-export function buildCashFlow(transactions: Transaction[], range: PeriodRange): CashFlowReport {
+export function buildCashFlow(transactions: Transaction[], range: PeriodRange, locale: Locale): CashFlowReport {
   const bounded = reportRange(range, transactions)
   if (!bounded) return { granularity: 'month', buckets: [] }
 
@@ -141,11 +156,11 @@ export function buildCashFlow(transactions: Transaction[], range: PeriodRange): 
 
   if (granularity === 'month') {
     for (const { year, month } of monthsOf(bounded)) {
-      buckets.push({ label: formatMonthLabel(year, month), key: formatMonthKey(year, month), ...empty })
+      buckets.push({ label: formatMonthLabel(year, month, locale), key: formatMonthKey(year, month), ...empty })
     }
   } else {
     for (let d = startOfDayUtc(bounded.start); d.getTime() <= bounded.end.getTime(); d = addDaysUtc(d, 1)) {
-      buckets.push({ label: formatDayLabel(d), key: dayKeyUtc(d), ...empty })
+      buckets.push({ label: formatDayLabel(d, locale), key: dayKeyUtc(d), ...empty })
     }
   }
 
@@ -173,12 +188,14 @@ export function buildCashFlow(transactions: Transaction[], range: PeriodRange): 
 /**
  * P&L over a resolved period: income and expense by category for the transactions inside the
  * range, split by the UTC months the range touches (the table's columns) with a total per row.
- * Transfers do not count; transactions without a known category go to «Без категорії».
+ * Transfers do not count; transactions without a known category go to two rows (income and
+ * expense) named `uncategorizedName` (the translated «Без категорії»).
  */
 export function buildPL(
   transactions: Transaction[],
   categories: Category[],
-  range: PeriodRange
+  range: PeriodRange,
+  uncategorizedName: string
 ): PLReport {
   const bounded = reportRange(range, transactions)
   if (!bounded) return { monthKeys: [], rows: [] }
@@ -202,14 +219,14 @@ export function buildPL(
   // Uncategorized buckets
   const uncatIncome: PLRow = {
     categoryId: '__uncategorized_income',
-    categoryName: 'Без категорії',
+    categoryName: uncategorizedName,
     type: 'income',
     months: Object.fromEntries(monthKeys.map(k => [k, 0])),
     total: 0,
   }
   const uncatExpense: PLRow = {
     categoryId: '__uncategorized_expense',
-    categoryName: 'Без категорії',
+    categoryName: uncategorizedName,
     type: 'expense',
     months: Object.fromEntries(monthKeys.map(k => [k, 0])),
     total: 0,

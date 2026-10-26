@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { LogOut, Settings } from 'lucide-react'
 import {
@@ -12,11 +13,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useShell } from '@/lib/hooks/useShell'
 import { settingsPath } from '@/lib/shell/settings-sections'
 
 export function ProfileMenu() {
+  const t = useTranslations('shell.profile')
+  const tErrors = useTranslations('errors')
   const router = useRouter()
   const { user, signOut } = useAuth()
   const { orgId } = useShell()
@@ -25,7 +29,7 @@ export function ProfileMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label="Профіль"
+        aria-label={t('label')}
         className="flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-sm font-semibold text-ink transition-colors hover:border-brand focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
       >
         {initial}
@@ -35,14 +39,16 @@ export function ProfileMenu() {
           <DropdownMenuLabel className="truncate">{user?.email}</DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        <LanguageSwitcher variant="menu" />
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push(settingsPath(orgId, 'company'))}>
           <Settings />
-          Налаштування
+          {t('settings')}
         </DropdownMenuItem>
         {/* The AuthProvider listener performs the hard redirect to /login. */}
-        <DropdownMenuItem onClick={() => signOut().catch(() => toast.error('Не вдалося вийти'))}>
+        <DropdownMenuItem onClick={() => signOut().catch(() => toast.error(tErrors('signOut')))}>
           <LogOut />
-          Вийти
+          {t('signOut')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -17,18 +17,24 @@ export interface RegisteredUser {
   companyName: string
 }
 
-/** Registers through the real form (Auth user + organization) and lands on /{orgId}/transactions. */
-export async function registerViaUi(page: Page, prefix: string): Promise<RegisteredUser> {
+/**
+ * Registers through the real form (Auth user + organization) and lands on /{orgId}/transactions.
+ * The form preselects PLN; the helper picks `currency` (UAH by default) because most tests read
+ * Ukrainian-language amounts and the "Разом у UAH" total.
+ */
+export async function registerViaUi(page: Page, prefix: string, currency = 'UAH'): Promise<RegisteredUser> {
   const runId = `${Date.now()}${Math.floor(Math.random() * 1000)}`
   const email = `${prefix}-${runId}@finflow.test`
   const companyName = `${prefix} Co ${runId}`
   await page.goto('/register')
   await waitForHydration(page, '#name')
-  await page.getByLabel('Your name', { exact: true }).fill('UI Tester')
-  await page.getByLabel('Email', { exact: true }).fill(email)
-  await page.getByLabel('Password', { exact: true }).fill(UI_PASSWORD)
-  await page.getByLabel('Company name', { exact: true }).fill(companyName)
-  await page.getByRole('button', { name: 'Try 14 days free' }).click()
+  await page.getByLabel('Ваше ім\'я', { exact: true }).fill('UI Tester')
+  await page.getByLabel('Електронна пошта', { exact: true }).fill(email)
+  await page.getByLabel('Пароль', { exact: true }).fill(UI_PASSWORD)
+  await page.getByLabel('Назва компанії', { exact: true }).fill(companyName)
+  await page.getByLabel('Валюта', { exact: true }).click()
+  await page.getByRole('option', { name: new RegExp(`^${currency} `) }).click()
+  await page.getByRole('button', { name: 'Спробувати 14 днів безкоштовно' }).click()
   await page.waitForURL(/\/[A-Za-z0-9]{20}\/transactions$/)
   return { email, password: UI_PASSWORD, orgId: new URL(page.url()).pathname.split('/')[1], companyName }
 }

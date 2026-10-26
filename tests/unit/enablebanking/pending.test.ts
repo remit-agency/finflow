@@ -30,7 +30,12 @@ describe('acceptEbAuth', () => {
 
   it('falls back to a generic institution name when the pending entry has none', () => {
     const storage = memoryStorage({ [EB_PENDING_KEY]: JSON.stringify({ authorizationId: 'auth-1' }) })
-    expect(acceptEbAuth(b64url({ sessionId: 'sess-1' }), storage)?.institutionName).toBe('Банк')
+    expect(acceptEbAuth(b64url({ sessionId: 'sess-1' }), storage)?.institutionName).toBe('Bank')
+  })
+
+  it('uses the caller-supplied (translated) fallback name when the pending entry has none', () => {
+    const storage = memoryStorage({ [EB_PENDING_KEY]: JSON.stringify({ authorizationId: 'auth-1' }) })
+    expect(acceptEbAuth(b64url({ sessionId: 'sess-1' }), storage, 'Банк')?.institutionName).toBe('Банк')
   })
 
   it('accepts padded and unpadded base64url', () => {

@@ -1,21 +1,19 @@
+import { formatDate, formatWeekday } from '@/lib/i18n/format'
+import type { Locale } from '@/lib/i18n/config'
 import type { Transaction } from '@/types'
 
 /**
- * Day and month of a transaction date in UTC. The journal groups transactions by their UTC day
- * (`toDateKey`), so a row must be formatted in UTC too, otherwise a row at 00:00Z reads as the
- * previous day west of Greenwich while its group header shows the right one.
+ * Day and month of a transaction date in UTC, in the UI language. The journal groups transactions
+ * by their UTC day (`toDateKey`), so a row must be formatted in UTC too, otherwise a row at 00:00Z
+ * reads as the previous day west of Greenwich while its group header shows the right one.
  */
-export function formatDayShortUtc(date: Date): string {
-  return new Intl.DateTimeFormat('uk-UA', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  }).format(date)
+export function formatDayShortUtc(date: Date, locale: Locale): string {
+  return formatDate(date, locale, { day: 'numeric', month: 'short' })
 }
 
 /** Short weekday of a transaction date in UTC (`пт`), for the same reason as `formatDayShortUtc`. */
-export function formatWeekdayShortUtc(date: Date): string {
-  return new Intl.DateTimeFormat('uk-UA', { weekday: 'short', timeZone: 'UTC' }).format(date)
+export function formatWeekdayShortUtc(date: Date, locale: Locale): string {
+  return formatWeekday(date, locale, 'short')
 }
 
 /**

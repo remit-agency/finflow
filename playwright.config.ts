@@ -32,6 +32,8 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     headless: true,
+    // Sends Accept-Language: uk-UA, so the app renders Ukrainian and existing e2e labels keep matching.
+    locale: 'uk-UA',
     // The app buckets transactions by the browser's local month; UTC keeps the
     // smoke assertion deterministic on every machine.
     timezoneId: 'UTC',

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useShell } from '@/lib/hooks/useShell'
 import { MODULE_TABS, activeModule } from '@/lib/shell/modules'
 import { cn } from '@/lib/utils'
@@ -9,13 +10,14 @@ import { cn } from '@/lib/utils'
 // Navigation links styled as large pills (the active module is a dark filled pill, as in Finmap):
 // Tab moves between them, Enter follows a link. Sticky at the top of the scrolling content column.
 export function ModuleTabs() {
+  const t = useTranslations('shell')
   const { orgId } = useShell()
   const pathname = usePathname()
   const active = activeModule(pathname, orgId)
 
   return (
     <nav
-      aria-label="Модулі"
+      aria-label={t('nav.modules')}
       className="sticky top-0 z-10 flex shrink-0 items-center gap-1 overflow-x-auto bg-surface px-4 pt-4 pb-3 lg:px-8"
     >
       {MODULE_TABS.map((tab) => {
@@ -30,7 +32,7 @@ export function ModuleTabs() {
               isActive ? 'bg-ink text-white' : 'text-ink-muted hover:bg-canvas hover:text-ink',
             )}
           >
-            {tab.label}
+            {t(`modules.${tab.key}`)}
           </Link>
         )
       })}

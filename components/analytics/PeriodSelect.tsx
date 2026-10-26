@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { Menu as MenuPrimitive } from '@base-ui/react/menu'
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
 import { CheckIcon, ChevronDownIcon } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,14 +15,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { cn } from '@/lib/utils'
+import { useFormatters } from '@/lib/i18n/useFormatters'
 import {
-  PERIOD_LABELS,
-  PERIOD_MENU_HEADER,
   REPORT_PERIOD_PRESETS,
   formatPeriodLabel,
   type PeriodPreset,
   type PeriodSelection,
 } from '@/lib/utils/period'
+import { todayUtcDay } from '@/lib/utils/today'
 
 export interface PeriodSelectProps {
   value: PeriodSelection
@@ -37,21 +38,24 @@ export const TOOLBAR_PILL =
 
 /**
  * The period filter of the reports: a pill with the selected period that opens a menu of presets
- * (`menuitemradio`, the selected one bold with a check) under the header «ЗА ДАТОЮ ОПЕРАЦІЇ».
- * «Обрати дати» closes the menu and opens a date range picker anchored to the pill; «Застосувати»
- * makes the range a custom period, «Скасувати» / Esc / a click outside keep the old one. Focus
- * returns to the pill in every case.
+ * (`menuitemradio`, the selected one bold with a check) under the header `periods.menuHeader`.
+ * The `custom` entry closes the menu and opens a date range picker anchored to the pill; the
+ * picker's apply button makes the range a custom period, cancel / Esc / a click outside keep the
+ * old one. Focus returns to the pill in every case.
  */
 export function PeriodSelect({ value, onChange, presets = REPORT_PERIOD_PRESETS, className }: PeriodSelectProps) {
+  const t = useTranslations('periods')
+  const { locale } = useFormatters()
   const [menuOpen, setMenuOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
-  // «Обрати дати» was chosen: open the picker once the menu has finished closing (and handed
+  // The custom entry was chosen: open the picker once the menu has finished closing (and handed
   // focus back to the pill), so the two layers never fight over focus.
   const openPickerAfterMenu = useRef(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dayRef = useRef<HTMLButtonElement>(null)
-  const [today] = useState(() => new Date())
-  const label = formatPeriodLabel(value)
+  // Warsaw's date, read once per visit.
+  const [today] = useState(() => todayUtcDay())
+  const label = formatPeriodLabel(value, locale, (preset) => t(preset))
   const open = menuOpen || pickerOpen
 
   return (
@@ -72,7 +76,7 @@ export function PeriodSelect({ value, onChange, presets = REPORT_PERIOD_PRESETS,
           data-open={open || undefined}
           className={cn(TOOLBAR_PILL, 'max-w-full', className)}
         >
-          <span className="sr-only">Період: </span>
+          <span className="sr-only">{t('srLabel')}</span>
           <span className="truncate">{label}</span>
           <ChevronDownIcon
             aria-hidden
@@ -85,12 +89,12 @@ export function PeriodSelect({ value, onChange, presets = REPORT_PERIOD_PRESETS,
         >
           <DropdownMenuGroup>
             <DropdownMenuLabel className="px-4 pt-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
-              {PERIOD_MENU_HEADER}
+              {t('menuHeader')}
             </DropdownMenuLabel>
             <DropdownMenuRadioGroup
               value={value.preset}
               onValueChange={(next) => {
-                // `custom` only opens the picker (onClick below); the range applies on «Застосувати».
+                // `custom` only opens the picker (onClick below); the range applies on the picker's apply button.
                 if (next !== 'custom') onChange({ preset: next as PeriodPreset })
               }}
             >
@@ -102,7 +106,7 @@ export function PeriodSelect({ value, onChange, presets = REPORT_PERIOD_PRESETS,
                   onClick={preset === 'custom' ? () => { openPickerAfterMenu.current = true } : undefined}
                   className="relative flex min-h-12 cursor-default items-center rounded-control py-2.5 pr-12 pl-4 text-[15px] text-ink outline-none select-none data-checked:font-semibold data-highlighted:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-soft-foreground"
                 >
-                  {PERIOD_LABELS[preset]}
+                  {t(preset)}
                   <MenuPrimitive.RadioItemIndicator className="absolute right-4 flex items-center text-brand-soft-foreground">
                     <CheckIcon aria-hidden className="size-5" strokeWidth={2.5} />
                   </MenuPrimitive.RadioItemIndicator>
@@ -124,7 +128,7 @@ export function PeriodSelect({ value, onChange, presets = REPORT_PERIOD_PRESETS,
             className="isolate z-50 outline-none"
           >
             <PopoverPrimitive.Popup
-              aria-label={PERIOD_LABELS.custom}
+              aria-label={t('custom')}
               initialFocus={dayRef}
               finalFocus={triggerRef}
               data-testid="period-picker"

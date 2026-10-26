@@ -1,0 +1,500 @@
+{
+  "meta": {
+    "title": "FinFlow — управління фінансами бізнесу",
+    "description": "Облік доходів, витрат і грошових потоків вашого бізнесу. 14 днів безкоштовно."
+  },
+  "common": {
+    "language": "Мова",
+    "save": "Зберегти",
+    "cancel": "Скасувати",
+    "delete": "Видалити",
+    "close": "Закрити",
+    "loading": "Завантаження…",
+    "edit": "Редагувати",
+    "toggleTheme": "Переключити тему",
+    "accountTypes": {
+      "bank": "Банківський рахунок",
+      "cash": "Готівка",
+      "card": "Карта",
+      "crypto": "Крипто"
+    }
+  },
+  "roles": {
+    "owner": "Власник",
+    "accountant": "Бухгалтер",
+    "viewer": "Глядач"
+  },
+  "errors": {
+    "signOut": "Не вдалося вийти",
+    "switchOrg": "Не вдалося переключити компанію",
+    "deleteAccount": "Не вдалося видалити рахунок",
+    "loadOrgs": "Не вдалося завантажити компанії",
+    "auth": {
+      "wrongPassword": "Невірна електронна пошта або пароль.",
+      "userNotFound": "Користувача з такою поштою не знайдено.",
+      "emailInUse": "Обліковий запис з такою поштою вже існує.",
+      "weakPassword": "Пароль надто простий. Використайте щонайменше 6 символів.",
+      "tooManyRequests": "Забагато спроб. Спробуйте за кілька хвилин.",
+      "network": "Помилка мережі. Перевірте з’єднання та спробуйте ще раз.",
+      "popupClosed": "Вікно входу було закрито до завершення.",
+      "loadCompanies": "Не вдалося завантажити ваші компанії. Спробуйте ще раз.",
+      "generic": "Щось пішло не так. Спробуйте ще раз."
+    },
+    "orgCreate": {
+      "org_limit_reached": "Ви можете бути власником не більше 3 компаній.",
+      "unauthorized": "Сеанс завершився. Увійдіть ще раз.",
+      "invalid": "Перевірте назву компанії та валюту.",
+      "network": "Помилка мережі. Перевірте з’єднання та спробуйте ще раз.",
+      "server": "Не вдалося створити компанію. Спробуйте ще раз."
+    },
+    "bank": {
+      "connectFailed": "Помилка підключення банку",
+      "notConfirmed": "Підключення не підтверджено",
+      "saveFailed": "Помилка збереження підключення",
+      "loadInstitutions": "Не вдалось завантажити банки",
+      "emailNotVerified": "Підтвердіть email, щоб підключити банк",
+      "connect": "Не вдалося підключити банк. Спробуйте ще раз.",
+      "connectForbidden": "Підключати банки може лише власник компанії",
+      "connectInvalid": "Не вдалося підключити цей банк. Оберіть інший або спробуйте пізніше.",
+      "connectUnavailable": "Банк або сервіс підключення зараз недоступний. Спробуйте пізніше.",
+      "connectNetwork": "Немає зв’язку із сервером. Перевірте інтернет і спробуйте ще раз.",
+      "disconnectFailed": "Помилка відключення банку"
+    }
+  },
+  "auth": {
+    "or": "або",
+    "login": {
+      "title": "Вхід",
+      "description": "Введіть дані для входу в обліковий запис",
+      "email": "Електронна пошта",
+      "emailPlaceholder": "you@company.com",
+      "password": "Пароль",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Увійти",
+      "submitting": "Входимо…",
+      "google": "Увійти через Google",
+      "noAccount": "Немає акаунта?",
+      "toRegister": "Зареєструватися"
+    },
+    "register": {
+      "title": "Спробуйте безкоштовно",
+      "description": "14 днів безкоштовно, без банківської картки",
+      "companyOnlyTitle": "Завершіть налаштування",
+      "companyOnlyDescription": "Обліковий запис готовий. Додайте компанію, щоб продовжити.",
+      "companyOnlyFromLoginTitle": "Створіть компанію",
+      "companyOnlyFromLoginDescription": "Ви увійшли, але у вас ще немає компанії.",
+      "name": "Ваше ім'я",
+      "namePlaceholder": "Іван Петренко",
+      "email": "Електронна пошта",
+      "emailPlaceholder": "you@company.com",
+      "password": "Пароль",
+      "passwordPlaceholder": "Щонайменше 6 символів",
+      "companySection": "Компанія",
+      "orgName": "Назва компанії",
+      "orgNamePlaceholder": "Моя компанія",
+      "currency": "Валюта",
+      "currencyPlaceholder": "Оберіть валюту",
+      "submit": "Спробувати 14 днів безкоштовно",
+      "submitting": "Створюємо обліковий запис…",
+      "createCompany": "Створити компанію",
+      "creatingCompany": "Створюємо компанію…",
+      "google": "Зареєструватися через Google",
+      "googleNeedsCompany": "Спочатку введіть назву компанії",
+      "haveAccount": "Вже є акаунт?",
+      "toLogin": "Увійти",
+      "notYou": "Це не ви?",
+      "signOut": "Вийти"
+    },
+    "currencies": {
+      "UAH": "UAH — українська гривня",
+      "EUR": "EUR — євро",
+      "USD": "USD — долар США",
+      "PLN": "PLN — польський злотий"
+    }
+  },
+  "shell": {
+    "modules": {
+      "transactions": "Платежі",
+      "analytics": "Аналітика"
+    },
+    "analyticsSections": {
+      "cashflow": "Cash Flow",
+      "pl": "P&L",
+      "balance": "Баланс",
+      "calendar": "Календар"
+    },
+    "settingsSections": {
+      "company": "Компанія",
+      "categories": "Категорії",
+      "banks": "Банки",
+      "subscription": "Підписка"
+    },
+    "nav": {
+      "modules": "Модулі",
+      "analytics": "Розділи аналітики",
+      "settings": "Розділи налаштувань"
+    },
+    "header": {
+      "openAccounts": "Відкрити рахунки",
+      "income": "Дохід",
+      "expense": "Витрата",
+      "transfer": "Переказ"
+    },
+    "frame": {
+      "settings": "Налаштування",
+      "accounts": "Рахунки"
+    },
+    "insufficientRights": {
+      "title": "Недостатньо прав",
+      "body": "Цей розділ доступний лише власнику компанії."
+    },
+    "noAccess": {
+      "deniedTitle": "Немає доступу до цієї компанії",
+      "errorTitle": "Не вдалося перевірити доступ",
+      "deniedBody": "Ця компанія не належить вашому обліковому запису, або її не існує.",
+      "errorBody": "Перевірте з’єднання та спробуйте ще раз.",
+      "toMyCompany": "До моєї компанії",
+      "retry": "Спробувати ще раз",
+      "signOut": "Вийти"
+    },
+    "orgSwitcher": {
+      "company": "Компанія",
+      "yourCompanies": "Ваші компанії",
+      "current": "Поточна компанія"
+    },
+    "profile": {
+      "label": "Профіль",
+      "settings": "Налаштування",
+      "signOut": "Вийти"
+    },
+    "settingsMenu": {
+      "back": "До платежів",
+      "title": "Налаштування"
+    },
+    "accounts": {
+      "expand": "Розгорнути сайдбар",
+      "collapse": "Згорнути сайдбар",
+      "collapsedList": "Рахунки (згорнуто)",
+      "add": "Додати рахунок",
+      "connectBank": "Підключити банк",
+      "openBanking": "Open Banking, бета",
+      "totalIn": "Разом у {currency}",
+      "mine": "Мої рахунки",
+      "all": "Усі рахунки",
+      "none": "Рахунків ще немає",
+      "list": "Список рахунків",
+      "actionsFor": "Дії з рахунком {name}",
+      "confirmDelete": "Видалити рахунок «{name}»?"
+    },
+    "verifyEmail": {
+      "alreadySent": "Лист уже надіслано. Зачекайте хвилину.",
+      "sent": "Лист надіслано",
+      "tooMany": "Забагато спроб. Спробуйте за кілька хвилин.",
+      "sendFailed": "Не вдалося надіслати лист. Спробуйте пізніше.",
+      "short": "Підтвердіть email, щоб підключати банки",
+      "long": "Підтвердіть email <strong>{email}</strong>, щоб підключати банки. Не отримали лист? Надішліть його ще раз.",
+      "sending": "Надсилаємо…",
+      "resendShort": "Надіслати",
+      "resendLong": "Надіслати лист ще раз"
+    }
+  },
+  "journal": {
+    "title": "Платежі",
+    "showAllAccounts": "Показати всі рахунки",
+    "filters": {
+      "searchPlaceholder": "Пошук по опису…",
+      "search": "Пошук по опису",
+      "account": "Рахунок",
+      "allAccounts": "Всі рахунки",
+      "category": "Категорія",
+      "allCategories": "Всі категорії",
+      "more": "Додаткові фільтри",
+      "clear": "Очистити",
+      "dateFrom": "Дата від",
+      "dateTo": "до",
+      "amountFrom": "Сума від",
+      "amountTo": "до"
+    },
+    "list": {
+      "emptyTitle": "Операцій ще немає",
+      "emptyBody": "Натисніть «Дохід», «Витрата» або «Переказ» у шапці, щоб додати першу операцію",
+      "date": "Дата",
+      "amount": "Сума",
+      "account": "Рахунок",
+      "category": "Категорія",
+      "comment": "Коментар",
+      "transfer": "Переказ",
+      "noCategory": "Без категорії",
+      "rowEdit": "{account}: {amount}, {date}, редагувати"
+    }
+  },
+  "forms": {
+    "transaction": {
+      "titleNew": "Нова транзакція",
+      "titleEdit": "Редагувати транзакцію",
+      "income": "Дохід",
+      "expense": "Витрата",
+      "transfer": "Переказ",
+      "account": "Рахунок",
+      "accountFrom": "Рахунок (звідки)",
+      "accountTo": "Рахунок (куди)",
+      "chooseAccount": "Оберіть рахунок",
+      "amount": "Сума",
+      "currency": "Валюта",
+      "category": "Категорія",
+      "noCategory": "Без категорії",
+      "date": "Дата",
+      "description": "Опис",
+      "descriptionPlaceholder": "Необов'язково",
+      "showAdvanced": "Розгорнути додаткові поля",
+      "hideAdvanced": "Сховати додаткові поля",
+      "recurring": "Повторювана транзакція",
+      "recurringBadge": "recurring",
+      "addAnother": "Додати та створити подібний",
+      "add": "Додати",
+      "errors": {
+        "account": "Оберіть рахунок",
+        "amount": "Введіть суму > 0",
+        "toAccount": "Оберіть рахунок призначення",
+        "sameAccount": "Рахунки мають бути різними"
+      }
+    },
+    "account": {
+      "titleNew": "Новий рахунок",
+      "titleEdit": "Редагувати рахунок",
+      "name": "Назва",
+      "namePlaceholder": "Наприклад: Монобанк",
+      "type": "Тип",
+      "types": {
+        "bank": "Банківський",
+        "cash": "Готівка",
+        "card": "Карта",
+        "crypto": "Крипто"
+      },
+      "balance": "Баланс",
+      "currency": "Валюта",
+      "color": "Колір",
+      "create": "Створити",
+      "errors": {
+        "name": "Назва обов'язкова",
+        "balance": "Баланс повинен бути ≥ 0"
+      }
+    },
+    "saving": "Збереження…"
+  },
+  "defaultCategories": {
+    "income": {
+      "sales": "Продажі",
+      "services": "Послуги",
+      "investments": "Інвестиції",
+      "other": "Інше (дохід)"
+    },
+    "expense": {
+      "salary": "Зарплата",
+      "rent": "Оренда",
+      "marketing": "Маркетинг",
+      "utilities": "Комунальні",
+      "equipment": "Обладнання",
+      "taxes": "Податки",
+      "other": "Інше (витрата)"
+    }
+  },
+  "settings": {
+    "title": "Налаштування",
+    "banks": {
+      "title": "Підключення банку",
+      "description": "Santander, PKO, mBank, ING та інші банки через Enable Banking",
+      "connect": "Підключити банк",
+      "redirecting": "Перенаправлення…",
+      "loading": "Завантаження…",
+      "searchPlaceholder": "Пошук банку…",
+      "noneFound": "Банків не знайдено",
+      "connectedOn": "Підключено {date}",
+      "connected": "{name} підключено",
+      "disconnected": "Банк відключено",
+      "disconnect": "Відключити {name}",
+      "defaultInstitution": "Банк",
+      "countries": {
+        "PL": "🇵🇱 Польща",
+        "DE": "🇩🇪 Німеччина",
+        "GB": "🇬🇧 Велика Британія",
+        "FR": "🇫🇷 Франція",
+        "NL": "🇳🇱 Нідерланди",
+        "LT": "🇱🇹 Литва",
+        "UA": "🇺🇦 Україна"
+      }
+    },
+    "categories": {
+      "title": "Категорії",
+      "description": "Доходи та витрати",
+      "income": "Доходи",
+      "expense": "Витрати",
+      "none": "Немає категорій",
+      "addTitle": "Додати категорію",
+      "nameLabel": "Назва категорії",
+      "typeLabel": "Тип категорії",
+      "typeIncome": "Дохід",
+      "typeExpense": "Витрата",
+      "colorLabel": "Колір {color}",
+      "deleteLabel": "Видалити категорію {name}",
+      "submit": "Додати",
+      "added": "Категорію додано",
+      "deleted": "Видалено",
+      "failed": "Помилка"
+    },
+    "company": {
+      "title": "Компанія",
+      "description": "Назва та валюта",
+      "nameLabel": "Назва",
+      "currencyLabel": "Валюта",
+      "saving": "Збереження…",
+      "saved": "Збережено",
+      "saveFailed": "Помилка збереження",
+      "ownerOnly": "Змінювати дані компанії може лише власник.",
+      "currencies": {
+        "UAH": "UAH — українська гривня",
+        "EUR": "EUR — євро",
+        "USD": "USD — долар США",
+        "PLN": "PLN — польський злотий"
+      }
+    },
+    "subscription": {
+      "title": "Підписка",
+      "plans": {
+        "trial": "Trial plan",
+        "pro": "Pro plan",
+        "free": "Free plan"
+      },
+      "trialUntil": "Trial до {date}",
+      "upgrade": "Upgrade to Pro"
+    }
+  },
+  "analytics": {
+    "title": "Аналітика",
+    "subtitle": "Оберіть розділ для перегляду звітів",
+    "exportCsv": "Експорт CSV",
+    "cards": {
+      "cashflow": "Доходи, витрати та баланс по місяцях у вигляді графіку",
+      "pl": "Прибутки та збитки по категоріях за обраний період",
+      "calendar": "Рух коштів по днях — зручний перегляд по місяцях",
+      "balance": "Активи, зобов’язання та власний капітал організації"
+    },
+    "columns": {
+      "account": "Рахунок",
+      "type": "Тип",
+      "category": "Категорія",
+      "month": "Місяць",
+      "day": "День",
+      "income": "Дохід",
+      "expense": "Витрата",
+      "net": "Різниця",
+      "balance": "Баланс",
+      "currency": "Валюта",
+      "total": "Всього"
+    },
+    "cashflow": {
+      "subtitle": "Рух коштів за обраний період",
+      "totalIncome": "Доходи",
+      "totalExpense": "Витрати",
+      "detailMonths": "Деталізація по місяцях",
+      "detailDays": "Деталізація по днях",
+      "empty": "Немає даних за цей період."
+    },
+    "pl": {
+      "title": "P&L — Прибутки та збитки",
+      "subtitle": "По категоріях за обраний період"
+    },
+    "calendar": {
+      "subtitle": "Щоденний рух грошей"
+    },
+    "balance": {
+      "subtitle": "Активи та капітал",
+      "asOf": "Станом на:",
+      "asOfLabel": "Станом на",
+      "periods": {
+        "currentMonth": "Поточний місяць",
+        "quarter": "Квартал",
+        "year": "Рік"
+      }
+    }
+  },
+  "periods": {
+    "menuHeader": "ЗА ДАТОЮ ОПЕРАЦІЇ",
+    "srLabel": "Період: ",
+    "currentYear": "На поточний рік",
+    "prevYear": "За попередній рік",
+    "currentWeek": "За поточний тиждень",
+    "prevWeek": "За останній тиждень",
+    "currentMonth": "За поточний місяць",
+    "prevMonth": "За останній місяць",
+    "allTime": "Весь час",
+    "custom": "Обрати дати",
+    "picker": {
+      "prevMonth": "Попередній місяць",
+      "nextMonth": "Наступний місяць",
+      "chooseFirst": "Оберіть першу дату",
+      "startChosen": "Початок: {date}. Оберіть другу дату",
+      "apply": "Застосувати"
+    }
+  },
+  "charts": {
+    "loading": "Завантаження…",
+    "noData": "Немає даних за цей період",
+    "addTransactions": "Додати транзакції →",
+    "cashFlow": {
+      "income": "Дохід",
+      "expense": "Витрата",
+      "balance": "Баланс",
+      "net": "Різниця"
+    },
+    "plSummary": {
+      "profit": "Прибуток / Збиток за період",
+      "margin": "Рентабельність",
+      "incomeByCategory": "Доходи за категоріями",
+      "expenseByCategory": "Витрати за категоріями"
+    },
+    "plTable": {
+      "category": "Категорія",
+      "total": "Всього",
+      "income": "Доходи",
+      "expense": "Витрати",
+      "totalIncome": "Всього доходи",
+      "totalExpense": "Всього витрати",
+      "profit": "Прибуток / Збиток"
+    },
+    "calendar": {
+      "previousMonth": "Попередній місяць",
+      "nextMonth": "Наступний місяць",
+      "empty": "Немає транзакцій за цей місяць",
+      "day": "День",
+      "income": "Дохід",
+      "expense": "Витрата",
+      "transfer": "Переказ",
+      "balance": "Баланс"
+    },
+    "balanceSheet": {
+      "assets": "Активи",
+      "liabilities": "Зобов’язання",
+      "fixedAssets": "Основні засоби",
+      "realEstate": "Нерухомість",
+      "equipment": "Обладнання",
+      "crypto": "Інвестиції (крипто)",
+      "currentAssets": "Поточні активи",
+      "inventory": "Запаси",
+      "receivables": "Дебіторська заборгованість",
+      "money": "Гроші",
+      "noAccounts": "Немає рахунків",
+      "totalAssets": "Всього активи",
+      "equity": "Власний капітал",
+      "charterCapital": "Статутний капітал",
+      "additionalCapital": "Додатковий капітал",
+      "retainedEarnings": "Нерозподілений прибуток",
+      "debt": "Позиковий капітал",
+      "loans": "Кредити",
+      "totalLiabilities": "Всього зобов’язання",
+      "check": "Баланс",
+      "balanced": "Активи = Зобов’язання",
+      "difference": "Різниця: {amount}"
+    }
+  }
+}

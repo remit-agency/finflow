@@ -1,0 +1,500 @@
+{
+  "meta": {
+    "title": "FinFlow — zarządzanie finansami firmy",
+    "description": "Ewidencja wpływów, wydatków i przepływów pieniężnych Twojej firmy. 14 dni za darmo."
+  },
+  "common": {
+    "language": "Język",
+    "save": "Zapisz",
+    "cancel": "Anuluj",
+    "delete": "Usuń",
+    "close": "Zamknij",
+    "loading": "Ładowanie…",
+    "edit": "Edytuj",
+    "toggleTheme": "Przełącz motyw",
+    "accountTypes": {
+      "bank": "Konto bankowe",
+      "cash": "Gotówka",
+      "card": "Karta",
+      "crypto": "Krypto"
+    }
+  },
+  "roles": {
+    "owner": "Właściciel",
+    "accountant": "Księgowy",
+    "viewer": "Przeglądający"
+  },
+  "errors": {
+    "signOut": "Nie udało się wylogować",
+    "switchOrg": "Nie udało się przełączyć firmy",
+    "deleteAccount": "Nie udało się usunąć konta",
+    "loadOrgs": "Nie udało się wczytać firm",
+    "auth": {
+      "wrongPassword": "Nieprawidłowy adres e-mail lub hasło.",
+      "userNotFound": "Nie znaleziono użytkownika z tym adresem e-mail.",
+      "emailInUse": "Konto z tym adresem e-mail już istnieje.",
+      "weakPassword": "Hasło jest zbyt słabe. Użyj co najmniej 6 znaków.",
+      "tooManyRequests": "Zbyt wiele prób. Spróbuj ponownie za kilka minut.",
+      "network": "Błąd sieci. Sprawdź połączenie i spróbuj ponownie.",
+      "popupClosed": "Okno logowania zostało zamknięte przed zakończeniem.",
+      "loadCompanies": "Nie udało się wczytać Twoich firm. Spróbuj ponownie.",
+      "generic": "Coś poszło nie tak. Spróbuj ponownie."
+    },
+    "orgCreate": {
+      "org_limit_reached": "Możesz być właścicielem najwyżej 3 firm.",
+      "unauthorized": "Sesja wygasła. Zaloguj się ponownie.",
+      "invalid": "Sprawdź nazwę firmy i walutę.",
+      "network": "Błąd sieci. Sprawdź połączenie i spróbuj ponownie.",
+      "server": "Nie udało się utworzyć firmy. Spróbuj ponownie."
+    },
+    "bank": {
+      "connectFailed": "Nie udało się połączyć z bankiem",
+      "notConfirmed": "Połączenie nie zostało potwierdzone",
+      "saveFailed": "Nie udało się zapisać połączenia",
+      "loadInstitutions": "Nie udało się załadować banków",
+      "emailNotVerified": "Potwierdź adres e-mail, aby połączyć bank",
+      "connect": "Nie udało się połączyć banku. Spróbuj ponownie.",
+      "connectForbidden": "Banki może łączyć tylko właściciel firmy",
+      "connectInvalid": "Nie udało się połączyć tego banku. Wybierz inny lub spróbuj później.",
+      "connectUnavailable": "Bank lub usługa połączeń jest teraz niedostępna. Spróbuj później.",
+      "connectNetwork": "Brak połączenia z serwerem. Sprawdź internet i spróbuj ponownie.",
+      "disconnectFailed": "Nie udało się rozłączyć banku"
+    }
+  },
+  "auth": {
+    "or": "lub",
+    "login": {
+      "title": "Logowanie",
+      "description": "Podaj dane, aby zalogować się na konto",
+      "email": "E-mail",
+      "emailPlaceholder": "you@company.com",
+      "password": "Hasło",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Zaloguj się",
+      "submitting": "Logowanie…",
+      "google": "Zaloguj się przez Google",
+      "noAccount": "Nie masz konta?",
+      "toRegister": "Zarejestruj się"
+    },
+    "register": {
+      "title": "Wypróbuj za darmo",
+      "description": "14 dni za darmo, bez karty płatniczej",
+      "companyOnlyTitle": "Dokończ konfigurację",
+      "companyOnlyDescription": "Konto jest gotowe. Dodaj firmę, aby kontynuować.",
+      "companyOnlyFromLoginTitle": "Utwórz firmę",
+      "companyOnlyFromLoginDescription": "Jesteś zalogowany, ale nie masz jeszcze firmy.",
+      "name": "Twoje imię",
+      "namePlaceholder": "Jan Kowalski",
+      "email": "E-mail",
+      "emailPlaceholder": "you@company.com",
+      "password": "Hasło",
+      "passwordPlaceholder": "Co najmniej 6 znaków",
+      "companySection": "Firma",
+      "orgName": "Nazwa firmy",
+      "orgNamePlaceholder": "Moja firma",
+      "currency": "Waluta",
+      "currencyPlaceholder": "Wybierz walutę",
+      "submit": "Wypróbuj 14 dni za darmo",
+      "submitting": "Tworzenie konta…",
+      "createCompany": "Utwórz firmę",
+      "creatingCompany": "Tworzenie firmy…",
+      "google": "Zarejestruj się przez Google",
+      "googleNeedsCompany": "Najpierw podaj nazwę firmy",
+      "haveAccount": "Masz już konto?",
+      "toLogin": "Zaloguj się",
+      "notYou": "To nie Ty?",
+      "signOut": "Wyloguj się"
+    },
+    "currencies": {
+      "UAH": "UAH — hrywna ukraińska",
+      "EUR": "EUR — euro",
+      "USD": "USD — dolar amerykański",
+      "PLN": "PLN — złoty polski"
+    }
+  },
+  "shell": {
+    "modules": {
+      "transactions": "Płatności",
+      "analytics": "Analityka"
+    },
+    "analyticsSections": {
+      "cashflow": "Przepływy pieniężne (Cash Flow)",
+      "pl": "Rachunek zysków i strat (P&L)",
+      "balance": "Bilans",
+      "calendar": "Kalendarz"
+    },
+    "settingsSections": {
+      "company": "Firma",
+      "categories": "Kategorie",
+      "banks": "Banki",
+      "subscription": "Subskrypcja"
+    },
+    "nav": {
+      "modules": "Moduły",
+      "analytics": "Sekcje analityki",
+      "settings": "Sekcje ustawień"
+    },
+    "header": {
+      "openAccounts": "Otwórz konta",
+      "income": "Wpływ",
+      "expense": "Wydatek",
+      "transfer": "Przelew"
+    },
+    "frame": {
+      "settings": "Ustawienia",
+      "accounts": "Konta"
+    },
+    "insufficientRights": {
+      "title": "Brak uprawnień",
+      "body": "Ta sekcja jest dostępna tylko dla właściciela firmy."
+    },
+    "noAccess": {
+      "deniedTitle": "Brak dostępu do tej firmy",
+      "errorTitle": "Nie udało się sprawdzić dostępu",
+      "deniedBody": "Ta firma nie należy do Twojego konta lub nie istnieje.",
+      "errorBody": "Sprawdź połączenie i spróbuj ponownie.",
+      "toMyCompany": "Przejdź do mojej firmy",
+      "retry": "Spróbuj ponownie",
+      "signOut": "Wyloguj się"
+    },
+    "orgSwitcher": {
+      "company": "Firma",
+      "yourCompanies": "Twoje firmy",
+      "current": "Bieżąca firma"
+    },
+    "profile": {
+      "label": "Profil",
+      "settings": "Ustawienia",
+      "signOut": "Wyloguj się"
+    },
+    "settingsMenu": {
+      "back": "Do płatności",
+      "title": "Ustawienia"
+    },
+    "accounts": {
+      "expand": "Rozwiń panel boczny",
+      "collapse": "Zwiń panel boczny",
+      "collapsedList": "Konta (zwinięte)",
+      "add": "Dodaj konto",
+      "connectBank": "Połącz bank",
+      "openBanking": "Open Banking, beta",
+      "totalIn": "Razem w {currency}",
+      "mine": "Moje konta",
+      "all": "Wszystkie konta",
+      "none": "Nie ma jeszcze kont",
+      "list": "Lista kont",
+      "actionsFor": "Działania dla konta {name}",
+      "confirmDelete": "Usunąć konto „{name}”?"
+    },
+    "verifyEmail": {
+      "alreadySent": "Wiadomość została już wysłana. Poczekaj minutę.",
+      "sent": "Wiadomość wysłana",
+      "tooMany": "Zbyt wiele prób. Spróbuj ponownie za kilka minut.",
+      "sendFailed": "Nie udało się wysłać wiadomości. Spróbuj później.",
+      "short": "Potwierdź adres e-mail, aby połączyć banki",
+      "long": "Potwierdź adres e-mail <strong>{email}</strong>, aby połączyć banki. Wiadomość nie dotarła? Wyślij ją ponownie.",
+      "sending": "Wysyłanie…",
+      "resendShort": "Wyślij",
+      "resendLong": "Wyślij wiadomość ponownie"
+    }
+  },
+  "journal": {
+    "title": "Płatności",
+    "showAllAccounts": "Pokaż wszystkie konta",
+    "filters": {
+      "searchPlaceholder": "Szukaj w opisie…",
+      "search": "Szukaj w opisie",
+      "account": "Konto",
+      "allAccounts": "Konta",
+      "category": "Kategoria",
+      "allCategories": "Kategorie",
+      "more": "Więcej filtrów",
+      "clear": "Wyczyść",
+      "dateFrom": "Data od",
+      "dateTo": "do",
+      "amountFrom": "Kwota od",
+      "amountTo": "do"
+    },
+    "list": {
+      "emptyTitle": "Nie ma jeszcze operacji",
+      "emptyBody": "Kliknij „Wpływ”, „Wydatek” lub „Przelew” w nagłówku, aby dodać pierwszą operację",
+      "date": "Data",
+      "amount": "Kwota",
+      "account": "Konto",
+      "category": "Kategoria",
+      "comment": "Komentarz",
+      "transfer": "Przelew",
+      "noCategory": "Bez kategorii",
+      "rowEdit": "{account}: {amount}, {date}, edytuj"
+    }
+  },
+  "forms": {
+    "transaction": {
+      "titleNew": "Nowa operacja",
+      "titleEdit": "Edytuj operację",
+      "income": "Wpływ",
+      "expense": "Wydatek",
+      "transfer": "Przelew",
+      "account": "Konto",
+      "accountFrom": "Konto (źródłowe)",
+      "accountTo": "Konto (docelowe)",
+      "chooseAccount": "Wybierz konto",
+      "amount": "Kwota",
+      "currency": "Waluta",
+      "category": "Kategoria",
+      "noCategory": "Bez kategorii",
+      "date": "Data",
+      "description": "Opis",
+      "descriptionPlaceholder": "Opcjonalnie",
+      "showAdvanced": "Pokaż dodatkowe pola",
+      "hideAdvanced": "Ukryj dodatkowe pola",
+      "recurring": "Operacja cykliczna",
+      "recurringBadge": "cykliczna",
+      "addAnother": "Dodaj i utwórz podobną",
+      "add": "Dodaj",
+      "errors": {
+        "account": "Wybierz konto",
+        "amount": "Podaj kwotę większą od zera",
+        "toAccount": "Wybierz konto docelowe",
+        "sameAccount": "Konta muszą być różne"
+      }
+    },
+    "account": {
+      "titleNew": "Nowe konto",
+      "titleEdit": "Edytuj konto",
+      "name": "Nazwa",
+      "namePlaceholder": "Na przykład: mBank",
+      "type": "Typ",
+      "types": {
+        "bank": "Bankowe",
+        "cash": "Gotówka",
+        "card": "Karta",
+        "crypto": "Krypto"
+      },
+      "balance": "Saldo",
+      "currency": "Waluta",
+      "color": "Kolor",
+      "create": "Utwórz",
+      "errors": {
+        "name": "Nazwa jest wymagana",
+        "balance": "Podaj poprawne saldo, np. 1 234,50"
+      }
+    },
+    "saving": "Zapisywanie…"
+  },
+  "defaultCategories": {
+    "income": {
+      "sales": "Sprzedaż",
+      "services": "Usługi",
+      "investments": "Inwestycje",
+      "other": "Inne (wpływ)"
+    },
+    "expense": {
+      "salary": "Wynagrodzenia",
+      "rent": "Czynsz",
+      "marketing": "Marketing",
+      "utilities": "Media",
+      "equipment": "Sprzęt",
+      "taxes": "Podatki",
+      "other": "Inne (wydatek)"
+    }
+  },
+  "settings": {
+    "title": "Ustawienia",
+    "banks": {
+      "title": "Połączenie z bankiem",
+      "description": "Santander, PKO, mBank, ING i inne banki przez Enable Banking",
+      "connect": "Połącz bank",
+      "redirecting": "Przekierowanie…",
+      "loading": "Ładowanie…",
+      "searchPlaceholder": "Szukaj banku…",
+      "noneFound": "Nie znaleziono banków",
+      "connectedOn": "Połączono {date}",
+      "connected": "Połączono z bankiem {name}",
+      "disconnected": "Bank został rozłączony",
+      "disconnect": "Rozłącz {name}",
+      "defaultInstitution": "Bank",
+      "countries": {
+        "PL": "🇵🇱 Polska",
+        "DE": "🇩🇪 Niemcy",
+        "GB": "🇬🇧 Wielka Brytania",
+        "FR": "🇫🇷 Francja",
+        "NL": "🇳🇱 Holandia",
+        "LT": "🇱🇹 Litwa",
+        "UA": "🇺🇦 Ukraina"
+      }
+    },
+    "categories": {
+      "title": "Kategorie",
+      "description": "Wpływy i wydatki",
+      "income": "Wpływy",
+      "expense": "Wydatki",
+      "none": "Brak kategorii",
+      "addTitle": "Dodaj kategorię",
+      "nameLabel": "Nazwa kategorii",
+      "typeLabel": "Typ kategorii",
+      "typeIncome": "Wpływ",
+      "typeExpense": "Wydatek",
+      "colorLabel": "Kolor {color}",
+      "deleteLabel": "Usuń kategorię {name}",
+      "submit": "Dodaj",
+      "added": "Kategoria została dodana",
+      "deleted": "Usunięto",
+      "failed": "Błąd"
+    },
+    "company": {
+      "title": "Firma",
+      "description": "Nazwa i waluta",
+      "nameLabel": "Nazwa",
+      "currencyLabel": "Waluta",
+      "saving": "Zapisywanie…",
+      "saved": "Zapisano",
+      "saveFailed": "Nie udało się zapisać",
+      "ownerOnly": "Dane firmy może zmieniać tylko właściciel.",
+      "currencies": {
+        "UAH": "UAH — hrywna ukraińska",
+        "EUR": "EUR — euro",
+        "USD": "USD — dolar amerykański",
+        "PLN": "PLN — złoty polski"
+      }
+    },
+    "subscription": {
+      "title": "Subskrypcja",
+      "plans": {
+        "trial": "Plan próbny",
+        "pro": "Plan Pro",
+        "free": "Plan darmowy"
+      },
+      "trialUntil": "Okres próbny do {date}",
+      "upgrade": "Przejdź na Pro"
+    }
+  },
+  "analytics": {
+    "title": "Analityka",
+    "subtitle": "Wybierz sekcję, aby zobaczyć raporty",
+    "exportCsv": "Eksport CSV",
+    "cards": {
+      "cashflow": "Wpływy, wydatki i saldo według miesięcy na wykresie",
+      "pl": "Zyski i straty według kategorii za wybrany okres",
+      "calendar": "Przepływ środków dzień po dniu, wygodny przegląd według miesięcy",
+      "balance": "Aktywa, zobowiązania i kapitał własny firmy"
+    },
+    "columns": {
+      "account": "Konto",
+      "type": "Typ",
+      "category": "Kategoria",
+      "month": "Miesiąc",
+      "day": "Dzień",
+      "income": "Wpływ",
+      "expense": "Wydatek",
+      "net": "Różnica",
+      "balance": "Saldo",
+      "currency": "Waluta",
+      "total": "Razem"
+    },
+    "cashflow": {
+      "subtitle": "Przepływ środków za wybrany okres",
+      "totalIncome": "Wpływy",
+      "totalExpense": "Wydatki",
+      "detailMonths": "Szczegóły według miesięcy",
+      "detailDays": "Szczegóły według dni",
+      "empty": "Brak danych za ten okres."
+    },
+    "pl": {
+      "title": "Rachunek zysków i strat (P&L)",
+      "subtitle": "Według kategorii za wybrany okres"
+    },
+    "calendar": {
+      "subtitle": "Dzienny ruch pieniędzy"
+    },
+    "balance": {
+      "subtitle": "Aktywa i kapitał",
+      "asOf": "Stan na:",
+      "asOfLabel": "Stan na",
+      "periods": {
+        "currentMonth": "Bieżący miesiąc",
+        "quarter": "Kwartał",
+        "year": "Rok"
+      }
+    }
+  },
+  "periods": {
+    "menuHeader": "WG DATY OPERACJI",
+    "srLabel": "Okres: ",
+    "currentYear": "Za bieżący rok",
+    "prevYear": "Za poprzedni rok",
+    "currentWeek": "Za bieżący tydzień",
+    "prevWeek": "Za poprzedni tydzień",
+    "currentMonth": "Za bieżący miesiąc",
+    "prevMonth": "Za poprzedni miesiąc",
+    "allTime": "Cały okres",
+    "custom": "Wybierz daty",
+    "picker": {
+      "prevMonth": "Poprzedni miesiąc",
+      "nextMonth": "Następny miesiąc",
+      "chooseFirst": "Wybierz pierwszą datę",
+      "startChosen": "Początek: {date}. Wybierz drugą datę",
+      "apply": "Zastosuj"
+    }
+  },
+  "charts": {
+    "loading": "Ładowanie…",
+    "noData": "Brak danych za ten okres",
+    "addTransactions": "Dodaj operacje →",
+    "cashFlow": {
+      "income": "Wpływ",
+      "expense": "Wydatek",
+      "balance": "Saldo",
+      "net": "Różnica"
+    },
+    "plSummary": {
+      "profit": "Zysk / strata za okres",
+      "margin": "Rentowność",
+      "incomeByCategory": "Wpływy według kategorii",
+      "expenseByCategory": "Wydatki według kategorii"
+    },
+    "plTable": {
+      "category": "Kategoria",
+      "total": "Razem",
+      "income": "Wpływy",
+      "expense": "Wydatki",
+      "totalIncome": "Razem wpływy",
+      "totalExpense": "Razem wydatki",
+      "profit": "Zysk / strata"
+    },
+    "calendar": {
+      "previousMonth": "Poprzedni miesiąc",
+      "nextMonth": "Następny miesiąc",
+      "empty": "Brak operacji w tym miesiącu",
+      "day": "Dzień",
+      "income": "Wpływ",
+      "expense": "Wydatek",
+      "transfer": "Przelew",
+      "balance": "Saldo"
+    },
+    "balanceSheet": {
+      "assets": "Aktywa",
+      "liabilities": "Pasywa",
+      "fixedAssets": "Środki trwałe",
+      "realEstate": "Nieruchomości",
+      "equipment": "Wyposażenie",
+      "crypto": "Inwestycje (krypto)",
+      "currentAssets": "Aktywa obrotowe",
+      "inventory": "Zapasy",
+      "receivables": "Należności",
+      "money": "Środki pieniężne",
+      "noAccounts": "Brak kont",
+      "totalAssets": "Razem aktywa",
+      "equity": "Kapitał własny",
+      "charterCapital": "Kapitał zakładowy",
+      "additionalCapital": "Kapitał zapasowy",
+      "retainedEarnings": "Zysk zatrzymany",
+      "debt": "Kapitał obcy",
+      "loans": "Kredyty",
+      "totalLiabilities": "Razem pasywa",
+      "check": "Bilans",
+      "balanced": "Aktywa = Pasywa",
+      "difference": "Różnica: {amount}"
+    }
+  }
+}

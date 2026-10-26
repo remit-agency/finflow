@@ -3,12 +3,7 @@ import { ANALYTICS_SECTIONS, activeAnalyticsSection, analyticsPath } from '@/lib
 
 describe('ANALYTICS_SECTIONS', () => {
   it('lists the four reports in menu order', () => {
-    expect(ANALYTICS_SECTIONS.map((s) => [s.slug, s.label])).toEqual([
-      ['cashflow', 'Cash Flow'],
-      ['pl', 'P&L'],
-      ['balance', 'Баланс'],
-      ['calendar', 'Календар'],
-    ])
+    expect(ANALYTICS_SECTIONS.map((s) => s.slug)).toEqual(['cashflow', 'pl', 'balance', 'calendar'])
   })
 })
 
