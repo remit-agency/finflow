@@ -189,13 +189,15 @@ export function buildCashFlow(transactions: Transaction[], range: PeriodRange, l
  * P&L over a resolved period: income and expense by category for the transactions inside the
  * range, split by the UTC months the range touches (the table's columns) with a total per row.
  * Transfers do not count; transactions without a known category go to two rows (income and
- * expense) named `uncategorizedName` (the translated «Без категорії»).
+ * expense) named `uncategorizedName` (the translated «Без категорії»). `nameOf` is the label of a
+ * category row (the UI passes the localized name); it defaults to the stored name.
  */
 export function buildPL(
   transactions: Transaction[],
   categories: Category[],
   range: PeriodRange,
-  uncategorizedName: string
+  uncategorizedName: string,
+  nameOf: (category: Category) => string = (category) => category.name
 ): PLReport {
   const bounded = reportRange(range, transactions)
   if (!bounded) return { monthKeys: [], rows: [] }
@@ -209,7 +211,7 @@ export function buildPL(
     for (const key of monthKeys) months[key] = 0
     rowMap.set(cat.id, {
       categoryId: cat.id,
-      categoryName: cat.name,
+      categoryName: nameOf(cat),
       type: cat.type,
       months,
       total: 0,

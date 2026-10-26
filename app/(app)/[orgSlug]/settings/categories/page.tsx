@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useShell } from '@/lib/hooks/useShell'
 import { createCategory } from '@/lib/firebase/categories'
 import { db } from '@/lib/firebase/firebase'
+import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { cn } from '@/lib/utils'
 import type { Category } from '@/types'
 
@@ -26,6 +27,7 @@ const CATEGORY_COLORS = [
 
 export default function CategoriesSettingsPage() {
   const t = useTranslations('settings.categories')
+  const categoryName = useCategoryName()
   const params = useParams()
   const orgId = params.orgSlug as string
   const { incomeCategories, expenseCategories, can } = useShell()
@@ -80,12 +82,12 @@ export default function CategoriesSettingsPage() {
                 {cats.map((cat) => (
                   <div key={cat.id} className="group flex items-center gap-2">
                     <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: cat.color }} />
-                    <span className="flex-1 text-sm text-ink">{cat.name}</span>
+                    <span className="flex-1 text-sm text-ink">{categoryName(cat)}</span>
                     {canEdit && (
                       <button
                         type="button"
                         onClick={() => handleDeleteCategory(cat)}
-                        aria-label={t('deleteLabel', { name: cat.name })}
+                        aria-label={t('deleteLabel', { name: categoryName(cat) })}
                         className="text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:text-expense focus-visible:opacity-100"
                       >
                         <Trash2 className="size-3.5" />
