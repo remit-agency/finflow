@@ -14,7 +14,7 @@ export interface ExpectedLedger {
 /** True when the operation can be turned into effects and contributions. */
 function countable(tx: LedgerTransaction, baseCurrency: string, known: Record<string, number>): boolean {
   if (tx.status !== 'actual') return true
-  if (!Object.keys(balanceEffects(tx)).every((id) => id in known)) return false
+  if (!Object.keys(balanceEffects(tx)).every((id) => Object.hasOwn(known, id))) return false
   return tx.type === 'transfer' || baseOf(tx, baseCurrency) !== null
 }
 

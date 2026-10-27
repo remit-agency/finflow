@@ -38,4 +38,14 @@ describe('computeLedger', () => {
     expect(out.invalid).toEqual(['x', 'y'])
     expect(out.balances).toEqual({ a: 0 })
   })
+
+  it('treats an account id that is a member of Object.prototype as unknown unless it exists, and counts it when it does', () => {
+    const missing = computeLedger([acc('a', 0)], [tx({ id: 'x', accountId: 'toString' }), tx({ id: 'y', accountId: 'constructor' })], 'PLN')
+    expect(missing.invalid).toEqual(['x', 'y'])
+    expect(missing.balances).toEqual({ a: 0 })
+
+    const present = computeLedger([acc('constructor', 100)], [tx({ id: 'z', accountId: 'constructor', amountMinor: 50 })], 'PLN')
+    expect(present.invalid).toEqual([])
+    expect(present.balances.constructor).toBe(150)
+  })
 })

@@ -22,6 +22,9 @@
 // Emulator: when FIRESTORE_EMULATOR_HOST is set (for example inside `firebase emulators:exec`), the script targets project
 // `demo-finflow` on that emulator and uses no credentials, so it can never reach production.
 //
+// The dry run (also the first pass of --apply) builds the rollups the migrated ledger will have; a company where that fails is
+// reported (operation ids only) and not applied. The dry run never writes, not even the FX cache (`fxTables`).
+//
 // Exit code: 0 success, 1 a company failed (the others still ran; failed ids are listed), 2 bad arguments.
 import fs from 'node:fs'
 import path from 'node:path'
@@ -30,13 +33,14 @@ import { getFirestore } from 'firebase-admin/firestore'
 import { toDay } from '@/lib/domain/ledger/days'
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import { createResolver } from '@/lib/server/fx/resolver'
-import { firestoreFxStore } from '@/lib/server/fx/store'
+import { firestoreFxStore, type FxStore } from '@/lib/server/fx/store'
 import { fetchNbpTables } from '@/lib/server/fx/nbp'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import { todayUtcDay } from '@/lib/utils/today'
 import { assertProductionFlags } from './lib/migration-guard.mjs'
 import { parseLedgerCliArgs } from './lib/migrate-ledger-args'
 import { dropLegacy, migrateOrg, type MigrateReport } from './lib/migrate-ledger-v2'
+import { readOnlyFxStore } from './lib/readonly-fx-store'
 
 const PROJECT_ID = 'finflow-e94b5'
 const EMULATOR_PROJECT_ID = 'demo-finflow'
@@ -65,7 +69,8 @@ function printReport(r: MigrateReport): void {
   const c = r.counters
   console.log(
     `org ${r.orgId}: accounts=${r.accountsToMigrate} operations=${r.txsToMigrate} skipped=${r.skipped.length} ` +
-      `currencyMismatch=${c.currencyMismatch} transferAmountAssumed=${c.transferAmountAssumed} futureActual=${c.futureActual} drift=${r.drift.length}`,
+      `currencyMismatch=${c.currencyMismatch} transferAmountAssumed=${c.transferAmountAssumed} futureActual=${c.futureActual} ` +
+      `invalidReference=${c.invalidReference} trimmed=${c.trimmed} drift=${r.drift.length}`,
   )
   for (const d of r.drift) console.log(`  account ${d.accountId}: legacy=${d.legacyBalanceMinor} sum=${d.sumMinor} opening=${d.openingMinor}`)
   for (const s of r.skipped.slice(0, SKIPPED_LINES)) console.log(`  skipped ${s.kind} ${s.id}: ${s.reason}`)
@@ -100,8 +105,17 @@ async function main(): Promise<number> {
   const db = getFirestore()
 
   const today = () => toDay(todayUtcDay())
-  const resolver = createResolver({ store: firestoreFxStore(db), fetchTables: (a, b) => fetchNbpTables(a, b), now: () => Date.now(), today })
-  const deps: LedgerDeps = { db, resolveRate: resolver, now: () => new Date(), today }
+  const fxStore = firestoreFxStore(db)
+  const makeDeps = (store: FxStore): LedgerDeps => ({
+    db,
+    resolveRate: createResolver({ store, fetchTables: (a, b) => fetchNbpTables(a, b), now: () => Date.now(), today }),
+    now: () => new Date(),
+    today,
+  })
+  // The resolver caches NBP tables in `fxTables/{month}`. The dry run must not write there, so it reads through a store whose
+  // writes are dropped; only the apply pass (and dropLegacy, which resolves no rates) gets the real one.
+  const dryDeps = makeDeps(readOnlyFxStore(fxStore))
+  const deps = makeDeps(fxStore)
 
   const orgIds = org ? [org] : (await db.collection('organizations').select().get()).docs.map((d) => d.id)
   console.log(`companies: ${orgIds.length}`)
@@ -123,7 +137,13 @@ async function main(): Promise<number> {
         continue
       }
 
-      printReport(await migrateOrg(deps, orgId, { apply: false, resetOpening }))
+      const dryReport = await migrateOrg(dryDeps, orgId, { apply: false, resetOpening })
+      printReport(dryReport)
+      if (dryReport.simulationError !== undefined) {
+        console.error(`org ${orgId}: REFUSED, the rollups of the migrated ledger cannot be built (${dryReport.simulationError}); nothing applied`)
+        failed.push(orgId)
+        continue
+      }
       if (!apply) continue
 
       const result = await migrateOrg(deps, orgId, {

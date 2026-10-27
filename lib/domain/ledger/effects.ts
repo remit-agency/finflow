@@ -16,7 +16,7 @@ export function balanceEffects(tx: LedgerTransaction): Record<string, number> {
 export function mergeEffects(...parts: Array<Record<string, number>>): Record<string, number> {
   const out: Record<string, number> = {}
   for (const part of parts) {
-    for (const [id, delta] of Object.entries(part)) out[id] = (out[id] ?? 0) + delta
+    for (const [id, delta] of Object.entries(part)) out[id] = (Object.hasOwn(out, id) ? out[id] : 0) + delta
   }
   for (const id of Object.keys(out)) if (out[id] === 0) delete out[id]
   return out

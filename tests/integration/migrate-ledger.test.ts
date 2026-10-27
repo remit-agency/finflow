@@ -1,8 +1,12 @@
 import { Timestamp } from 'firebase-admin/firestore'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { dropLegacy, migrateOrg } from '@/scripts/lib/migrate-ledger-v2'
+import { LedgerError } from '@/lib/domain/ledger/errors'
+import { parseTransactionInput } from '@/lib/domain/ledger/input'
+import { acquireLock } from '@/lib/server/ledger/lock'
 import { verifyLedger } from '@/lib/server/ledger/verify'
-import { ORG, auditActions, clearFirestore, fakeResolveRate, makeDeps, readDoc, seedOrg, testDb } from './helpers'
+import { createTransaction } from '@/lib/server/ledger/write'
+import { dropLegacy, migrateOrg } from '@/scripts/lib/migrate-ledger-v2'
+import { ORG, UID, auditActions, clearFirestore, fakeResolveRate, makeDeps, readDoc, rollup, seedAccount, seedOrg, testDb } from './helpers'
 
 const db = testDb()
 const deps = makeDeps(db)
@@ -12,6 +16,7 @@ const DAY = Timestamp.fromDate(new Date('2026-10-20T00:00:00Z'))
 
 const acct = (id: string) => `organizations/${ORG}/accounts/${id}`
 const txPath = (id: string) => `organizations/${ORG}/transactions/${id}`
+const lockPath = `organizations/${ORG}/ledger/lock`
 
 async function seedLegacy(): Promise<void> {
   await clearFirestore()
@@ -32,6 +37,8 @@ async function snapshot(): Promise<Record<string, unknown>> {
   for (const col of ['accounts', 'transactions', 'audit', 'rollups', 'ledger']) {
     for (const doc of (await db.collection(`organizations/${ORG}/${col}`).get()).docs) out[doc.ref.path] = doc.data()
   }
+  // The migration holds the ledger lock while it runs (see 'the ledger lock'); the lock document is checked on its own.
+  delete out[lockPath]
   return out
 }
 
@@ -47,7 +54,8 @@ describe('migrateOrg: dry run', () => {
 
     expect(report).toMatchObject({ applied: false, accountsToMigrate: 2, txsToMigrate: 5 })
     expect(report.skipped).toEqual([{ kind: 'tx', id: 'bad', reason: 'invalid_amount' }])
-    expect(report.counters).toEqual({ currencyMismatch: 1, transferAmountAssumed: 1, futureActual: 0 })
+    expect(report.counters).toEqual({ currencyMismatch: 1, transferAmountAssumed: 1, futureActual: 0, invalidReference: 0, trimmed: 0 })
+    expect(report.simulationError).toBeUndefined()
     expect(report.drift).toEqual([
       { accountId: 'a', legacyBalanceMinor: 123450, sumMinor: 122960, openingMinor: 490 },
       { accountId: 'e', legacyBalanceMinor: 1000, sumMinor: 800, openingMinor: 200 },
@@ -202,6 +210,129 @@ describe('migrateOrg: apply', () => {
 
   it('throws for a missing company', async () => {
     await expect(migrateOrg(deps, 'nope', DRY)).rejects.toMatchObject({ code: 'not_found' })
+  })
+})
+
+describe('migrateOrg: the ledger lock', () => {
+  const six = 6 * 60_000
+  const t0 = new Date('2026-10-27T10:00:00Z').getTime()
+
+  it('a second migration of the same company gets ledger_busy and writes nothing', async () => {
+    const token = await acquireLock(deps, ORG, 'other-migration')
+    const before = await snapshot()
+    let backups = 0
+    await expect(migrateOrg(deps, ORG, { ...OPTS, beforeWrite: () => { backups++ } })).rejects.toMatchObject({ code: 'ledger_busy' })
+    expect(backups).toBe(0)
+    expect(await snapshot()).toEqual(before)
+    expect(await readDoc(db, lockPath)).toMatchObject({ holder: token, by: 'other-migration' })
+  })
+
+  it('a dry run does not need the lock', async () => {
+    await acquireLock(deps, ORG, 'other-migration')
+    expect((await migrateOrg(deps, ORG, DRY)).applied).toBe(false)
+  })
+
+  it('holds the lock during the run (writes are refused) and releases it afterwards, also after a failure', async () => {
+    await seedAccount(db, ORG, 'm', 'PLN')
+    let during = ''
+    await migrateOrg(deps, ORG, {
+      ...OPTS,
+      beforeWrite: async () => {
+        try {
+          await createTransaction(deps, ORG, UID, parseTransactionInput({ type: 'income', accountId: 'm', amountMinor: 1, paymentDate: '2026-10-20' }))
+          during = 'written'
+        } catch (e) {
+          during = e instanceof LedgerError ? e.code : String(e)
+        }
+      },
+    })
+    expect(during).toBe('ledger_busy')
+    expect(await readDoc(db, lockPath)).toBeUndefined()
+
+    await seedLegacy()
+    await expect(migrateOrg(deps, ORG, { ...OPTS, beforeWrite: () => { throw new Error('disk full') } })).rejects.toThrow('disk full')
+    expect(await readDoc(db, lockPath)).toBeUndefined()
+    const failing = makeDeps(db, { resolveRate: async () => { throw new Error('nbp down') } })
+    await expect(migrateOrg(failing, ORG, OPTS)).rejects.toThrow('nbp down')
+    expect(await readDoc(db, lockPath)).toBeUndefined()
+  })
+
+  it('renews the lease before every batch and stops when it is lost', async () => {
+    await clearFirestore()
+    await seedOrg(db)
+    await db.doc(acct('a')).set({ orgId: ORG, name: 'Main', type: 'bank', currency: 'PLN', balance: 10 })
+    const seed = db.batch()
+    for (let i = 0; i < 310; i++) seed.set(db.doc(txPath(`t${i}`)), { orgId: ORG, accountId: 'a', type: 'income', amount: 1, date: DAY })
+    await seed.commit()
+
+    let offset = 0
+    const lossy = new Proxy(db, {
+      get(target, prop) {
+        if (prop === 'batch') {
+          return () => {
+            offset = six // from the first batch on, the lease counts as expired
+            return target.batch()
+          }
+        }
+        const v = Reflect.get(target, prop)
+        return typeof v === 'function' ? v.bind(target) : v
+      },
+    }) as unknown as typeof db
+    const lossyDeps = { ...makeDeps(db, { now: () => new Date(t0 + offset) }), db: lossy }
+
+    await expect(migrateOrg(lossyDeps, ORG, OPTS)).rejects.toMatchObject({ code: 'ledger_busy' })
+    const migrated = (await db.collection(`organizations/${ORG}/transactions`).get()).docs.filter((d) => d.get('schemaVersion') === 2)
+    expect(migrated).toHaveLength(300) // the first batch only
+    expect((await readDoc(db, acct('a')))?.schemaVersion).toBeUndefined()
+    expect(await readDoc(db, lockPath)).toBeUndefined()
+  })
+})
+
+describe('migrateOrg: legacy values the API would not accept', () => {
+  it('a reference that is not a valid id is left out, the stored one removed, and the ledger verifies', async () => {
+    await db.doc(txPath('e1')).set({ orgId: ORG, accountId: 'a', type: 'income', amount: 5, date: DAY, categoryId: '' })
+    await db.doc(txPath('e2')).set({ orgId: ORG, accountId: 'a', type: 'income', amount: 6, date: DAY, categoryId: '__proto__', projectId: 'a.b' })
+    await db.doc(txPath('e3')).set({ orgId: ORG, accountId: 'a', type: 'income', amount: 7, date: DAY, categoryId: 'constructor', description: ` ${'d'.repeat(600)} ` })
+    await db.doc(txPath('bad')).delete()
+
+    const report = await migrateOrg(deps, ORG, OPTS)
+    expect(report.simulationError).toBeUndefined()
+    expect(report.counters).toMatchObject({ invalidReference: 3, trimmed: 1 })
+    for (const id of ['e1', 'e2']) {
+      const data = await readDoc(db, txPath(id))
+      expect(data, id).toMatchObject({ schemaVersion: 2 })
+      expect(data, id).not.toHaveProperty('categoryId')
+      expect(data, id).not.toHaveProperty('projectId')
+    }
+    expect(await readDoc(db, txPath('e3'))).toMatchObject({ categoryId: 'constructor', description: 'd'.repeat(500) })
+    expect((await verifyLedger(deps, ORG)).ok).toBe(true)
+    // _none: i1 123460 + i2 1000 + e1 500 + e2 600 + ei 1320 (3 EUR at 4.4)
+    expect(await rollup(db, ORG, 'pl_2026-10')).toMatchObject({ 'categories._none.incomeBase': 126880, 'categories.constructor.incomeBase': 700 })
+    expect(({} as Record<string, unknown>).incomeBase).toBeUndefined()
+  })
+})
+
+describe('migrateOrg: simulation of the rollups', () => {
+  it('reports what would break the final rebuild and applies nothing, in a dry run and in an apply', async () => {
+    // an operation that is already schema 2 and cannot be rolled up (empty category id)
+    await db.doc(acct('m')).set({ orgId: ORG, name: 'M', type: 'bank', currency: 'PLN', color: '#000000', openingMinor: 0, balanceMinor: 100, schemaVersion: 2 })
+    await db.doc(txPath('v2bad')).set({
+      orgId: ORG, schemaVersion: 2, type: 'income', status: 'actual', accountId: 'm', amountMinor: 100, currency: 'PLN',
+      paymentDate: '2026-10-20', accrual: { mode: 'date', date: '2026-10-20' }, isRecurring: false, tags: [], fileUrls: [], categoryId: '',
+    })
+    const before = await snapshot()
+
+    const dry = await migrateOrg(deps, ORG, DRY)
+    expect(dry.simulationError).toContain('v2bad')
+    expect(dry.applied).toBe(false)
+
+    let backups = 0
+    const applied = await migrateOrg(deps, ORG, { ...OPTS, beforeWrite: () => { backups++ } })
+    expect(applied.simulationError).toContain('v2bad')
+    expect(applied.applied).toBe(false)
+    expect(backups).toBe(0)
+    expect(await snapshot()).toEqual(before)
+    expect(await readDoc(db, lockPath)).toBeUndefined()
   })
 })
 

@@ -81,6 +81,29 @@ describe('nest / flatten', () => {
   it('maps leaves', () => {
     expect(nest({ a: 2 }, (n) => ({ inc: n }))).toEqual({ a: { inc: 2 } })
   })
+
+  // Category ids are user data: names that exist on Object.prototype must behave like any other id.
+  const INHERITED = ['constructor', 'toString', 'valueOf', 'hasOwnProperty']
+  it.each(INHERITED)('keeps a category called %s and does not touch Object.prototype', (id) => {
+    const flat = { [`categories.${id}.incomeBase`]: 5, 'categories.other.incomeBase': 7, inMinor: 1 }
+    const nested = nest(flat)
+    expect(Object.keys(nested.categories as object).sort()).toEqual([id, 'other'].sort())
+    expect(Object.hasOwn(nested.categories as object, id)).toBe(true)
+    expect((nested.categories as Record<string, unknown>)[id]).toEqual({ incomeBase: 5 })
+    expect(flatten(nested)).toEqual(flat)
+    expect(({} as Record<string, unknown>).incomeBase).toBeUndefined()
+    expect((Object.prototype as unknown as Record<string, unknown>).incomeBase).toBeUndefined()
+  })
+
+  it('contributions of operations in categories named like Object.prototype members round-trip through nest/flatten', () => {
+    const docs: RollupDocs = new Map()
+    for (const id of INHERITED) addInto(docs, contributions(tx({ categoryId: id }), 'PLN'))
+    addInto(docs, contributions(tx({ categoryId: 'cat' }), 'PLN'))
+    const pl = docs.get(plDocId('2026-10')) as Record<string, number>
+    expect(Object.keys(pl).sort()).toEqual([...INHERITED.map((id) => `categories.${id}.expenseBase`), 'categories.cat.expenseBase'].sort())
+    expect(flatten(nest(pl))).toEqual(pl)
+    expect(({} as Record<string, unknown>).expenseBase).toBeUndefined()
+  })
 })
 
 describe('diffRollups', () => {

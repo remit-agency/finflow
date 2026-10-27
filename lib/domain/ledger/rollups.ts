@@ -69,14 +69,19 @@ export function contributions(tx: LedgerTransaction, baseCurrency: string, sign:
 
 /** Dotted flat fields to a nested object; `leaf` wraps each number (e.g. FieldValue.increment). */
 export function nest(flat: RollupFlat, leaf: (n: number) => unknown = (n) => n): Record<string, unknown> {
+  // Keys are user data (category ids): only own properties count, and a node is defined, never assigned, so ids such as
+  // `constructor` or `toString` are ordinary keys and nothing reaches Object.prototype.
+  const setOwn = (target: Record<string, unknown>, key: string, value: unknown) =>
+    Object.defineProperty(target, key, { value, enumerable: true, writable: true, configurable: true })
   const out: Record<string, unknown> = {}
   for (const [path, n] of Object.entries(flat)) {
     const keys = path.split('.')
     let cursor = out
     for (const key of keys.slice(0, -1)) {
-      cursor = (cursor[key] ??= {}) as Record<string, unknown>
+      if (!Object.hasOwn(cursor, key)) setOwn(cursor, key, {})
+      cursor = cursor[key] as Record<string, unknown>
     }
-    cursor[keys[keys.length - 1]] = leaf(n)
+    setOwn(cursor, keys[keys.length - 1], leaf(n))
   }
   return out
 }

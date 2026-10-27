@@ -24,6 +24,9 @@ describe('mergeEffects / negateEffects', () => {
   it('sums per account and drops zeros', () => {
     expect(mergeEffects({ a: 5, b: 1 }, { a: -5, c: 2 })).toEqual({ b: 1, c: 2 })
   })
+  it('sums account ids that are members of Object.prototype like any other id', () => {
+    expect(mergeEffects({ constructor: 5, toString: 1 }, { constructor: 2 })).toEqual({ constructor: 7, toString: 1 })
+  })
   it('negates', () => {
     expect(negateEffects({ a: 5, b: -2 })).toEqual({ a: -5, b: 2 })
   })

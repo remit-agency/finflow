@@ -5,14 +5,16 @@ import { attachFx } from '@/lib/domain/ledger/build'
 import { parseAccount, parseTransaction, transactionToDoc } from '@/lib/domain/ledger/doc'
 import { balanceEffects } from '@/lib/domain/ledger/effects'
 import { LedgerError } from '@/lib/domain/ledger/errors'
-import type { LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
+import type { LedgerAccount, LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
 import { auditData } from '@/lib/server/ledger/audit'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import { accountsCol, auditCol, orgRef, transactionsCol } from '@/lib/server/ledger/paths'
+import { acquireLock, releaseLock, renewLock } from '@/lib/server/ledger/lock'
 import { rebuildLedger } from '@/lib/server/ledger/rebuild'
 import { evidenceOf } from '@/lib/server/ledger/write'
 import { verifyLedger } from '@/lib/server/ledger/verify'
 import { planOrg, type LegacyDoc, type Plan, type PlannedTx } from './plan-ledger-v2'
+import { simulateRollups } from './simulate-ledger-v2'
 
 /** Operations per write batch (plus the balance increments of the schema 2 accounts they touch, capped by BATCH_WRITES). */
 const TX_BATCH = 300
@@ -52,6 +54,8 @@ export interface MigrateReport {
   rebuildBalanceFixes?: number
   /** True when the rebuild report was cut at its limit, so `rebuildBalanceFixes` is a lower bound. */
   rebuildTruncated?: boolean
+  /** Set when the rollups of the migrated ledger could not be built or written; nothing is applied then. */
+  simulationError?: string
 }
 
 /** Timestamps and Dates (also nested) as ISO strings; everything else is copied as is. */
@@ -65,14 +69,18 @@ function jsonSafe(value: unknown): unknown {
   return value
 }
 
-/** Optional text fields the plan leaves out. A legacy value that is not a string (null, a number) would make the schema 2 document unreadable. */
+/**
+ * Optional text fields the plan leaves out. Whatever the legacy document holds there (null, a number, an empty or
+ * invalid id, a blank description) must not survive: the document is merged, so it would stay and either make the
+ * schema 2 document unreadable or break the rollups.
+ */
 const TEXT_FIELDS = ['categoryId', 'description', 'projectId', 'counterpartyId'] as const
 
 function staleTextFields(raw: Record<string, unknown>, tx: LedgerTransaction): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const key of TEXT_FIELDS) {
     if (key === 'counterpartyId' && tx.type === 'transfer') continue // the legacy transfer target stays until dropLegacy
-    if (tx[key] === undefined && raw[key] !== undefined && typeof raw[key] !== 'string') out[key] = FieldValue.delete()
+    if (tx[key] === undefined && raw[key] !== undefined) out[key] = FieldValue.delete()
   }
   return out
 }
@@ -85,25 +93,48 @@ function accountSums(batch: PlannedTx[]): Map<string, number> {
   return sums
 }
 
+/**
+ * An apply holds the ledger lock for its whole run (writes through the API answer ledger_busy meanwhile; a second
+ * migration of the company gets ledger_busy and writes nothing) and renews the lease before every batch. A dry run
+ * writes nothing and needs no lock.
+ */
 export async function migrateOrg(deps: LedgerDeps, orgId: string, opts: MigrateOptions): Promise<MigrateReport> {
+  if (!opts.apply) return migrate(deps, orgId, opts, null)
+  const token = await acquireLock(deps, orgId, 'migration')
+  try {
+    return await migrate(deps, orgId, opts, token)
+  } finally {
+    await releaseLock(deps, orgId, token)
+  }
+}
+
+async function migrate(deps: LedgerDeps, orgId: string, opts: MigrateOptions, token: string | null): Promise<MigrateReport> {
+  const renew = async () => {
+    if (token !== null) await renewLock(deps, orgId, token)
+  }
   const org = await orgRef(deps.db, orgId).get()
   if (!org.exists) throw new LedgerError('not_found', 'org')
   const baseCurrency = org.get('currency') as string
 
   const legacyAccounts: LegacyDoc[] = []
   const migratedAccounts = new Map<string, string>()
+  const migratedAccountDocs: LedgerAccount[] = []
   for (const doc of (await accountsCol(deps.db, orgId).get()).docs) {
     const account = parseAccount(doc.id, doc.data())
-    if (account) migratedAccounts.set(doc.id, account.currency)
-    else legacyAccounts.push({ id: doc.id, data: doc.data() })
+    if (account) {
+      migratedAccounts.set(doc.id, account.currency)
+      migratedAccountDocs.push(account)
+    } else legacyAccounts.push({ id: doc.id, data: doc.data() })
   }
 
   const legacyTxs: LegacyDoc[] = []
   const markedTxs: LedgerTransaction[] = []
+  const schema2Txs: LedgerTransaction[] = []
   for (const doc of (await transactionsCol(deps.db, orgId).get()).docs) {
     const data = doc.data()
     const tx = parseTransaction(doc.id, data)
     if (tx) {
+      schema2Txs.push(tx)
       if (data.migratedFrom === 'v1') markedTxs.push(tx)
     } else {
       const date = data.date
@@ -147,7 +178,18 @@ export async function migrateOrg(deps: LedgerDeps, orgId: string, opts: MigrateO
       txs: txs.map((t) => ({ id: t.id, data: jsonSafe(rawTx.get(t.id)) as Record<string, unknown> })),
     },
   }
-  if (!opts.apply) return report
+
+  // What the final rebuild will have to build: the ledger as it will be after this run. A dry run finds in advance what
+  // would only fail once the rollups are written.
+  const plannedAccounts = plan.accounts.flatMap((a) => parseAccount(a.id, a.fields) ?? [])
+  const simulationError = simulateRollups({
+    baseCurrency,
+    accounts: [...migratedAccountDocs, ...plannedAccounts],
+    txs: [...schema2Txs, ...txs.map((t) => t.tx)],
+  })
+  if (simulationError !== null) report.simulationError = simulationError
+
+  if (!opts.apply || report.simulationError !== undefined) return report
   await opts.beforeWrite?.(report)
 
   // a. Operations. A batch also moves the balance of the schema 2 accounts it touches, so the operation and its effect
@@ -166,6 +208,7 @@ export async function migrateOrg(deps: LedgerDeps, orgId: string, opts: MigrateO
   }
   for (let i = 0; i < txs.length; ) {
     const { slice, effects } = nextBatch(i)
+    await renew()
     const batch: WriteBatch = deps.db.batch()
     for (const planned of slice) {
       batch.set(
@@ -188,18 +231,21 @@ export async function migrateOrg(deps: LedgerDeps, orgId: string, opts: MigrateO
 
   // b. Legacy accounts (the legacy `balance` field stays until dropLegacy).
   for (let i = 0; i < plan.accounts.length; i += BATCH_WRITES) {
+    await renew()
     const batch = deps.db.batch()
     for (const a of plan.accounts.slice(i, i + BATCH_WRITES)) batch.set(accountsCol(deps.db, orgId).doc(a.id), a.fields, { merge: true })
     await batch.commit()
   }
 
   // c. Rollups (and any balance the steps above left off) are recomputed from the operations.
-  const rebuilt = await rebuildLedger(deps, orgId, 'migration', { apply: true })
+  //    The rebuild runs under the lock this run already holds and renews it itself before each of its batches.
+  const rebuilt = await rebuildLedger(deps, orgId, 'migration', { apply: true, lock: token ?? undefined })
   report.rebuildBalanceFixes = rebuilt.balanceDiffs.length
   report.rebuildTruncated = rebuilt.truncated
 
   // d. One audit entry, only when something was migrated.
   if (plan.accounts.length > 0 || txs.length > 0) {
+    await renew()
     await auditCol(deps.db, orgId).doc().create(
       auditData(deps, 'migration.v2', 'migration', orgId, null, {
         accounts: plan.accounts.length,

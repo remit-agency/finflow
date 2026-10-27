@@ -115,9 +115,9 @@ describe('createTransaction', () => {
   })
 
   it('answers ledger_busy while the ledger is locked and works again after the lock is released', async () => {
-    await acquireLock(deps, ORG, 'test')
+    const token = await acquireLock(deps, ORG, 'test')
     expect(await code(createTransaction(deps, ORG, UID, input({})))).toBe('ledger_busy:undefined')
-    await releaseLock(deps, ORG)
+    await releaseLock(deps, ORG, token)
     await createTransaction(deps, ORG, UID, input({}))
     expect(await balanceOf(db, ORG, 'pln1')).toBe(13345)
   })

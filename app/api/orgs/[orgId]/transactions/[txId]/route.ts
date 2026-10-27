@@ -8,7 +8,7 @@ import { readJsonBody } from '@/lib/server/request-body'
 
 export const runtime = 'nodejs'
 
-const MAX_BODY_BYTES = 16 * 1024
+const MAX_BODY_BYTES = 32 * 1024
 type Ctx = { params: Promise<{ orgId: string; txId: string }> }
 
 // PATCH /api/orgs/{orgId}/transactions/{txId}  (owner, accountant)

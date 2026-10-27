@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { Timestamp, type Transaction } from 'firebase-admin/firestore'
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import type { LedgerDeps } from './deps'
@@ -15,16 +16,36 @@ export async function assertUnlocked(t: Transaction, deps: LedgerDeps, orgId: st
   if (snap.exists && active(snap.get('until'), deps.now())) throw new LedgerError('ledger_busy')
 }
 
-/** Takes the lease for LOCK_MS or throws ledger_busy. */
-export async function acquireLock(deps: LedgerDeps, orgId: string, holder: string): Promise<void> {
+/**
+ * Takes the lease for LOCK_MS or throws ledger_busy. Returns the token that proves ownership: `renewLock` and
+ * `releaseLock` act only while the stored holder is that token. `by` (who asked) is kept for people reading the document.
+ */
+export async function acquireLock(deps: LedgerDeps, orgId: string, by: string): Promise<string> {
   const ref = lockRef(deps.db, orgId)
+  const token = randomUUID()
   await deps.db.runTransaction(async (t) => {
     const snap = await t.get(ref)
     if (snap.exists && active(snap.get('until'), deps.now())) throw new LedgerError('ledger_busy')
-    t.set(ref, { until: Timestamp.fromMillis(deps.now().getTime() + LOCK_MS), holder })
+    t.set(ref, { until: Timestamp.fromMillis(deps.now().getTime() + LOCK_MS), holder: token, by })
+  })
+  return token
+}
+
+/** Extends the lease to now + LOCK_MS. Throws ledger_busy when the lease expired or somebody else holds the lock. */
+export async function renewLock(deps: LedgerDeps, orgId: string, token: string): Promise<void> {
+  const ref = lockRef(deps.db, orgId)
+  await deps.db.runTransaction(async (t) => {
+    const snap = await t.get(ref)
+    if (!snap.exists || snap.get('holder') !== token || !active(snap.get('until'), deps.now())) throw new LedgerError('ledger_busy')
+    t.update(ref, { until: Timestamp.fromMillis(deps.now().getTime() + LOCK_MS) })
   })
 }
 
-export async function releaseLock(deps: LedgerDeps, orgId: string): Promise<void> {
-  await lockRef(deps.db, orgId).delete()
+/** Deletes the lock only when `token` still holds it (a lease that was taken over belongs to its new holder). */
+export async function releaseLock(deps: LedgerDeps, orgId: string, token: string): Promise<void> {
+  const ref = lockRef(deps.db, orgId)
+  await deps.db.runTransaction(async (t) => {
+    const snap = await t.get(ref)
+    if (snap.exists && snap.get('holder') === token) t.delete(ref)
+  })
 }

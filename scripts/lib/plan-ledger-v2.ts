@@ -3,6 +3,7 @@ import { fxPlan, type FxRequest } from '@/lib/domain/ledger/build'
 import { isDay, toDay } from '@/lib/domain/ledger/days'
 import { accountToDoc } from '@/lib/domain/ledger/doc'
 import { balanceEffects } from '@/lib/domain/ledger/effects'
+import { isId } from '@/lib/domain/ledger/guards'
 import { toMinor } from '@/lib/domain/ledger/money'
 import { ACCOUNT_TYPES, LEDGER_CURRENCIES, TX_TYPES, type LedgerAccount, type LedgerTransaction } from '@/lib/domain/ledger/types'
 
@@ -49,19 +50,57 @@ export interface Plan {
   accounts: PlannedAccount[]
   txs: PlannedTx[]
   skipped: Array<{ kind: 'account' | 'tx'; id: string; reason: string }>
-  counters: { currencyMismatch: number; transferAmountAssumed: number; futureActual: number }
+  counters: Counters
+}
+
+export interface Counters {
+  currencyMismatch: number
+  transferAmountAssumed: number
+  futureActual: number
+  /** A category, project or counterparty reference that is not a valid id: the field was left out. */
+  invalidReference: number
+  /** A description, tags or fileUrls value that exceeded the API limits and was shortened or lost entries. */
+  trimmed: number
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/
 const DEFAULT_COLOR = '#00c896'
 
+// The limits of parseTransactionInput (lib/domain/ledger/input.ts).
+const MAX_DESCRIPTION = 500
+const MAX_TAGS = 20
+const MAX_TAG_LENGTH = 50
+const MAX_FILE_URLS = 10
+const MAX_FILE_URL_LENGTH = 2048
+
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v.length > 0 ? v : undefined
 }
 
+/** Strings of 1..maxLength characters, at most maxItems of them. `lossy` is true when anything was dropped. */
+function limitedList(v: unknown, maxItems: number, maxLength: number): { list: string[]; lossy: boolean } {
+  if (!Array.isArray(v)) return { list: [], lossy: false }
+  const valid = v.filter((s): s is string => typeof s === 'string' && s.length > 0 && s.length <= maxLength)
+  const list = valid.slice(0, maxItems)
+  return { list, lossy: list.length !== v.length }
+}
+
+function cutText(text: string, max: number): string {
+  if (text.length <= max) return text
+  const end = text.charCodeAt(max - 1) >= 0xd800 && text.charCodeAt(max - 1) <= 0xdbff ? max - 1 : max // keep surrogate pairs whole
+  return text.slice(0, end)
+}
+
 export function planOrg(input: PlanInput): Plan {
   const skipped: Plan['skipped'] = []
-  const counters = { currencyMismatch: 0, transferAmountAssumed: 0, futureActual: 0 }
+  const counters: Counters = { currencyMismatch: 0, transferAmountAssumed: 0, futureActual: 0, invalidReference: 0, trimmed: 0 }
+  /** A reference to another document: kept only if the API would accept it. null/undefined mean "none" and are not counted. */
+  const reference = (v: unknown): string | undefined => {
+    if (v === undefined || v === null) return undefined
+    if (isId(v)) return v
+    counters.invalidReference++
+    return undefined
+  }
   const known = new Map<string, string>(input.migratedAccounts)
 
   const legacy: Array<{ id: string; account: LedgerAccount; legacyBalanceMinor: number }> = []
@@ -109,29 +148,40 @@ export function planOrg(input: PlanInput): Plan {
       paymentDate,
       accrual: { mode: 'date', date: paymentDate },
       isRecurring: data.isRecurring === true,
-      tags: Array.isArray(data.tags) ? data.tags.filter((t): t is string => typeof t === 'string') : [],
-      fileUrls: Array.isArray(data.fileUrls) ? data.fileUrls.filter((u): u is string => typeof u === 'string') : [],
+      tags: [],
+      fileUrls: [],
     }
     const planned: PlannedTx = { id, tx, fxRequests: [] }
 
+    // Nothing is counted for an operation that ends up skipped, so the checks that can skip it come first.
     if (type === 'transfer') {
-      const to = str(data.counterpartyId)
-      if (!to || !known.has(to)) { skipped.push({ kind: 'tx', id, reason: 'unknown_target' }); continue }
+      const to = data.counterpartyId
+      if (!isId(to) || !known.has(to)) { skipped.push({ kind: 'tx', id, reason: 'unknown_target' }); continue }
       if (to === accountId) { skipped.push({ kind: 'tx', id, reason: 'same_account' }); continue }
       tx.toAccountId = to
       tx.toCurrency = known.get(to) as string
       tx.toAmountMinor = amountMinor
       if (tx.toCurrency !== currency) counters.transferAmountAssumed++
     } else {
-      const categoryId = str(data.categoryId)
+      const categoryId = reference(data.categoryId)
       if (categoryId) tx.categoryId = categoryId
-      const counterpartyId = str(data.counterpartyId)
+      const counterpartyId = reference(data.counterpartyId)
       if (counterpartyId) tx.counterpartyId = counterpartyId
     }
-    const description = str(data.description)
-    if (description) tx.description = description
-    const projectId = str(data.projectId)
+    const rawDescription = str(data.description)?.trim()
+    if (rawDescription) {
+      const description = cutText(rawDescription, MAX_DESCRIPTION).trim()
+      if (description.length < rawDescription.length) counters.trimmed++
+      if (description) tx.description = description
+    }
+    const projectId = reference(data.projectId)
     if (projectId) tx.projectId = projectId
+    const tags = limitedList(data.tags, MAX_TAGS, MAX_TAG_LENGTH)
+    const fileUrls = limitedList(data.fileUrls, MAX_FILE_URLS, MAX_FILE_URL_LENGTH)
+    tx.tags = tags.list
+    tx.fileUrls = fileUrls.list
+    if (tags.lossy) counters.trimmed++
+    if (fileUrls.lossy) counters.trimmed++
 
     if (typeof data.currency === 'string' && data.currency !== currency) {
       planned.legacyCurrency = data.currency

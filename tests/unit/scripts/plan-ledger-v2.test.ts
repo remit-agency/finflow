@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { parseTransactionInput } from '@/lib/domain/ledger/input'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
 import { planOrg, type LegacyDoc, type PlanInput } from '@/scripts/lib/plan-ledger-v2'
 
@@ -170,6 +171,83 @@ describe('planOrg: skips', () => {
       { kind: 'account', id: 's', reason: 'invalid_balance' },
       { kind: 'tx', id: 't', reason: 'unknown_account' },
     ])
+  })
+})
+
+describe('planOrg: the limits of the API apply to legacy values', () => {
+  const one = (data: Record<string, unknown>) => {
+    const plan = planOrg(input({ legacyAccounts: [acc('a', 1)], legacyTxs: [legacyTx('t', data)] }))
+    return { plan, tx: plan.txs[0]?.tx as LedgerTransaction }
+  }
+
+  it.each(['categoryId', 'projectId', 'counterpartyId'] as const)('%s: a valid id is kept, an invalid one is omitted and counted', (field) => {
+    for (const ok of ['constructor', 'toString', 'c-1_X']) {
+      const { plan, tx } = one({ [field]: ok })
+      expect(tx[field]).toBe(ok)
+      expect(plan.counters.invalidReference).toBe(0)
+    }
+    for (const bad of ['', '__proto__', '__x__', 'a.b', 'a/b', 'a b', 'x'.repeat(129), 5, {}]) {
+      const { plan, tx } = one({ [field]: bad })
+      expect(tx).not.toHaveProperty(field)
+      expect(plan.counters.invalidReference).toBe(1)
+    }
+  })
+
+  it('an absent or null reference is not counted', () => {
+    const { plan, tx } = one({ categoryId: null, projectId: undefined })
+    expect(tx).not.toHaveProperty('categoryId')
+    expect(tx).not.toHaveProperty('projectId')
+    expect(plan.counters.invalidReference).toBe(0)
+  })
+
+  it('a transfer whose target is not a valid id is skipped unknown_target; its project is checked too', () => {
+    const run = (data: Record<string, unknown>) =>
+      planOrg(input({ legacyAccounts: [acc('a', 1), acc('b', 1), acc('__proto__', 1)], legacyTxs: [legacyTx('t', { type: 'transfer', ...data })] }))
+    expect(run({ counterpartyId: '__proto__' }).skipped).toEqual([{ kind: 'tx', id: 't', reason: 'unknown_target' }])
+    expect(run({ counterpartyId: 'a.b' }).skipped).toEqual([{ kind: 'tx', id: 't', reason: 'unknown_target' }])
+    const ok = run({ counterpartyId: 'b', projectId: 'x y' })
+    expect(ok.skipped).toEqual([])
+    expect(ok.txs[0].tx).not.toHaveProperty('projectId')
+    expect(ok.counters.invalidReference).toBe(1)
+  })
+
+  it('description is trimmed and cut to 500 characters', () => {
+    expect(one({ description: '  hello  ' }).tx.description).toBe('hello')
+    expect(one({ description: '   ' }).tx).not.toHaveProperty('description')
+    const { plan, tx } = one({ description: ` ${'x'.repeat(600)} ` })
+    expect(tx.description).toBe('x'.repeat(500))
+    expect(plan.counters.trimmed).toBe(1)
+    expect(one({ description: 'x'.repeat(500) }).plan.counters.trimmed).toBe(0)
+  })
+
+  it('tags keep strings of 1..50 characters, at most 20', () => {
+    const { plan, tx } = one({ tags: ['ok', '', 'y'.repeat(51), 'z'.repeat(50), 7] })
+    expect(tx.tags).toEqual(['ok', 'z'.repeat(50)])
+    expect(plan.counters.trimmed).toBe(1)
+
+    const many = one({ tags: Array.from({ length: 25 }, (_, i) => `t${i}`) })
+    expect(many.tx.tags).toEqual(Array.from({ length: 20 }, (_, i) => `t${i}`))
+    expect(many.plan.counters.trimmed).toBe(1)
+  })
+
+  it('fileUrls keep strings of 1..2048 characters, at most 10', () => {
+    const long = `https://x/${'a'.repeat(2048)}`
+    const { plan, tx } = one({ fileUrls: ['https://x/1', '', long, 3] })
+    expect(tx.fileUrls).toEqual(['https://x/1'])
+    expect(plan.counters.trimmed).toBe(1)
+
+    const many = one({ fileUrls: Array.from({ length: 12 }, (_, i) => `https://x/${i}`) })
+    expect(many.tx.fileUrls).toHaveLength(10)
+    expect(many.plan.counters.trimmed).toBe(1)
+  })
+
+  it('every migrated operation passes the same validation as an API request', () => {
+    const { tx } = one({ categoryId: 'constructor', projectId: 'p', counterpartyId: 'cp', description: ' d ', tags: ['t'], fileUrls: ['https://x/1'] })
+    const parsed = parseTransactionInput({
+      type: tx.type, accountId: tx.accountId, amountMinor: tx.amountMinor, paymentDate: tx.paymentDate, categoryId: tx.categoryId,
+      projectId: tx.projectId, counterpartyId: tx.counterpartyId, description: tx.description, tags: tx.tags, fileUrls: tx.fileUrls,
+    })
+    expect(parsed).toMatchObject({ categoryId: 'constructor', description: 'd' })
   })
 })
 

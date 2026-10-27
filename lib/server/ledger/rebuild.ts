@@ -3,7 +3,7 @@ import { computeLedger } from '@/lib/domain/ledger/expected'
 import { nest } from '@/lib/domain/ledger/rollups'
 import { auditData } from './audit'
 import type { LedgerDeps } from './deps'
-import { acquireLock, releaseLock } from './lock'
+import { acquireLock, releaseLock, renewLock } from './lock'
 import { accountsCol, auditCol, rollupsCol } from './paths'
 import { buildReport, loadLedger, verifyLedger, type LedgerReport } from './verify'
 
@@ -22,11 +22,12 @@ export async function rebuildLedger(
   deps: LedgerDeps,
   orgId: string,
   uid: string,
-  opts: { apply: boolean },
+  opts: { apply: boolean; lock?: string },
 ): Promise<RebuildResult> {
   if (!opts.apply) return { ...(await verifyLedger(deps, orgId)), applied: false }
 
-  await acquireLock(deps, orgId, uid)
+  // A caller that already holds the lock (the migration) passes its token and keeps ownership of the release.
+  const token = opts.lock ?? (await acquireLock(deps, orgId, uid))
   try {
     const data = await loadLedger(deps, orgId)
     const expected = computeLedger(data.accounts, data.txs, data.baseCurrency)
@@ -57,12 +58,14 @@ export async function rebuildLedger(
     )
 
     for (let i = 0; i < ops.length; i += BATCH_SIZE) {
+      // The lease is 5 minutes and nobody else renews it: prove we still own it before every batch, and stop when we do not.
+      await renewLock(deps, orgId, token)
       const batch = deps.db.batch()
       for (const op of ops.slice(i, i + BATCH_SIZE)) op(batch)
       await batch.commit()
     }
     return { ...report, applied: true }
   } finally {
-    await releaseLock(deps, orgId)
+    if (opts.lock === undefined) await releaseLock(deps, orgId, token)
   }
 }

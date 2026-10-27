@@ -115,7 +115,7 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
     for (const [id, snap] of accountSnaps) {
       const account = snap.exists ? parseAccount(snap.id, snap.data()) : null
       if (!account) throw new LedgerError('conflict')
-      const assumed = job.next?.currencies[id]
+      const assumed = job.next && Object.hasOwn(job.next.currencies, id) ? job.next.currencies[id] : undefined
       if (assumed !== undefined && assumed !== account.currency) throw new LedgerError('conflict')
     }
     if (categorySnap !== null && job.next) {
@@ -137,6 +137,9 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
       const old = currentSnap.data() ?? {}
       t.set(txRef, {
         ...transactionToDoc(job.next.tx),
+        // Provenance of a migrated operation (S05 migration) outlives edits.
+        ...(job.prior && old.migratedFrom !== undefined ? { migratedFrom: old.migratedFrom } : {}),
+        ...(job.prior && old.legacy !== undefined ? { legacy: old.legacy } : {}),
         orgId,
         createdAt: job.prior ? (old.createdAt ?? ts) : ts,
         createdBy: job.prior ? (old.createdBy ?? uid) : uid,

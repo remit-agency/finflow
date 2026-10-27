@@ -123,6 +123,24 @@ describe('POST /transactions', () => {
     expect(ledger.createTransaction).not.toHaveBeenCalled()
   })
 
+  it('accepts the largest valid body (10 file URLs of 2048 characters, about 20 KB) and still answers 413 above the limit', async () => {
+    vi.mocked(ledger.createTransaction).mockResolvedValue({ transaction: TX, replayed: false } as never)
+    vi.mocked(ledger.updateTransaction).mockResolvedValue({ transaction: TX, replayed: false } as never)
+    const url = (i: number) => `https://files.example.com/${i}/`.padEnd(2048, 'a')
+    const fileUrls = Array.from({ length: 10 }, (_, i) => url(i))
+    const body = JSON.stringify({ ...BODY_TX, fileUrls })
+    expect(body.length).toBeGreaterThan(20_000)
+
+    const ok = await postTx(req('POST', '/api/orgs/org-acme/transactions', body), ctx())
+    expect(ok.status).toBe(201)
+    const patch = await patchTx(req('PATCH', '/api/orgs/org-acme/transactions/t1', JSON.stringify({ fileUrls })), ctx({ txId: 't1' }))
+    expect(patch.status).toBe(200)
+
+    const huge = JSON.stringify({ ...BODY_TX, description: 'x'.repeat(40_000) })
+    expect((await postTx(req('POST', '/api/orgs/org-acme/transactions', huge), ctx())).status).toBe(413)
+    expect((await patchTx(req('PATCH', '/api/orgs/org-acme/transactions/t1', huge), ctx({ txId: 't1' }))).status).toBe(413)
+  })
+
   it('answers 400 invalid_body for a body that is not JSON', async () => {
     const res = await postTx(req('POST', '/api/orgs/org-acme/transactions', '{nope'), ctx())
     expect(res.status).toBe(400)
