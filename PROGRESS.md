@@ -250,3 +250,51 @@ CashFlowChart (Recharts), PLTable, CalendarView, BalanceSheet, all 4 analytics p
 - **Закриті періоди:** не входять, редагувати можна будь-яку дату (слід в аудиті).
 - **Прибирання старої схеми:** поля `date`, `amount`, `balance` лишаються до `--drop-legacy` після розгортання.
 - **Права на рівні окремих рахунків:** пізніше.
+
+## 2026-10-27 — S06: контрагенти
+
+Спека: `docs/superpowers/specs/2026-10-27-s06-counterparties-design.md`. План: `docs/superpowers/plans/2026-10-27-s06-counterparties.md`.
+
+**Статус:** реалізовано в гілці `s06-counterparties`, чекає мерджа. НЕ розгорнуто: ні merge, ні правила Firestore, ні засівання на production не виконувались.
+
+### Зроблено
+- **Домен** (`lib/domain/counterparties/`, чисті функції): нормалізація назви, NIP і NRB, контрольні суми (NIP mod 11, NRB mod 97), розбір входу й PATCH, мапінг документа (schema 1), ключі унікальності, системні записи ZUS і Urząd Skarbowy, розбір відповіді Білої ліста, пошук для клієнта й вибору.
+- **Сервер** (`lib/server/counterparties/`): створення й зміна однією транзакцією Admin (документ, ключі `counterpartyKeys/nip_*` і `name_*`, аудит), `409 duplicate` з `field` і `existingId`, `409 limit` (5000), `409 conflict` при одночасному редагуванні. `vat` і `onWhitelist` виставляє лише сервер, клієнт їх не надсилає. `lookupNip` викликає API Білої ліста (таймаут 8 с, один повтор на мережеву помилку; збій це `502 lookup_unavailable` і не блокує збереження).
+- **Роути** `app/api/orgs/[orgId]/counterparties/`: POST, PATCH `[counterpartyId]`, GET `lookup` (лише owner і accountant). Видалення немає, є `archived`.
+- **Ліміт запитів:** `lib/server/rate-limit.ts` (ядро, приймає Firestore) і `rate-limit-guard.ts` (обгортка); `lookup` 30 на хвилину і 300 на годину, `/api/rates` 120 і 1200 (закриває відкритий пункт S04).
+- **Зв'язок з операціями:** запис леджера перевіряє новий `counterpartyId` у тій самій транзакції (`422 counterparty_not_found`, `422 counterparty_archived`).
+- **Правила Firestore:** `counterparties` читають усі члени, клієнтський запис закрито; `counterpartyKeys` і кореневий `rateLimits` закриті повністю.
+- **Інтерфейс:** розділ налаштувань «Контрагенти» (список, пошук за назвою й NIP, архівні, форма з «Підтягнути дані», бейджі VAT і білого списку), PL/EN/UA.
+- **`CounterpartyPicker`:** контрольований комбобокс для S07 (у форму операції не підключено).
+- **Засівання:** `seedSystemCounterparties` у транзакції створення компанії і `npm run seed:counterparties` для існуючих (dry-run за замовчуванням, `-- --apply --project=finflow-e94b5`, ідемпотентний).
+- **Документація:** блок «Counterparties (S06)» у `CLAUDE.md`, спека приведена у відповідність до реалізації (`vat` лише від сервера, 422 замість 400, `conflict`, формат лічильників `rateLimits`, правило підстановки IBAN).
+
+### Підсумок перевірок (2026-10-27, реально виміряно)
+- `npx tsc --noEmit`: чисто (код 0).
+- `npx eslint .`: 0 errors / 13 warnings (не більше, ніж було).
+- unit (`npx vitest run`): 1584 тести, 91 файл.
+- rules (`npm run test:rules`): 113 тестів, 2 файли.
+- integration (`npm run test:integration`, емулятор Firestore): 100 тестів, 9 файлів.
+- e2e (`firebase emulators:exec --only auth,firestore --project demo-finflow "npm run test:e2e"`): 72 passed (було 65 до S06), без падінь.
+- `npm run build`: ок (є роути `/[orgSlug]/settings/counterparties` і три роути `/api/orgs/[orgId]/counterparties`).
+- **Живий виклик Білої ліста MF** (Node `fetch`, не в CI): NIP 7740001454 дав HTTP 200, `statusVat` = `Czynny`.
+
+### Не перевірено
+- Справжня Біла ліста з CI (CI на мережу не покладається, там заглушка `tests/e2e/helpers/wl-stub.mjs`); формат відповіді підтверджує лише ручна перевірка вище.
+- `CounterpartyPicker` у браузері (немає браузерного тесту, доки S07 не підключить його до форми операції).
+- Гілка `conflict` (одночасне редагування одного контрагента) не має автоматичного тесту.
+- На `rateLimits` немає TTL-політики Firestore (поле `expiresAt` є, політику ще не створено).
+- Перша авторизована перевірка на production (створення контрагента, `lookup` з реальною сесією) не виконана.
+
+### Порядок розгортання
+1. Merge і Vercel.
+2. `firebase deploy --only firestore:rules --project finflow-e94b5 --account "$FIREBASE_ACCOUNT"` (нові колекції закриті, наявні не змінюються), потім `verify-firestore-rules`.
+3. `npm run seed:counterparties` (dry-run), після окремого «ок» власника `npm run seed:counterparties -- --apply --project=finflow-e94b5` (лише додає документи ZUS і Urząd Skarbowy).
+4. Опційно: TTL-політика Firestore для `rateLimits.expiresAt`.
+
+### Known follow-ups (S06)
+- Нічна синхронізація статусу VAT і білого списку (S18): зараз статус це знімок на день перевірки.
+- Фізособа без NIP і іноземний контрагент: лише ручне введення, ключ унікальності тільки за назвою.
+- Об'єднання дублів, що виникли поза системою (імпорт, S14).
+- Підключення `CounterpartyPicker` до форми операції і його браузерний тест (S07).
+- TTL-політика для `rateLimits`.
