@@ -126,6 +126,7 @@
     },
     "settingsSections": {
       "company": "Компанія",
+      "language": "Мова",
       "categories": "Категорії",
       "banks": "Банки",
       "subscription": "Підписка"
