@@ -11,8 +11,9 @@ rules_version = '2';
 //
 // Data shape:
 //   organizations/{orgId} { name, currency, ownerId, plan, trialEndsAt, createdAt }
-//   organizations/{orgId}/{accounts|categories|transactions|rollups|audit|bankConnections|ledger}/{docId}
-// Accounts, transactions, rollups, audit and ledger are written by the server only (S05).
+//   organizations/{orgId}/{accounts|categories|transactions|rollups|audit|bankConnections|ledger|counterparties|counterpartyKeys}/{docId}
+// Accounts, transactions, rollups, audit, ledger and counterparties are written by the server only (S05, S06); counterpartyKeys
+// (uniqueness keys) and the root rateLimits are not readable or writable by clients at all.
 //
 // The name `members` is reserved for memberships: the collection-group rule below applies to
 // every collection called `members`. New subcollections must be added to the lists below.
@@ -53,7 +54,7 @@ service cloud.firestore {
       }
 
       match /{subcollection}/{docId} {
-        allow read: if (subcollection in ['accounts', 'categories', 'transactions', 'rollups']
+        allow read: if (subcollection in ['accounts', 'categories', 'transactions', 'rollups', 'counterparties']
             && hasRole(orgId, ['owner', 'accountant', 'viewer']))
           || (subcollection in ['bankConnections', 'audit'] && hasRole(orgId, ['owner']));
 
