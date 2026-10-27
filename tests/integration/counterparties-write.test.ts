@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CounterpartyError } from '@/lib/domain/counterparties/errors'
+import { HttpError } from '@/lib/server/http-error'
 import type { WhitelistLookup } from '@/lib/domain/counterparties/whitelist'
 import type { CounterpartyDeps } from '@/lib/server/counterparties/deps'
 import { createCounterparty, updateCounterparty } from '@/lib/server/counterparties/write'
@@ -88,6 +89,28 @@ describe('createCounterparty', () => {
     expect(await ids(`organizations/${ORG}/counterpartyKeys`)).toEqual(['name_one', 'nip_7740001454'])
   })
 
+  it('a duplicate costs no white list call (checked before asking)', async () => {
+    await createCounterparty(makeCpDeps(), ORG, UID, { name: 'One', nip: '7740001454', ibans: [] })
+    const lookup = vi.fn(async () => FOUND)
+    const byNip = await failure(createCounterparty(makeCpDeps({ lookup }), ORG, UID, { name: 'Two', nip: '7740001454', ibans: [] }))
+    expect(byNip).toMatchObject({ code: 'duplicate', field: 'nip' })
+    const byName = await failure(createCounterparty(makeCpDeps({ lookup }), ORG, UID, { name: 'one', nip: '5252344078', ibans: [] }))
+    expect(byName).toMatchObject({ code: 'duplicate', field: 'name' })
+    expect(lookup).not.toHaveBeenCalled()
+  })
+
+  it('a refused white list question (429) rejects the create and saves nothing', async () => {
+    const lookup = async (): Promise<WhitelistLookup> => {
+      throw new HttpError(429, 'rate_limited')
+    }
+    await expect(createCounterparty(makeCpDeps({ lookup }), ORG, UID, { name: 'Orlen', nip: '7740001454', ibans: [] })).rejects.toMatchObject({
+      status: 429,
+      message: 'rate_limited',
+    })
+    expect(await ids(`organizations/${ORG}/counterparties`)).toEqual([])
+    expect(await ids(`organizations/${ORG}/counterpartyKeys`)).toEqual([])
+  })
+
   it('lets the same name live in two companies', async () => {
     await seedOrg(testDb(), 'org2')
     await createCounterparty(makeCpDeps(), ORG, UID, { name: 'Acme', ibans: [] })
@@ -132,6 +155,17 @@ describe('updateCounterparty', () => {
     expect(e).toMatchObject({ code: 'duplicate', field: 'nip', existingId: a.id })
     expect((await readDoc(testDb(), `organizations/${ORG}/counterparties/${b.id}`))?.nip).toBeUndefined()
     expect(await ids(`organizations/${ORG}/counterpartyKeys`)).toEqual(['name_a', 'name_b', 'nip_7740001454'])
+  })
+
+  it('a refused white list question (429) rejects the update and changes nothing', async () => {
+    const c = await createCounterparty(makeCpDeps(), ORG, UID, { name: 'Orlen', ibans: [] })
+    const lookup = async (): Promise<WhitelistLookup> => {
+      throw new HttpError(429, 'rate_limited')
+    }
+    await expect(updateCounterparty(makeCpDeps({ lookup }), ORG, UID, c.id, { nip: '7740001454' })).rejects.toMatchObject({ status: 429, message: 'rate_limited' })
+    expect((await readDoc(testDb(), `organizations/${ORG}/counterparties/${c.id}`))?.nip).toBeUndefined()
+    expect(await ids(`organizations/${ORG}/counterpartyKeys`)).toEqual(['name_orlen'])
+    expect(await auditActions(testDb(), ORG)).toEqual(['counterparty.create'])
   })
 
   it('archiving asks the white list nothing and keeps the keys', async () => {

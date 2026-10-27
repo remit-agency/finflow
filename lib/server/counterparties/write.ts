@@ -39,11 +39,18 @@ function duplicate(key: string, existing: { get: (f: string) => unknown }): Coun
 }
 
 export async function createCounterparty(deps: CounterpartyDeps, orgId: string, uid: string, input: CounterpartyInput): Promise<Counterparty> {
+  const keysCol = counterpartyKeysCol(deps.db, orgId)
+  // A duplicate must not cost a white list call. Not a guarantee (the transaction below is), only a cheap early exit.
+  const early = keysOf({ name: input.name, nip: input.nip })
+  const existing = await Promise.all(early.map((k) => keysCol.doc(k).get()))
+  existing.forEach((snap, i) => {
+    if (snap.exists) throw duplicate(early[i], snap)
+  })
+
   const found = input.nip === undefined ? null : await ask(deps, input.nip)
   const marks = found === null ? { ibans: unmarked(input.ibans) } : marksFrom(found, deps.today(), input.ibans)
 
   const ref = counterpartiesCol(deps.db, orgId).doc()
-  const keysCol = counterpartyKeysCol(deps.db, orgId)
   const c: Counterparty = {
     id: ref.id,
     name: input.name,

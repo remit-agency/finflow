@@ -24,10 +24,22 @@ function deps(): CounterpartyDeps {
   return { db: getAdmin().db, now: () => new Date(), today, lookup: (nip) => lookupNip(nip, today()) }
 }
 
+/** Like `deps()`, but every white list question counts against the caller's lookup limit (a 429 stops the save). */
+function limitedDeps(uid: string): CounterpartyDeps {
+  const d = deps()
+  return {
+    ...d,
+    lookup: async (nip) => {
+      await enforceRateLimit(uid, 'lookup', LOOKUP_LIMITS)
+      return d.lookup(nip)
+    },
+  }
+}
+
 /** The counterparties service bound to production Firestore, the MF white list and the Warsaw clock. */
 export const counterparties = {
-  create: (orgId: string, uid: string, input: CounterpartyInput) => createCounterparty(deps(), orgId, uid, input),
-  update: (orgId: string, uid: string, id: string, patch: CounterpartyPatch) => updateCounterparty(deps(), orgId, uid, id, patch),
+  create: (orgId: string, uid: string, input: CounterpartyInput) => createCounterparty(limitedDeps(uid), orgId, uid, input),
+  update: (orgId: string, uid: string, id: string, patch: CounterpartyPatch) => updateCounterparty(limitedDeps(uid), orgId, uid, id, patch),
   /** Counts against the caller's lookup limit, asks the white list and answers what it found (nothing is saved). */
   lookup: async (uid: string, nip: string): Promise<LookupAnswer> => {
     await enforceRateLimit(uid, 'lookup', LOOKUP_LIMITS)
