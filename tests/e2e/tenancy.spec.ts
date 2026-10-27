@@ -2,6 +2,7 @@ import { test, expect, type Browser, type Page } from '@playwright/test'
 import { UI_PASSWORD, registerViaUi, waitForHydration, waitForShell, type RegisteredUser } from './helpers/app-ui'
 import { EMULATOR_USER_PASSWORD, createEmulatorUser, signInEmulatorUser } from './helpers/emulator-auth'
 import { createDocAs, readDoc, seedDoc, seedMember } from './helpers/emulator-firestore'
+import { seedLedgerAccount, seedLedgerOperation } from './helpers/ledger-seed'
 
 const NEEDS_EMULATORS =
   'Needs the Auth + Firestore emulators. Run: firebase emulators:exec --only auth,firestore --project demo-finflow "npm run test:e2e"'
@@ -15,27 +16,13 @@ async function waitForAccess(page: Page): Promise<void> {
 
 // One account and one operation in the company, written as admin (like app-shell.spec.ts does).
 async function seedJournalRow(request: Parameters<typeof seedDoc>[0], orgId: string): Promise<void> {
-  await seedDoc(request, `organizations/${orgId}/accounts`, 'acc-tenancy', {
-    name: 'Alpha',
-    type: 'bank',
-    balance: 300,
-    currency: 'UAH',
-    color: '#00c896',
-    orgId,
-    createdAt: new Date(),
-  })
-  await seedDoc(request, `organizations/${orgId}/transactions`, 'tx-tenancy', {
+  await seedLedgerAccount(request, orgId, 'acc-tenancy', { name: 'Alpha', balance: 300, currency: 'UAH' })
+  await seedLedgerOperation(request, orgId, 'tx-tenancy', {
     type: 'income',
     accountId: 'acc-tenancy',
     amount: 120,
     currency: 'UAH',
-    date: new Date(),
     description: 'Оплата від Alpha',
-    isRecurring: false,
-    tags: [],
-    fileUrls: [],
-    orgId,
-    createdAt: new Date(),
   })
 }
 
@@ -130,9 +117,13 @@ test.describe('tenancy (emulators)', () => {
       await expect(v.getByTestId('insufficient-rights')).toBeVisible()
 
       // The protection is the rules, not the UI: the viewer's own token cannot write.
+      // Categories are the browser's to write (owner, accountant); accounts and operations are the server's (S05).
+      const category = { orgId: owner.orgId, name: 'x', type: 'expense', color: '#ef4444' }
+      expect(await createDocAs(request, viewerToken, `organizations/${owner.orgId}/categories`, 'viewer-write', category)).toBe(403)
       expect(await createDocAs(request, viewerToken, `organizations/${owner.orgId}/accounts`, 'viewer-write', { orgId: owner.orgId, name: 'x' })).toBe(403)
       const ownerToken = (await signInEmulatorUser(request, owner.email, owner.password)).idToken
-      expect(await createDocAs(request, ownerToken, `organizations/${owner.orgId}/accounts`, 'owner-write', { orgId: owner.orgId, name: 'x' })).toBe(200)
+      expect(await createDocAs(request, ownerToken, `organizations/${owner.orgId}/categories`, 'owner-write', category)).toBe(200)
+      expect(await createDocAs(request, ownerToken, `organizations/${owner.orgId}/accounts`, 'owner-write', { orgId: owner.orgId, name: 'x' })).toBe(403)
     } finally {
       await second.close()
     }
@@ -164,7 +155,8 @@ test.describe('tenancy (emulators)', () => {
       await a.goto(`/${owner.orgId}/settings/subscription`)
       await expect(a.getByTestId('insufficient-rights')).toBeVisible()
 
-      expect(await createDocAs(request, idToken, `organizations/${owner.orgId}/accounts`, 'acct-write', { orgId: owner.orgId, name: 'x' })).toBe(200)
+      expect(await createDocAs(request, idToken, `organizations/${owner.orgId}/categories`, 'acct-write', { orgId: owner.orgId, name: 'x', type: 'expense', color: '#ef4444' })).toBe(200)
+      expect(await createDocAs(request, idToken, `organizations/${owner.orgId}/accounts`, 'acct-write', { orgId: owner.orgId, name: 'x' })).toBe(403)
       expect(await createDocAs(request, idToken, `organizations/${owner.orgId}/bankConnections`, 'acct-bank', { orgId: owner.orgId })).toBe(403)
     } finally {
       await second.close()

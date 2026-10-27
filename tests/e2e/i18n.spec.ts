@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { registerViaUi, waitForHydration, waitForShell } from './helpers/app-ui'
 import { listDocs, seedDoc } from './helpers/emulator-firestore'
+import { seedLedgerAccount, seedLedgerOperation } from './helpers/ledger-seed'
 import en from '../../messages/en.json'
 import pl from '../../messages/pl.json'
 import uk from '../../messages/uk.json'
@@ -102,19 +103,11 @@ test.describe('language switching (emulators)', () => {
     expect(page.url()).toBe(route)
   })
 
-  test('in Polish "1 234,50" is typed, stored as 1234.5 and shown with the Polish decimal comma', async ({ page, request, context }) => {
+  test('in Polish "1 234,50" is typed, stored as 123450 minor units and shown with the Polish decimal comma', async ({ page, request, context }) => {
     const user = await registerViaUi(page, 'i18namount')
     await waitForShell(page, user.companyName)
     const accountName = `Konto ${Date.now()}`
-    await seedDoc(request, `organizations/${user.orgId}/accounts`, 'i18n-acc', {
-      name: accountName,
-      type: 'bank',
-      balance: 0,
-      currency: 'UAH',
-      color: '#00c896',
-      orgId: user.orgId,
-      createdAt: new Date(),
-    })
+    await seedLedgerAccount(request, user.orgId, 'i18n-acc', { name: accountName, balance: 0, currency: 'UAH' })
     await context.addCookies([{ name: 'NEXT_LOCALE', value: 'pl', url: ORIGIN }])
     await page.goto(`/${user.orgId}/transactions`)
     await waitForShell(page, user.companyName)
@@ -137,24 +130,16 @@ test.describe('language switching (emulators)', () => {
     await expect
       .poll(async () => {
         const docs = await listDocs(request, `organizations/${user.orgId}/transactions`)
-        const stored = docs[0]?.fields.amount
+        const stored = docs[0]?.fields.amountMinor
         return stored && 'doubleValue' in stored ? stored.doubleValue : stored && 'integerValue' in stored ? Number(stored.integerValue) : null
       })
-      .toBe(1234.5)
+      .toBe(123450)
   })
 
   test('a default category stored in Ukrainian is shown in the active language, a user category as stored', async ({ page, request, context }) => {
     const user = await registerViaUi(page, 'i18ncat')
     await waitForShell(page, user.companyName)
-    await seedDoc(request, `organizations/${user.orgId}/accounts`, 'cat-acc', {
-      name: 'Konto kat',
-      type: 'bank',
-      balance: 0,
-      currency: 'PLN',
-      color: '#00c896',
-      orgId: user.orgId,
-      createdAt: new Date(),
-    })
+    await seedLedgerAccount(request, user.orgId, 'cat-acc', { name: 'Konto kat', balance: 0, currency: 'PLN' })
     const rentStoredInUkrainian = uk.defaultCategories.expense.rent
     const userCategory = 'My shop'
     for (const [id, name] of [['cat-rent', rentStoredInUkrainian], ['cat-shop', userCategory]]) {
@@ -167,19 +152,13 @@ test.describe('language switching (emulators)', () => {
       })
     }
     for (const [id, categoryId, description] of [['cat-tx-rent', 'cat-rent', 'Rata za biuro'], ['cat-tx-shop', 'cat-shop', 'Zakupy sklep']]) {
-      await seedDoc(request, `organizations/${user.orgId}/transactions`, id, {
+      await seedLedgerOperation(request, user.orgId, id, {
         type: 'expense',
         accountId: 'cat-acc',
         categoryId,
         amount: 10,
         currency: 'PLN',
-        date: new Date(),
         description,
-        isRecurring: false,
-        tags: [],
-        fileUrls: [],
-        orgId: user.orgId,
-        createdAt: new Date(),
       })
     }
     await context.addCookies([{ name: 'NEXT_LOCALE', value: 'pl', url: ORIGIN }])
@@ -202,30 +181,16 @@ test.describe('language switching (emulators)', () => {
     await expect(page.getByLabel(uk.auth.register.currency, { exact: true })).toHaveText(/^PLN/)
   })
 
-  test('an amount with more than 2 decimals opens rounded, with the Polish comma, and a new operation takes its account currency', async ({ page, request, context }) => {
+  test('an existing amount opens with the Polish comma, and a new operation shows its account currency (no selector)', async ({ page, request, context }) => {
     const user = await registerViaUi(page, 'i18nprefill')
     await waitForShell(page, user.companyName)
-    await seedDoc(request, `organizations/${user.orgId}/accounts`, 'pln-acc', {
-      name: 'Konto PLN',
-      type: 'bank',
-      balance: 0,
-      currency: 'PLN',
-      color: '#00c896',
-      orgId: user.orgId,
-      createdAt: new Date(),
-    })
-    await seedDoc(request, `organizations/${user.orgId}/transactions`, 'prefill-tx', {
+    await seedLedgerAccount(request, user.orgId, 'pln-acc', { name: 'Konto PLN', balance: 0, currency: 'PLN' })
+    await seedLedgerOperation(request, user.orgId, 'prefill-tx', {
       type: 'income',
       accountId: 'pln-acc',
-      amount: 12.345,
+      amount: 12.35,
       currency: 'PLN',
-      date: new Date(),
       description: 'Ułamki',
-      isRecurring: false,
-      tags: [],
-      fileUrls: [],
-      orgId: user.orgId,
-      createdAt: new Date(),
     })
     await context.addCookies([{ name: 'NEXT_LOCALE', value: 'pl', url: ORIGIN }])
     await page.goto(`/${user.orgId}/transactions`)
@@ -236,15 +201,17 @@ test.describe('language switching (emulators)', () => {
     await row.getByRole('button', { name: /edytuj$/ }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByText(form.titleEdit, { exact: true })).toBeVisible()
-    // 12.345 used to be prefilled as "12.345", which the parser reads as twelve thousand.
+    // An amount is prefilled with the Polish comma ("12,35"), never as "12.35" (which the parser would misread).
     await expect(dialog.getByRole('tabpanel').getByLabel(form.amount, { exact: true })).toHaveValue('12,35')
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
 
-    // A new operation starts in the currency of the first account (here PLN), not in UAH.
+    // A new operation takes the currency of its account (the first one, here PLN), not the company's UAH.
+    // The form has no currency selector any more: the currency is shown as the account's, read-only.
     await page.getByRole('button', { name: pl.shell.header.expense, exact: true }).click()
     await expect(dialog.getByText(form.titleNew, { exact: true })).toBeVisible()
-    await expect(dialog.getByRole('tabpanel').locator('[data-slot="select-trigger"]')).toHaveText(/^PLN/)
+    await expect(dialog.getByRole('tabpanel').locator('[data-slot="select-trigger"]')).toHaveCount(0)
+    await expect(dialog.getByRole('tabpanel').getByText('PLN', { exact: true })).toBeVisible()
   })
 
   test('the language persists across a sign-out / sign-in cycle', async ({ page, context }) => {

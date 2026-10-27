@@ -2,6 +2,7 @@ import { test, expect, type APIRequestContext, type Locator, type Page } from '@
 import { registerViaUi, waitForShell } from './helpers/app-ui'
 import { signInEmulatorUser } from './helpers/emulator-auth'
 import { seedDoc, seedMember } from './helpers/emulator-firestore'
+import { seedLedgerAccount, seedLedgerOperation } from './helpers/ledger-seed'
 import { formatDayLongUtc } from '../../lib/utils/calendar-grid'
 import { formatPeriodLabel } from '../../lib/utils/period'
 
@@ -18,22 +19,8 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-async function seedAccount(
-  request: APIRequestContext,
-  orgId: string,
-  id: string,
-  data: { name: string; balance: number; currency: string; color?: string },
-): Promise<void> {
-  await seedDoc(request, `organizations/${orgId}/accounts`, id, {
-    name: data.name,
-    type: 'bank',
-    balance: data.balance,
-    currency: data.currency,
-    color: data.color ?? '#00c896',
-    orgId,
-    createdAt: new Date(),
-  })
-}
+// Schema 2 seeds (tests/e2e/helpers/ledger-seed.ts): the browser cannot write accounts or operations.
+const seedAccount = seedLedgerAccount
 
 async function seedIncome(
   request: APIRequestContext,
@@ -43,19 +30,7 @@ async function seedIncome(
   amount: number,
   description: string,
 ): Promise<void> {
-  await seedDoc(request, `organizations/${orgId}/transactions`, id, {
-    type: 'income',
-    accountId,
-    amount,
-    currency: 'UAH',
-    date: new Date(),
-    description,
-    isRecurring: false,
-    tags: [],
-    fileUrls: [],
-    orgId,
-    createdAt: new Date(),
-  })
+  await seedLedgerOperation(request, orgId, id, { type: 'income', accountId, amount, currency: 'UAH', description })
 }
 
 /** Two UAH accounts with one income each, plus a EUR account (left out of the company total). */
@@ -579,18 +554,13 @@ async function seedReportData(request: APIRequestContext, orgId: string) {
   ]
   await seedAccount(request, orgId, 'acc-rep', { name: 'Reports', balance: 0, currency: 'UAH' })
   for (const t of txs) {
-    await seedDoc(request, `organizations/${orgId}/transactions`, t.id, {
+    await seedLedgerOperation(request, orgId, t.id, {
       type: 'income',
       accountId: 'acc-rep',
       amount: t.amount,
       currency: 'UAH',
       date: t.date,
       description: `Report ${t.id}`,
-      isRecurring: false,
-      tags: [],
-      fileUrls: [],
-      orgId,
-      createdAt: new Date(),
     })
   }
   const prevMonthInThisYear = prevMonthDay(10).getUTCFullYear() === y
