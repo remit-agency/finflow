@@ -25,6 +25,10 @@ interface Props {
   /** Absent: a new counterparty. */
   counterparty?: Counterparty
   onClose: () => void
+  /** The starting name and NIP of a NEW counterparty (what was typed in a picker); ignored when editing. */
+  initial?: { name?: string; nip?: string }
+  /** Called with the saved counterparty after a successful save, before `onClose`. */
+  onSaved?: (counterparty: Counterparty) => void
   /** Called with the id of the counterparty a duplicate error points at; the parent may switch to it. */
   onOpenExisting?: (id: string) => void
 }
@@ -44,14 +48,14 @@ function sameList(a: readonly string[], b: readonly string[]): boolean {
 
 type Duplicate = { field: 'nip' | 'name'; existingId: string }
 
-export function CounterpartyForm({ orgId, counterparty, onClose, onOpenExisting }: Props) {
+export function CounterpartyForm({ orgId, counterparty, onClose, initial, onSaved, onOpenExisting }: Props) {
   const t = useTranslations('settings.counterparties')
   const tCommon = useTranslations('common')
   const { date } = useFormatters()
   const isEdit = counterparty !== undefined
 
-  const [name, setName] = useState(counterparty?.name ?? '')
-  const [nip, setNip] = useState(counterparty?.nip ?? '')
+  const [name, setName] = useState(counterparty?.name ?? initial?.name ?? '')
+  const [nip, setNip] = useState(counterparty?.nip ?? initial?.nip ?? '')
   const [address, setAddress] = useState(counterparty?.address ?? '')
   const [ibans, setIbans] = useState<string[]>(counterparty?.ibans.map((i) => i.iban) ?? [])
   const [vat, setVat] = useState<Vat | null>(counterparty?.vat ?? null)
@@ -146,16 +150,18 @@ export function CounterpartyForm({ orgId, counterparty, onClose, onOpenExisting 
           onClose()
           return
         }
-        await updateCounterparty(orgId, counterparty.id, patch)
+        const saved = await updateCounterparty(orgId, counterparty.id, patch)
         toast.success(t('toast.saved'))
+        onSaved?.(saved)
       } else {
-        await createCounterparty(orgId, {
+        const created = await createCounterparty(orgId, {
           name: trimmedName,
           ibans: ibanList,
           ...(nipDigits === null ? {} : { nip: nipDigits }),
           ...(addressText === '' ? {} : { address: addressText }),
         })
         toast.success(t('toast.created'))
+        onSaved?.(created)
       }
       onClose()
     } catch (e) {

@@ -39,6 +39,9 @@ export function CounterpartyPicker({ counterparties, value, onChange, onCreate, 
     ...(onCreate ? [{ kind: 'create' } as Row] : []),
   ]
 
+  /** `active` can outlive the rows it pointed at when the query narrows the list. */
+  const activeIndex = Math.min(active, rows.length - 1)
+
   const close = () => {
     setOpen(false)
     setQuery('')
@@ -56,13 +59,16 @@ export function CounterpartyPicker({ counterparties, value, onChange, onCreate, 
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setOpen(true)
-      setActive((i) => Math.min(i + 1, rows.length - 1))
+      setActive(Math.min(activeIndex + 1, rows.length - 1))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setActive((i) => Math.max(i - 1, 0))
+      setActive(Math.max(activeIndex - 1, 0))
     } else if (e.key === 'Enter' && open) {
       e.preventDefault()
-      choose(rows[Math.min(active, rows.length - 1)])
+      const row = rows[activeIndex]
+      // Nothing matched what was typed: Enter must not clear the selection (a click on «none» still does).
+      if (row.kind === 'none' && query !== '') return
+      choose(row)
     } else if (e.key === 'Escape' && open) {
       e.preventDefault()
       close()
@@ -80,7 +86,7 @@ export function CounterpartyPicker({ counterparties, value, onChange, onCreate, 
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"
-        aria-activedescendant={open ? `${listId}-${active}` : undefined}
+        aria-activedescendant={open ? `${listId}-${activeIndex}` : undefined}
         aria-label={t('label')}
         placeholder={t('placeholder')}
         disabled={disabled}
@@ -113,7 +119,7 @@ export function CounterpartyPicker({ counterparties, value, onChange, onCreate, 
                 choose(row)
               }}
               onMouseEnter={() => setActive(index)}
-              className={cn('flex cursor-pointer items-center gap-2 px-3 py-2 text-sm', index === active && 'bg-canvas', row.kind === 'none' && 'text-ink-muted')}
+              className={cn('flex cursor-pointer items-center gap-2 px-3 py-2 text-sm', index === activeIndex && 'bg-canvas', row.kind === 'none' && 'text-ink-muted')}
             >
               {row.kind === 'create' && <Plus className="size-4" aria-hidden />}
               <span className="min-w-0 flex-1 truncate">{label(row)}</span>
@@ -121,7 +127,7 @@ export function CounterpartyPicker({ counterparties, value, onChange, onCreate, 
               {row.kind === 'item' && row.counterparty.id === value && <Check className="size-4" aria-hidden />}
             </li>
           ))}
-          {matches.length === 0 && <li className="px-3 py-2 text-sm text-ink-muted">{t('noMatches')}</li>}
+          {matches.length === 0 && <li role="presentation" className="px-3 py-2 text-sm text-ink-muted">{t('noMatches')}</li>}
         </ul>
       )}
     </div>
