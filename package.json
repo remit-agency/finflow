@@ -11,6 +11,8 @@
     "check:server-imports": "node scripts/check-server-imports.mjs",
     "test:unit": "vitest run --config vitest.config.ts",
     "test:rules": "firebase emulators:exec --only firestore --project demo-finflow \"vitest run --config vitest.rules.config.ts\"",
+    "test:integration": "firebase emulators:exec --only firestore --project demo-finflow \"vitest run --config vitest.integration.config.ts\"",
+    "migrate:ledger": "node --conditions=react-server --import tsx scripts/migrate-ledger-v2.ts",
     "test:e2e": "playwright test",
     "ui:shots": "firebase emulators:exec --only auth,firestore --project demo-finflow \"playwright test --config playwright.shots.config.ts\""
   },
@@ -46,6 +48,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.5"
   },

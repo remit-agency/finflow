@@ -12,9 +12,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createAccount, updateAccount } from '@/lib/firebase/accounts'
+import { toast } from 'sonner'
+import { createAccount, updateAccount, LedgerApiError } from '@/lib/api/ledger-client'
 import { useFormatters } from '@/lib/i18n/useFormatters'
-import { formatAmountInput, parseAmountInput, roundAmount } from '@/lib/utils/amount-input'
+import { formatAmountInput, parseSignedAmountInput } from '@/lib/utils/amount-input'
 import type { Account } from '@/types'
 
 const PRESET_COLORS = [
@@ -52,7 +53,7 @@ export function AccountForm({ orgId, account, defaultCurrency, open, onClose }: 
 
   const [name, setName] = useState(account?.name ?? '')
   const [type, setType] = useState<Account['type']>(account?.type ?? 'bank')
-  const [balance, setBalance] = useState(formatAmountInput(account?.balance ?? 0, locale))
+  const [balance, setBalance] = useState(formatAmountInput(account?.opening ?? 0, locale))
   const [currency, setCurrency] = useState(account?.currency ?? defaultCurrency ?? FALLBACK_CURRENCY)
   const [color, setColor] = useState(account?.color ?? PRESET_COLORS[0])
   const [loading, setLoading] = useState(false)
@@ -61,9 +62,9 @@ export function AccountForm({ orgId, account, defaultCurrency, open, onClose }: 
   const validate = (): boolean => {
     const errs: typeof errors = {}
     if (!name.trim()) errs.name = t('errors.name')
-    // parseAmountInput reads only non-negative amounts (a minus sign gives null), which is the
-    // rule this form has always had: the opening balance may be 0 but not below it.
-    if (parseAmountInput(balance) === null) errs.balance = t('errors.balance')
+    // The opening balance may be negative: the migration stores the legacy balance minus the sum of
+    // the operations, and the prefilled `-0,10` must stay valid so the account can still be edited.
+    if (parseSignedAmountInput(balance) === null) errs.balance = t('errors.balance')
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -76,10 +77,10 @@ export function AccountForm({ orgId, account, defaultCurrency, open, onClose }: 
       const data = {
         name: name.trim(),
         type,
-        // validate() has already refused anything parseAmountInput cannot read.
-        balance: roundAmount(parseAmountInput(balance) ?? 0),
         currency,
         color,
+        // validate() has already refused anything parseSignedAmountInput cannot read.
+        opening: parseSignedAmountInput(balance) ?? 0,
       }
       if (isEdit) {
         await updateAccount(orgId, account.id, data)
@@ -87,8 +88,8 @@ export function AccountForm({ orgId, account, defaultCurrency, open, onClose }: 
         await createAccount(orgId, data)
       }
       onClose()
-    } catch {
-      // error handled silently; in production add toast
+    } catch (e) {
+      toast.error(e instanceof LedgerApiError && e.code === 'account_has_operations' ? t('errors.hasOperations') : t('errors.save'))
     } finally {
       setLoading(false)
     }
@@ -127,7 +128,7 @@ export function AccountForm({ orgId, account, defaultCurrency, open, onClose }: 
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="acc-balance">{t('balance')}</Label>
+              <Label htmlFor="acc-balance">{t('opening')}</Label>
               {/* Text, not number: a number field rejects `1 234,50` and depends on the browser's locale. */}
               <Input
                 id="acc-balance"

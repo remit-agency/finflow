@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { doc, updateDoc } from 'firebase/firestore'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +11,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useOrg } from '@/lib/hooks/useOrg'
 import { useShell } from '@/lib/hooks/useShell'
-import { db } from '@/lib/firebase/firebase'
+import { LedgerApiError, updateOrganization } from '@/lib/api/ledger-client'
 
 // Codes only; the labels live in the catalogs (settings.company.currencies.<code>).
 const CURRENCIES = ['UAH', 'EUR', 'USD', 'PLN'] as const
@@ -46,9 +45,9 @@ export default function CompanySettingsPage() {
     if (!canEdit || !orgId || trimmedName.length === 0) return
     setSaving(true)
     try {
-      await updateDoc(doc(db, 'organizations', orgId), { name: trimmedName, currency })
-    } catch {
-      toast.error(t('saveFailed'))
+      await updateOrganization(orgId, { name: trimmedName, currency })
+    } catch (e) {
+      toast.error(e instanceof LedgerApiError && e.code === 'currency_locked' ? t('currencyLocked') : t('saveFailed'))
       setSaving(false)
       return
     }

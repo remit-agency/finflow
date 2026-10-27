@@ -1,0 +1,211 @@
+// Pure planner for the schema 1 -> schema 2 ledger migration (S05). No I/O, no Firebase: unit-tested in Vitest.
+import { fxPlan, type FxRequest } from '@/lib/domain/ledger/build'
+import { isDay, toDay } from '@/lib/domain/ledger/days'
+import { accountToDoc } from '@/lib/domain/ledger/doc'
+import { balanceEffects } from '@/lib/domain/ledger/effects'
+import { isId } from '@/lib/domain/ledger/guards'
+import { toMinor } from '@/lib/domain/ledger/money'
+import { ACCOUNT_TYPES, LEDGER_CURRENCIES, TX_TYPES, type LedgerAccount, type LedgerTransaction } from '@/lib/domain/ledger/types'
+
+export interface LegacyDoc {
+  id: string
+  /** `date` must already be a Date (the caller converts the Firestore Timestamp). */
+  data: Record<string, unknown>
+}
+
+export interface PlanInput {
+  baseCurrency: string
+  /** The Warsaw day. */
+  today: string
+  /** Account documents that are not schema 2 yet. */
+  legacyAccounts: LegacyDoc[]
+  /** Accounts already schema 2: id -> currency. */
+  migratedAccounts: ReadonlyMap<string, string>
+  /** Operation documents that are not schema 2 yet. */
+  legacyTxs: LegacyDoc[]
+  /** Operations a previous run migrated (marker `migratedFrom: 'v1'`); they still count for a legacy account's opening balance. */
+  markedTxs: LedgerTransaction[]
+  /** Accounts whose opening balance is forced to 0 (balance becomes the sum of operations). */
+  resetOpening: ReadonlySet<string>
+}
+
+export interface PlannedAccount {
+  id: string
+  fields: Record<string, unknown>
+  legacyBalanceMinor: number
+  sumMinor: number
+  openingMinor: number
+  balanceMinor: number
+}
+
+export interface PlannedTx {
+  id: string
+  tx: LedgerTransaction
+  /** Set when the legacy `currency` differed from the account's; kept as `legacy.currency`. */
+  legacyCurrency?: string
+  fxRequests: FxRequest[]
+}
+
+export interface Plan {
+  accounts: PlannedAccount[]
+  txs: PlannedTx[]
+  skipped: Array<{ kind: 'account' | 'tx'; id: string; reason: string }>
+  counters: Counters
+}
+
+export interface Counters {
+  currencyMismatch: number
+  transferAmountAssumed: number
+  futureActual: number
+  /** A category, project or counterparty reference that is not a valid id: the field was left out. */
+  invalidReference: number
+  /** A description, tags or fileUrls value that exceeded the API limits and was shortened or lost entries. */
+  trimmed: number
+}
+
+const HEX = /^#[0-9a-fA-F]{6}$/
+const DEFAULT_COLOR = '#00c896'
+
+// The limits of parseTransactionInput (lib/domain/ledger/input.ts).
+const MAX_DESCRIPTION = 500
+const MAX_TAGS = 20
+const MAX_TAG_LENGTH = 50
+const MAX_FILE_URLS = 10
+const MAX_FILE_URL_LENGTH = 2048
+
+function str(v: unknown): string | undefined {
+  return typeof v === 'string' && v.length > 0 ? v : undefined
+}
+
+/** Strings of 1..maxLength characters, at most maxItems of them. `lossy` is true when anything was dropped. */
+function limitedList(v: unknown, maxItems: number, maxLength: number): { list: string[]; lossy: boolean } {
+  if (!Array.isArray(v)) return { list: [], lossy: false }
+  const valid = v.filter((s): s is string => typeof s === 'string' && s.length > 0 && s.length <= maxLength)
+  const list = valid.slice(0, maxItems)
+  return { list, lossy: list.length !== v.length }
+}
+
+function cutText(text: string, max: number): string {
+  if (text.length <= max) return text
+  const end = text.charCodeAt(max - 1) >= 0xd800 && text.charCodeAt(max - 1) <= 0xdbff ? max - 1 : max // keep surrogate pairs whole
+  return text.slice(0, end)
+}
+
+export function planOrg(input: PlanInput): Plan {
+  const skipped: Plan['skipped'] = []
+  const counters: Counters = { currencyMismatch: 0, transferAmountAssumed: 0, futureActual: 0, invalidReference: 0, trimmed: 0 }
+  /** A reference to another document: kept only if the API would accept it. null/undefined mean "none" and are not counted. */
+  const reference = (v: unknown): string | undefined => {
+    if (v === undefined || v === null) return undefined
+    if (isId(v)) return v
+    counters.invalidReference++
+    return undefined
+  }
+  const known = new Map<string, string>(input.migratedAccounts)
+
+  const legacy: Array<{ id: string; account: LedgerAccount; legacyBalanceMinor: number }> = []
+  for (const { id, data } of input.legacyAccounts) {
+    const name = str(data.name)?.trim()
+    const currency = data.currency
+    const balance = data.balance
+    if (!name) { skipped.push({ kind: 'account', id, reason: 'invalid_name' }); continue }
+    if (!(LEDGER_CURRENCIES as readonly unknown[]).includes(currency)) { skipped.push({ kind: 'account', id, reason: 'invalid_currency' }); continue }
+    if (typeof balance !== 'number' || !Number.isFinite(balance) || Math.abs(balance) > 1e11) { skipped.push({ kind: 'account', id, reason: 'invalid_balance' }); continue }
+    const type = (ACCOUNT_TYPES as readonly unknown[]).includes(data.type) ? (data.type as LedgerAccount['type']) : 'bank'
+    const color = typeof data.color === 'string' && HEX.test(data.color) ? data.color : DEFAULT_COLOR
+    const legacyBalanceMinor = toMinor(balance)
+    known.set(id, currency as string)
+    legacy.push({
+      id,
+      legacyBalanceMinor,
+      account: { id, name, type, currency: currency as string, color, openingMinor: 0, balanceMinor: legacyBalanceMinor },
+    })
+  }
+
+  const txs: PlannedTx[] = []
+  for (const { id, data } of input.legacyTxs) {
+    const type = data.type
+    const accountId = str(data.accountId)
+    const amount = data.amount
+    const date = data.date
+    if (!(TX_TYPES as readonly unknown[]).includes(type)) { skipped.push({ kind: 'tx', id, reason: 'invalid_type' }); continue }
+    if (!accountId || !known.has(accountId)) { skipped.push({ kind: 'tx', id, reason: 'unknown_account' }); continue }
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 1e11) { skipped.push({ kind: 'tx', id, reason: 'invalid_amount' }); continue }
+    const amountMinor = toMinor(amount)
+    if (amountMinor < 1) { skipped.push({ kind: 'tx', id, reason: 'invalid_amount' }); continue }
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) { skipped.push({ kind: 'tx', id, reason: 'invalid_date' }); continue }
+    const paymentDate = toDay(date)
+    if (!isDay(paymentDate) || paymentDate < '2000-01-01') { skipped.push({ kind: 'tx', id, reason: 'invalid_date' }); continue }
+
+    const currency = known.get(accountId) as string
+    const tx: LedgerTransaction = {
+      id,
+      type: type as LedgerTransaction['type'],
+      status: 'actual',
+      accountId,
+      amountMinor,
+      currency,
+      paymentDate,
+      accrual: { mode: 'date', date: paymentDate },
+      isRecurring: data.isRecurring === true,
+      tags: [],
+      fileUrls: [],
+    }
+    const planned: PlannedTx = { id, tx, fxRequests: [] }
+
+    // Nothing is counted for an operation that ends up skipped, so the checks that can skip it come first.
+    if (type === 'transfer') {
+      const to = data.counterpartyId
+      if (!isId(to) || !known.has(to)) { skipped.push({ kind: 'tx', id, reason: 'unknown_target' }); continue }
+      if (to === accountId) { skipped.push({ kind: 'tx', id, reason: 'same_account' }); continue }
+      tx.toAccountId = to
+      tx.toCurrency = known.get(to) as string
+      tx.toAmountMinor = amountMinor
+      if (tx.toCurrency !== currency) counters.transferAmountAssumed++
+    } else {
+      const categoryId = reference(data.categoryId)
+      if (categoryId) tx.categoryId = categoryId
+      const counterpartyId = reference(data.counterpartyId)
+      if (counterpartyId) tx.counterpartyId = counterpartyId
+    }
+    const rawDescription = str(data.description)?.trim()
+    if (rawDescription) {
+      const description = cutText(rawDescription, MAX_DESCRIPTION).trim()
+      if (description.length < rawDescription.length) counters.trimmed++
+      if (description) tx.description = description
+    }
+    const projectId = reference(data.projectId)
+    if (projectId) tx.projectId = projectId
+    const tags = limitedList(data.tags, MAX_TAGS, MAX_TAG_LENGTH)
+    const fileUrls = limitedList(data.fileUrls, MAX_FILE_URLS, MAX_FILE_URL_LENGTH)
+    tx.tags = tags.list
+    tx.fileUrls = fileUrls.list
+    if (tags.lossy) counters.trimmed++
+    if (fileUrls.lossy) counters.trimmed++
+
+    if (typeof data.currency === 'string' && data.currency !== currency) {
+      planned.legacyCurrency = data.currency
+      counters.currencyMismatch++
+    }
+    if (paymentDate > input.today) counters.futureActual++
+    planned.fxRequests = fxPlan(tx, input.baseCurrency, input.today)
+    txs.push(planned)
+  }
+
+  // Opening balance of a legacy account = legacy balance - sum of the effects of all its operations
+  // (the ones being migrated now and the ones a previous run migrated).
+  const sums = new Map<string, number>()
+  for (const t of [...txs.map((p) => p.tx), ...input.markedTxs]) {
+    for (const [accountId, delta] of Object.entries(balanceEffects(t))) sums.set(accountId, (sums.get(accountId) ?? 0) + delta)
+  }
+  const accounts: PlannedAccount[] = legacy.map(({ id, account, legacyBalanceMinor }) => {
+    const sumMinor = sums.get(id) ?? 0
+    const reset = input.resetOpening.has(id)
+    const openingMinor = reset ? 0 : legacyBalanceMinor - sumMinor
+    const balanceMinor = reset ? sumMinor : legacyBalanceMinor
+    const final: LedgerAccount = { ...account, openingMinor, balanceMinor }
+    return { id, fields: accountToDoc(final), legacyBalanceMinor, sumMinor, openingMinor, balanceMinor }
+  })
+
+  return { accounts, txs, skipped, counters }
+}

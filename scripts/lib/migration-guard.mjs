@@ -16,13 +16,23 @@ const DESTRUCTIVE_SKIP_REASONS = ['invalid_role', 'invalid_uid']
  * `--rules-deployed` (the S02 app is deployed and the new firestore.rules are live: once the legacy
  * `members` field is gone, the OLD rules and the OLD app would lock every member out).
  *
- * @param {{ emulator: boolean, apply: boolean, drop: boolean, args: Iterable<string> }} input
+ * `dropFlag` and `rulesStatement` only change the wording of the refusal, so another migration (the S05 ledger
+ * migration: `--drop-legacy`) can reuse the same checks.
+ *
+ * @param {{ emulator: boolean, apply: boolean, drop: boolean, args: Iterable<string>, dropFlag?: string, rulesStatement?: string }} input
  * @returns {{ ok: true } | { ok: false, exitCode: 2, message: string }}
  */
-export function assertProductionFlags({ emulator, apply, drop, args }) {
+export function assertProductionFlags({
+  emulator,
+  apply,
+  drop,
+  args,
+  dropFlag = '--drop-members-map',
+  rulesStatement = 'the S02 app is deployed and the new firestore rules are live (the old rules and the old app read the members field)',
+}) {
   if (emulator || (!apply && !drop)) return { ok: true }
   const flags = new Set(args)
-  const mode = drop ? '--drop-members-map' : '--apply'
+  const mode = drop ? dropFlag : '--apply'
 
   if (!flags.has(PRODUCTION_PROJECT_FLAG)) {
     return {
@@ -36,8 +46,8 @@ export function assertProductionFlags({ emulator, apply, drop, args }) {
       ok: false,
       exitCode: 2,
       message:
-        `REFUSED: --drop-members-map against PRODUCTION also needs ${RULES_DEPLOYED_FLAG}, your statement that the S02 app is deployed ` +
-        'and the new firestore rules are live (the old rules and the old app read the members field). Nothing was read or written.',
+        `REFUSED: ${dropFlag} against PRODUCTION also needs ${RULES_DEPLOYED_FLAG}, your statement that ${rulesStatement}. ` +
+        'Nothing was read or written.',
     }
   }
   return { ok: true }

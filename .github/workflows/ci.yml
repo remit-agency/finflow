@@ -71,6 +71,9 @@ jobs:
       - name: Firestore rules tests (emulator)
         run: npm run test:rules
 
+      - name: Ledger integration tests (emulator)
+        run: npm run test:integration
+
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 

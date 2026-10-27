@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { addDays } from '@/lib/server/fx/days'
+import { addDays } from '@/lib/domain/ledger/days'
 import type { FxStore } from '@/lib/server/fx/store'
 import { FxError, type MonthDoc, type NbpTable } from '@/lib/server/fx/types'
 

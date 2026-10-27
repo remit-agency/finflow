@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 import { registerViaUi, waitForShell } from '../e2e/helpers/app-ui'
 import { seedDoc } from '../e2e/helpers/emulator-firestore'
+import { seedLedgerAccount, seedLedgerOperation } from '../e2e/helpers/ledger-seed'
 import { formatDayLongUtc } from '../../lib/utils/calendar-grid'
 import en from '../../messages/en.json'
 import pl from '../../messages/pl.json'
@@ -30,15 +31,7 @@ async function seedDemoData(request: APIRequestContext, orgId: string): Promise<
     { id: 'demo-eur', name: 'Рахунок EUR', balance: 1250, currency: 'EUR', color: '#6366f1' },
   ]
   for (const a of accounts) {
-    await seedDoc(request, `${base}/accounts`, a.id, {
-      name: a.name,
-      type: 'bank',
-      balance: a.balance,
-      currency: a.currency,
-      color: a.color,
-      orgId,
-      createdAt: new Date(now),
-    })
+    await seedLedgerAccount(request, orgId, a.id, { name: a.name, balance: a.balance, currency: a.currency, color: a.color })
   }
   await seedDoc(request, `${base}/categories`, 'demo-rent', {
     name: 'Оренда офісу (демо)',
@@ -54,15 +47,15 @@ async function seedDemoData(request: APIRequestContext, orgId: string): Promise<
     orgId,
     createdAt: new Date(now),
   })
-  const txs: { id: string; type: string; accountId: string; amount: number; daysAgo: number; description: string; categoryId?: string; counterpartyId?: string }[] = [
+  const txs: { id: string; type: 'income' | 'expense' | 'transfer'; accountId: string; amount: number; daysAgo: number; description: string; categoryId?: string; toAccountId?: string }[] = [
     { id: 'demo-t1', type: 'income', accountId: 'demo-main', amount: 18500, daysAgo: 0, description: 'Оплата рахунку №112', categoryId: 'demo-sales' },
     { id: 'demo-t2', type: 'expense', accountId: 'demo-main', amount: 12000, daysAgo: 0, description: 'Оренда офісу', categoryId: 'demo-rent' },
     { id: 'demo-t3', type: 'expense', accountId: 'demo-cash', amount: 640.5, daysAgo: 1, description: 'Канцелярія' },
     { id: 'demo-t4', type: 'income', accountId: 'demo-main', amount: 7300, daysAgo: 2, description: 'Консультація', categoryId: 'demo-sales' },
-    { id: 'demo-t5', type: 'transfer', accountId: 'demo-main', amount: 2000, daysAgo: 2, description: 'Поповнення каси', counterpartyId: 'demo-cash' },
+    { id: 'demo-t5', type: 'transfer', accountId: 'demo-main', amount: 2000, daysAgo: 2, description: 'Поповнення каси', toAccountId: 'demo-cash' },
   ]
   for (const t of txs) {
-    await seedDoc(request, `${base}/transactions`, t.id, {
+    await seedLedgerOperation(request, orgId, t.id, {
       type: t.type,
       accountId: t.accountId,
       amount: t.amount,
@@ -70,12 +63,8 @@ async function seedDemoData(request: APIRequestContext, orgId: string): Promise<
       date: new Date(now - t.daysAgo * DAY_MS),
       description: t.description,
       categoryId: t.categoryId,
-      counterpartyId: t.counterpartyId,
-      isRecurring: false,
-      tags: [],
-      fileUrls: [],
-      orgId,
-      createdAt: new Date(now),
+      // Both accounts are in UAH: the received amount is the sent one.
+      ...(t.toAccountId ? { toAccountId: t.toAccountId, toAmount: t.amount, toCurrency: 'UAH' } : {}),
     })
   }
 }

@@ -54,6 +54,20 @@ export function parseAmountInput(text: string): number | null {
   return Number.isFinite(value) ? value : null
 }
 
+/**
+ * Like `parseAmountInput` for a field that may be negative (an opening balance: the migration
+ * stores legacy balance minus the sum of operations, which can be below zero). An optional leading
+ * `-` or the Unicode minus `−` (U+2212), optionally followed by spaces, then exactly what
+ * `parseAmountInput` accepts. `-0` is 0, never -0. `+5`, a trailing or doubled sign give null.
+ */
+export function parseSignedAmountInput(text: string): number | null {
+  const s = text.replace(/^[\s  ]+/, '')
+  const negative = s.startsWith('-') || s.startsWith('−')
+  const value = parseAmountInput(negative ? s.slice(1) : s)
+  if (value === null) return null
+  return negative && value !== 0 ? -value : value
+}
+
 interface DecimalParts {
   negative: boolean
   /** Digits before the decimal mark, no leading zeros (`0` for none). */

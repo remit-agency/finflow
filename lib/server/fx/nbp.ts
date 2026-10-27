@@ -1,5 +1,5 @@
 import 'server-only'
-import { isDay } from '@/lib/server/fx/days'
+import { isDay } from '@/lib/domain/ledger/days'
 import { FxError, type NbpTable } from '@/lib/server/fx/types'
 
 const BASE = 'https://api.nbp.pl/api/exchangerates/tables/A'

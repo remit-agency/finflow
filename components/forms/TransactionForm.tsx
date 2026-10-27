@@ -12,25 +12,23 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 // Note: account/category selects use native <select> for reliable display
 import { Badge } from '@/components/ui/badge'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { createTransaction, updateTransaction } from '@/lib/firebase/transactions'
+import { toast } from 'sonner'
+import { createTransaction, updateTransaction } from '@/lib/api/ledger-client'
+import {
+  buildCreateDraft,
+  buildEditDraft,
+  categoryAfterTypeChange,
+  type FormOwnedDraft,
+} from '@/lib/api/transaction-draft'
 import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { useFormatters } from '@/lib/i18n/useFormatters'
-import { formatAmountInput, parseAmountInput, roundAmount } from '@/lib/utils/amount-input'
+import { formatAmountInput, parseAmountInput } from '@/lib/utils/amount-input'
 import { todayUtcDay } from '@/lib/utils/today'
 import type { Transaction, Account, Category } from '@/types'
-
-const CURRENCIES = ['UAH', 'EUR', 'USD', 'PLN']
 
 /** Used when neither the account nor the company says which currency to preselect. */
 const FALLBACK_CURRENCY = 'PLN'
@@ -69,16 +67,14 @@ export function TransactionForm({
   const { locale } = useFormatters()
   const categoryName = useCategoryName()
   const isEdit = !!transaction
-  const currencyOf = (id: string) => accounts.find((a) => a.id === id)?.currency ?? defaultCurrency ?? FALLBACK_CURRENCY
 
   const [type, setType] = useState<Transaction['type']>(transaction?.type ?? defaultType)
   const [accountId, setAccountId] = useState(transaction?.accountId ?? accounts[0]?.id ?? '')
-  const [toAccountId, setToAccountId] = useState(transaction?.counterpartyId ?? '')
+  const [toAccountId, setToAccountId] = useState(transaction?.toAccountId ?? '')
   const [amount, setAmount] = useState(transaction ? formatAmountInput(transaction.amount, locale) : '')
-  // A new operation starts in the currency of its account (else the company's); picking another
-  // account moves it along until the person has chosen a currency themselves.
-  const [currency, setCurrency] = useState(transaction?.currency ?? currencyOf(transaction?.accountId ?? accounts[0]?.id ?? ''))
-  const [currencyChosen, setCurrencyChosen] = useState(false)
+  const [toAmount, setToAmount] = useState(
+    transaction?.toAmount !== undefined ? formatAmountInput(transaction.toAmount, locale) : '',
+  )
   const [categoryId, setCategoryId] = useState(transaction?.categoryId ?? '')
   const [date, setDate] = useState(toInputDate(transaction?.date ?? todayUtcDay()))
   const [description, setDescription] = useState(transaction?.description ?? '')
@@ -89,6 +85,14 @@ export function TransactionForm({
 
   const categories = type === 'income' ? incomeCategories : expenseCategories
   const amountRef = useRef<HTMLInputElement>(null)
+  // One id per operation being created: a retry or a double click creates it once on the server.
+  const clientIdRef = useRef(crypto.randomUUID())
+
+  // The operation is always in the currency of its account.
+  const account = accounts.find((a) => a.id === accountId)
+  const toAccount = accounts.find((a) => a.id === toAccountId)
+  const currency = account?.currency ?? defaultCurrency ?? FALLBACK_CURRENCY
+  const crossCurrency = type === 'transfer' && !!account && !!toAccount && account.currency !== toAccount.currency
 
   // Reset form when opened with new defaultType
   useEffect(() => {
@@ -97,11 +101,6 @@ export function TransactionForm({
       setCategoryId('')
     }
   }, [open, defaultType, isEdit])
-
-  // Reset category when type changes
-  useEffect(() => {
-    setCategoryId('')
-  }, [type])
 
   // Focus amount on open
   useEffect(() => {
@@ -118,27 +117,36 @@ export function TransactionForm({
     if (type === 'transfer' && !toAccountId) errs.toAccountId = t('errors.toAccount')
     if (type === 'transfer' && toAccountId === accountId)
       errs.toAccountId = t('errors.sameAccount')
+    if (crossCurrency) {
+      const v = parseAmountInput(toAmount)
+      if (v === null || v <= 0) errs.toAmount = t('errors.amountTo')
+    }
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
 
-  const buildData = (): Omit<Transaction, 'id' | 'orgId'> => {
-    const data: Omit<Transaction, 'id' | 'orgId'> = {
+  // Only the fields this form shows. An edit carries the rest over from the stored operation.
+  const buildFormDraft = (): FormOwnedDraft => {
+    const draft: FormOwnedDraft = {
       type,
       accountId,
       // validate() has already refused anything parseAmountInput cannot read.
-      // Sub-cent values are not money: store what the prefill would show.
-      amount: roundAmount(parseAmountInput(amount) ?? 0),
-      currency,
-      date: new Date(date),
+      amount: parseAmountInput(amount) ?? 0,
+      // The input is the YYYY-MM-DD string of the date field; the accrual date follows it on the server.
+      paymentDate: date,
       isRecurring,
-      tags: [],
-      fileUrls: [],
     }
-    if (categoryId) data.categoryId = categoryId
-    if (type === 'transfer' && toAccountId) data.counterpartyId = toAccountId
-    if (description.trim()) data.description = description.trim()
-    return data
+    if (categoryId && type !== 'transfer') draft.categoryId = categoryId
+    if (type === 'transfer') draft.toAccountId = toAccountId
+    if (crossCurrency) draft.toAmount = parseAmountInput(toAmount) ?? 0
+    if (description.trim()) draft.description = description.trim()
+    return draft
+  }
+
+  // A category belongs to one type: it is cleared when the user picks another tab, never on mount.
+  const changeType = (next: Transaction['type']) => {
+    setCategoryId(categoryAfterTypeChange(categoryId, type, next))
+    setType(next)
   }
 
   const handleSubmit = async (addAnother = false) => {
@@ -146,17 +154,21 @@ export function TransactionForm({
     setLoading(true)
     try {
       if (isEdit) {
-        await updateTransaction(orgId, transaction.id, buildData())
+        await updateTransaction(orgId, transaction.id, buildEditDraft(transaction, buildFormDraft()))
       } else {
-        await createTransaction(orgId, buildData())
+        await createTransaction(orgId, buildCreateDraft(buildFormDraft()), clientIdRef.current)
+        clientIdRef.current = crypto.randomUUID()
       }
       if (addAnother) {
         setAmount('')
+        setToAmount('')
         setDescription('')
         amountRef.current?.focus()
       } else {
         onClose()
       }
+    } catch {
+      toast.error(t('errors.save'))
     } finally {
       setLoading(false)
     }
@@ -184,7 +196,7 @@ export function TransactionForm({
 
         <div className="space-y-4">
           {/* Type tabs */}
-          <Tabs value={type} onValueChange={(v) => setType(v as Transaction['type'])}>
+          <Tabs value={type} onValueChange={(v) => changeType(v as Transaction['type'])}>
             <TabsList className="w-full">
               <TabsTrigger value="income" className="flex-1 data-[state=active]:text-green-600">
                 {t('income')}
@@ -204,10 +216,7 @@ export function TransactionForm({
                   <Label>{panel === 'transfer' ? t('accountFrom') : t('account')}</Label>
                   <select
                     value={accountId}
-                    onChange={(e) => {
-                      setAccountId(e.target.value)
-                      if (!isEdit && !currencyChosen) setCurrency(currencyOf(e.target.value))
-                    }}
+                    onChange={(e) => setAccountId(e.target.value)}
                     className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus:border-[#00c896]"
                   >
                     <option value="">{t('chooseAccount')}</option>
@@ -257,23 +266,36 @@ export function TransactionForm({
                   </div>
                   <div className="space-y-1">
                     <Label>{t('currency')}</Label>
-                    <Select value={currency} onValueChange={(v) => {
-                        setCurrencyChosen(true)
-                        setCurrency((current) => v ?? current)
-                      }}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CURRENCIES.map((c) => (
-                          <SelectItem key={c} value={c}>
-                            {c}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex h-8 w-full items-center rounded-lg border border-input bg-transparent px-2.5 text-sm">
+                      {currency}
+                    </div>
                   </div>
                 </div>
+
+                {/* Amount received (a transfer between accounts in different currencies) */}
+                {panel === 'transfer' && crossCurrency && toAccount && (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2 space-y-1">
+                      <Label htmlFor="tx-amount-to">{t('amountTo')}</Label>
+                      <Input
+                        id="tx-amount-to"
+                        type="text"
+                        inputMode="decimal"
+                        value={toAmount}
+                        onChange={(e) => setToAmount(e.target.value)}
+                        className="tabular-nums text-lg font-semibold"
+                        style={{ color: TYPE_COLORS[panel] }}
+                      />
+                      {errors.toAmount && <p className="text-xs text-red-500">{errors.toAmount}</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <Label>{t('currency')}</Label>
+                      <div className="flex h-8 w-full items-center rounded-lg border border-input bg-transparent px-2.5 text-sm">
+                        {toAccount.currency}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Category (not for transfer) */}
                 {panel !== 'transfer' && (
