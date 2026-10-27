@@ -220,7 +220,7 @@ test.describe('app shell (emulators)', () => {
     }
   })
 
-  test('settings: a separate screen whose left column is the menu of four sections; the old URL redirects to Company with its query', async ({ page }) => {
+  test('settings: a separate screen whose left column is the menu of five sections; the old URL redirects to Company with its query', async ({ page }) => {
     const user = await registerViaUi(page, 'settings')
     await waitForShell(page, user.companyName)
     const modules = page.getByRole('navigation', { name: 'Модулі' })
@@ -233,7 +233,7 @@ test.describe('app shell (emulators)', () => {
     // The settings menu replaces the accounts sidebar, and the module tabs are gone.
     const settingsColumn = page.getByRole('complementary', { name: 'Налаштування' })
     const menu = settingsColumn.getByRole('navigation', { name: 'Розділи налаштувань' })
-    await expect(menu.getByRole('link')).toHaveText(['Компанія', 'Категорії', 'Банки', 'Підписка'])
+    await expect(menu.getByRole('link')).toHaveText(['Компанія', 'Мова', 'Категорії', 'Банки', 'Підписка'])
     await expect(page.getByRole('navigation', { name: 'Розділи налаштувань' })).toHaveCount(1)
     await expect(accountsSidebar(page)).toHaveCount(0)
     await expect(modules).toHaveCount(0)
@@ -243,6 +243,7 @@ test.describe('app shell (emulators)', () => {
 
     const sections = [
       { link: 'Компанія', path: 'company', marker: page.getByLabel('Назва', { exact: true }) },
+      { link: 'Мова', path: 'language', marker: page.getByRole('radio', { name: 'Polski', exact: true }) },
       { link: 'Категорії', path: 'categories', marker: page.getByText('Додати категорію', { exact: true }) },
       { link: 'Банки', path: 'banks', marker: page.getByRole('button', { name: 'Підключити банк' }) },
       { link: 'Підписка', path: 'subscription', marker: page.getByText(/trial plan/i) },
@@ -442,6 +443,22 @@ test.describe('app shell (emulators)', () => {
       return { background: style.backgroundColor, color: style.color }
     })
     expect(dialogColors).toEqual({ background: 'rgb(255, 255, 255)', color: 'rgb(23, 32, 29)' })
+  })
+
+  // Production report (1920 px wide): the journal started ~230 px right of the module tabs, leaving an empty
+  // band under them. The page container is no longer centred; tabs and page share one left edge.
+  test('at 1920x920 the first module tab and the journal toolbar start on the same line', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 920 })
+    const user = await registerViaUi(page, 'align')
+    await waitForShell(page, user.companyName)
+
+    const tab = page.getByRole('navigation', { name: 'Модулі' }).getByRole('link').first()
+    const search = page.getByPlaceholder('Пошук по опису…')
+    await expect(search).toBeVisible()
+    const tabBox = await tab.boundingBox()
+    const searchBox = await search.boundingBox()
+    expect(tabBox && searchBox).toBeTruthy()
+    expect(Math.abs(tabBox!.x - searchBox!.x)).toBeLessThanOrEqual(1)
   })
 
   // Production report: the open profile menu was hidden behind the sticky module tabs (z-10) down to

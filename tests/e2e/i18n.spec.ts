@@ -71,22 +71,23 @@ test.describe('language switching (emulators)', () => {
     expect(await localeCookie(page)).toBe('uk')
   })
 
-  test('the profile menu switches the whole shell without changing the route', async ({ page }) => {
+  test('the language section of the settings switches the whole shell without changing the route', async ({ page }) => {
     const user = await registerViaUi(page, 'i18n')
     await waitForShell(page, user.companyName)
-    const route = page.url()
 
     await openProfileMenu(page, uk.shell.profile.label)
-    await page.getByRole('menuitem', { name: 'Polski', exact: true }).click()
+    await page.getByRole('menuitem', { name: uk.shell.profile.settings, exact: true }).click()
+    await page.getByRole('navigation', { name: uk.shell.nav.settings }).getByRole('link', { name: uk.shell.settingsSections.language, exact: true }).click()
+    await page.waitForURL(/\/settings\/language$/)
+    const route = page.url()
+    await page.getByRole('radio', { name: 'Polski', exact: true }).click()
 
     const header = pl.shell.header
     await expect(page.getByRole('button', { name: header.income, exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: header.expense, exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: header.transfer, exact: true })).toBeVisible()
-    const modules = page.getByRole('navigation', { name: pl.shell.nav.modules })
-    await expect(modules.getByRole('link', { name: pl.shell.modules.transactions, exact: true })).toBeVisible()
-    await expect(modules.getByRole('link', { name: pl.shell.modules.analytics, exact: true })).toBeVisible()
-    await expect(page.getByText(pl.shell.accounts.mine, { exact: true })).toBeVisible()
+    await expect(page.getByRole('radio', { name: 'Polski', exact: true })).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByRole('navigation', { name: pl.shell.nav.settings }).getByRole('link', { name: pl.shell.settingsSections.language, exact: true })).toBeVisible()
     await expect(page.locator('html')).toHaveAttribute('lang', 'pl')
     expect(page.url()).toBe(route)
 
@@ -94,8 +95,7 @@ test.describe('language switching (emulators)', () => {
     await expect(page.getByRole('button', { name: header.income, exact: true })).toBeVisible()
     await expect(page.locator('html')).toHaveAttribute('lang', 'pl')
 
-    await openProfileMenu(page, pl.shell.profile.label)
-    await page.getByRole('menuitem', { name: 'English', exact: true }).click()
+    await page.getByRole('radio', { name: 'English', exact: true }).click()
     await expect(page.getByRole('button', { name: en.shell.header.income, exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: en.shell.header.expense, exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: en.shell.header.transfer, exact: true })).toBeVisible()

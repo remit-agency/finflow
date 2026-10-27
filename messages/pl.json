@@ -126,6 +126,7 @@
     },
     "settingsSections": {
       "company": "Firma",
+      "language": "Język",
       "categories": "Kategorie",
       "banks": "Banki",
       "subscription": "Subskrypcja"
