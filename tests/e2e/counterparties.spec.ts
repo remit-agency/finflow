@@ -97,6 +97,46 @@ test.describe('counterparties (emulators)', () => {
     await expect(page.getByText('Контрагент з таким NIP уже існує')).toBeVisible()
   })
 
+  test('a VAT status looked up while editing is saved', async ({ page }) => {
+    const user = await registerViaUi(page, 'cp-edit-lookup')
+    await waitForShell(page, user.companyName)
+    await openPage(page, user.orgId)
+
+    await page.getByRole('button', { name: 'Додати контрагента' }).click()
+    await page.getByLabel('Назва', { exact: true }).fill('Fuel Partner')
+    await page.getByRole('button', { name: 'Зберегти' }).click()
+    const row = page.getByTestId('counterparty-row').filter({ hasText: 'Fuel Partner' })
+    await expect(row).toBeVisible()
+
+    await row.getByRole('button', { name: 'Редагувати Fuel Partner' }).click()
+    await page.getByLabel('NIP', { exact: true }).fill('774-000-14-54')
+    await page.getByRole('button', { name: 'Заповнити з білого списку' }).click()
+    await expect(page.getByTestId('cp-vat')).toContainText('Платник ПДВ')
+    await page.getByRole('button', { name: 'Зберегти' }).click()
+
+    const saved = page.getByTestId('counterparty-row').filter({ hasText: 'NIP 7740001454' })
+    await expect(saved).toBeVisible()
+    await expect(saved).toContainText('Платник ПДВ')
+  })
+
+  test('saving an edit form without changes closes it without an error', async ({ page }) => {
+    const user = await registerViaUi(page, 'cp-edit-same')
+    await waitForShell(page, user.companyName)
+    await openPage(page, user.orgId)
+
+    await page.getByRole('button', { name: 'Додати контрагента' }).click()
+    await page.getByLabel('Назва', { exact: true }).fill('Same NIP Ltd')
+    await page.getByLabel('NIP', { exact: true }).fill('5252344078')
+    await page.getByRole('button', { name: 'Зберегти' }).click()
+    const row = page.getByTestId('counterparty-row').filter({ hasText: 'Same NIP Ltd' })
+    await expect(row).toContainText('NIP 5252344078')
+
+    await row.getByRole('button', { name: 'Редагувати Same NIP Ltd' }).click()
+    await page.getByRole('button', { name: 'Зберегти' }).click()
+    await expect(page.getByRole('heading', { name: 'Редагування контрагента' })).toHaveCount(0)
+    await expect(page.getByText('Не вдалося зберегти контрагента')).toHaveCount(0)
+  })
+
   test('a NIP that is not in the register says so and leaves the form for manual entry', async ({ page }) => {
     const user = await registerViaUi(page, 'cp-unknown')
     await waitForShell(page, user.companyName)

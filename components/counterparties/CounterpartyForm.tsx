@@ -58,6 +58,8 @@ export function CounterpartyForm({ orgId, counterparty, onClose, onOpenExisting 
   const [errors, setErrors] = useState<{ name?: string; nip?: string; ibans?: string }>({})
   const [busy, setBusy] = useState<null | 'lookup' | 'save'>(null)
   /** A refused save whose existing counterparty is known: shown under its field with a way to open it. */
+  /** The white list found the NIP: a saved edit then re-asks the server even if the NIP text did not change. */
+  const [lookedUp, setLookedUp] = useState(false)
   const [duplicate, setDuplicate] = useState<Duplicate | null>(null)
 
   const nipDigits = nipOrNull(nip)
@@ -102,6 +104,7 @@ export function CounterpartyForm({ orgId, counterparty, onClose, onOpenExisting 
         toast.info(t('errors.lookupNotFound'))
         return
       }
+      setLookedUp(true)
       if (result.name) setName(result.name)
       if (result.address !== undefined) setAddress(result.address)
       if (result.vatStatus) setVat({ status: result.vatStatus, checkedOn: result.checkedOn })
@@ -135,10 +138,15 @@ export function CounterpartyForm({ orgId, counterparty, onClose, onOpenExisting 
       if (counterparty) {
         const patch: CounterpartyPatchDraft = {}
         if (trimmedName !== counterparty.name) patch.name = trimmedName
-        if ((nipDigits ?? undefined) !== counterparty.nip) patch.nip = nipDigits
+        // The server asks the white list whenever a patch carries the NIP, so a looked-up status is stored by sending it.
+        if ((nipDigits ?? undefined) !== counterparty.nip || (lookedUp && nipDigits !== null)) patch.nip = nipDigits
         if (!sameList(ibanList, counterparty.ibans.map((i) => i.iban))) patch.ibans = ibanList
         if ((addressText === '' ? undefined : addressText) !== counterparty.address) patch.address = addressText === '' ? null : addressText
-        if (Object.keys(patch).length > 0) await updateCounterparty(orgId, counterparty.id, patch)
+        if (Object.keys(patch).length === 0) {
+          onClose()
+          return
+        }
+        await updateCounterparty(orgId, counterparty.id, patch)
         toast.success(t('toast.saved'))
       } else {
         await createCounterparty(orgId, {
