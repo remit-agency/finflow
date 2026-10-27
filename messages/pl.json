@@ -28,6 +28,7 @@
     "signOut": "Nie udało się wylogować",
     "switchOrg": "Nie udało się przełączyć firmy",
     "deleteAccount": "Nie udało się usunąć konta",
+    "accountHasOperations": "Konto ma operacje, nie można go usunąć.",
     "loadOrgs": "Nie udało się wczytać firm",
     "auth": {
       "wrongPassword": "Nieprawidłowy adres e-mail lub hasło.",
@@ -240,6 +241,7 @@
       "accountTo": "Konto (docelowe)",
       "chooseAccount": "Wybierz konto",
       "amount": "Kwota",
+      "amountTo": "Kwota na koncie docelowym",
       "currency": "Waluta",
       "category": "Kategoria",
       "noCategory": "Bez kategorii",
@@ -256,7 +258,9 @@
         "account": "Wybierz konto",
         "amount": "Podaj kwotę większą od zera",
         "toAccount": "Wybierz konto docelowe",
-        "sameAccount": "Konta muszą być różne"
+        "sameAccount": "Konta muszą być różne",
+        "amountTo": "Podaj kwotę na koncie docelowym",
+        "save": "Nie udało się zapisać operacji. Spróbuj ponownie."
       }
     },
     "account": {
@@ -271,13 +275,15 @@
         "card": "Karta",
         "crypto": "Krypto"
       },
-      "balance": "Saldo",
+      "opening": "Saldo początkowe",
       "currency": "Waluta",
       "color": "Kolor",
       "create": "Utwórz",
       "errors": {
         "name": "Nazwa jest wymagana",
-        "balance": "Podaj poprawne saldo, np. 1 234,50"
+        "balance": "Podaj poprawne saldo, np. 1 234,50",
+        "hasOperations": "Nie można zmienić waluty konta, dopóki ma operacje.",
+        "save": "Nie udało się zapisać konta. Spróbuj ponownie."
       }
     },
     "saving": "Zapisywanie…"
@@ -350,6 +356,7 @@
       "saving": "Zapisywanie…",
       "saved": "Zapisano",
       "saveFailed": "Nie udało się zapisać",
+      "currencyLocked": "Nie można zmienić waluty, dopóki firma ma operacje.",
       "ownerOnly": "Dane firmy może zmieniać tylko właściciel.",
       "currencies": {
         "UAH": "UAH — hrywna ukraińska",

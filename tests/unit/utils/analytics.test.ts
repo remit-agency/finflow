@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { buildCashFlow, buildPL } from '@/lib/utils/analytics'
 import { resolvePeriod } from '@/lib/utils/period'
 import type { Category, Transaction } from '@/types'
+import { makeTx } from '../helpers/fixtures'
 
 let seq = 0
 function tx(type: Transaction['type'], amount: number, iso: string, categoryId?: string): Transaction {
   seq += 1
-  return {
+  return makeTx({
     id: `t${seq}`,
     orgId: 'org',
     accountId: 'acc',
@@ -15,10 +16,7 @@ function tx(type: Transaction['type'], amount: number, iso: string, categoryId?:
     currency: 'UAH',
     categoryId,
     date: new Date(iso),
-    isRecurring: false,
-    tags: [],
-    fileUrls: [],
-  }
+  })
 }
 
 function category(id: string, type: Category['type'], name: string): Category {

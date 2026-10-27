@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { deleteAccount } from '@/lib/firebase/accounts'
+import { deleteAccount, LedgerApiError } from '@/lib/api/ledger-client'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { useShell } from '@/lib/hooks/useShell'
 import { isJournalPath } from '@/lib/shell/modules'
@@ -89,8 +89,12 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
     if (selectedAccountId === account.id) selectAccount(null)
     try {
       await deleteAccount(orgId, account.id)
-    } catch {
-      toast.error(tErrors('deleteAccount'))
+    } catch (e) {
+      toast.error(
+        e instanceof LedgerApiError && e.code === 'account_has_operations'
+          ? tErrors('accountHasOperations')
+          : tErrors('deleteAccount'),
+      )
     }
   }
 

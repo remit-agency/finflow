@@ -28,6 +28,7 @@
     "signOut": "Could not sign out",
     "switchOrg": "Could not switch company",
     "deleteAccount": "Could not delete the account",
+    "accountHasOperations": "The account has transactions and cannot be deleted.",
     "loadOrgs": "Could not load companies",
     "auth": {
       "wrongPassword": "Incorrect email or password.",
@@ -240,6 +241,7 @@
       "accountTo": "Account (to)",
       "chooseAccount": "Choose an account",
       "amount": "Amount",
+      "amountTo": "Amount received",
       "currency": "Currency",
       "category": "Category",
       "noCategory": "No category",
@@ -256,7 +258,9 @@
         "account": "Choose an account",
         "amount": "Enter an amount > 0",
         "toAccount": "Choose a destination account",
-        "sameAccount": "The accounts must be different"
+        "sameAccount": "The accounts must be different",
+        "amountTo": "Enter the amount received",
+        "save": "Could not save the transaction. Try again."
       }
     },
     "account": {
@@ -271,13 +275,15 @@
         "card": "Card",
         "crypto": "Crypto"
       },
-      "balance": "Balance",
+      "opening": "Opening balance",
       "currency": "Currency",
       "color": "Color",
       "create": "Create",
       "errors": {
         "name": "Name is required",
-        "balance": "Balance must be ≥ 0"
+        "balance": "Balance must be ≥ 0",
+        "hasOperations": "The account currency cannot be changed while it has transactions.",
+        "save": "Could not save the account. Try again."
       }
     },
     "saving": "Saving…"
@@ -350,6 +356,7 @@
       "saving": "Saving…",
       "saved": "Saved",
       "saveFailed": "Could not save",
+      "currencyLocked": "The currency cannot be changed while the company has transactions.",
       "ownerOnly": "Only the owner can change the company details.",
       "currencies": {
         "UAH": "UAH — Ukrainian Hryvnia",

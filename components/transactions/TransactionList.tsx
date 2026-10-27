@@ -50,7 +50,13 @@ export function TransactionList({
   const [editTx, setEditTx] = useState<Transaction | null>(null)
 
   // The amount cell exists twice (a column from `sm`, a trailing cell below it) and both read from here.
-  const amountLabel = (tx: Transaction): string => `${AMOUNT_STYLE[tx.type].sign}${money(tx.amount, tx.currency)}`
+  // A transfer between currencies shows what left and what arrived.
+  const amountLabel = (tx: Transaction): string => {
+    const base = `${AMOUNT_STYLE[tx.type].sign}${money(tx.amount, tx.currency)}`
+    const crossCurrency =
+      tx.type === 'transfer' && tx.toAmount !== undefined && !!tx.toCurrency && tx.toCurrency !== tx.currency
+    return crossCurrency ? `${base} → ${money(tx.toAmount!, tx.toCurrency!)}` : base
+  }
 
   // The group key is a UTC calendar day (`2026-10-23`), formatted in UTC like every stored date.
   const formatGroupKey = (key: string): string => {
@@ -131,7 +137,7 @@ export function TransactionList({
                   const amount = AMOUNT_STYLE[tx.type]
                   const account = accountMap[tx.accountId]
                   const toAccount =
-                    tx.type === 'transfer' && tx.counterpartyId ? accountMap[tx.counterpartyId] : null
+                    tx.type === 'transfer' && tx.toAccountId ? accountMap[tx.toAccountId] : null
                   const category = tx.categoryId ? categoryMap[tx.categoryId] : null
                   const categoryName = category
                     ? categoryLabel(category)

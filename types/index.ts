@@ -1,3 +1,4 @@
+import type { Accrual, TxStatus } from '@/lib/domain/ledger/types'
 import type { Role } from '@/lib/shell/permissions'
 
 export interface Organization {
@@ -22,7 +23,10 @@ export interface Account {
   orgId: string
   name: string
   type: 'bank' | 'cash' | 'card' | 'crypto'
+  /** Current balance: opening balance plus the actual operations. */
   balance: number
+  /** Opening balance. */
+  opening: number
   currency: string
   color: string
 }
@@ -41,11 +45,18 @@ export interface Transaction {
   orgId: string
   accountId: string
   type: 'income' | 'expense' | 'transfer'
+  status: TxStatus
   amount: number
   currency: string
+  /** Transfers only. */
+  toAccountId?: string
+  toAmount?: number
+  toCurrency?: string
   categoryId?: string
   counterpartyId?: string
+  /** The payment date as a Date at 00:00 UTC. */
   date: Date
+  accrual: Accrual
   description?: string
   isRecurring: boolean
   projectId?: string
