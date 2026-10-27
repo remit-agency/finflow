@@ -272,10 +272,11 @@ CashFlowChart (Recharts), PLTable, CalendarView, BalanceSheet, all 4 analytics p
 ### Підсумок перевірок (2026-10-27, реально виміряно)
 - `npx tsc --noEmit`: чисто (код 0).
 - `npx eslint .`: 0 errors / 13 warnings (не більше, ніж було).
-- unit (`npx vitest run`): 1584 тести, 91 файл.
+- unit (`npx vitest run`): 1598 тестів, 92 файли.
 - rules (`npm run test:rules`): 113 тестів, 2 файли.
-- integration (`npm run test:integration`, емулятор Firestore): 100 тестів, 9 файлів.
-- e2e (`firebase emulators:exec --only auth,firestore --project demo-finflow "npm run test:e2e"`): 72 passed (було 65 до S06), без падінь.
+- integration (`npm run test:integration`, емулятор Firestore): 108 тестів, 9 файлів.
+- e2e (`firebase emulators:exec --only auth,firestore --project demo-finflow "npm run test:e2e"`): 75 passed (було 65 до S06), без падінь.
+- Огляд всієї гілки (opus) знайшов 0 критичних і 4 важливі дефекти (ліміт білого списку обходився через create/update, дубль без посилання на наявний запис, статус VAT після пошуку в редагуванні не зберігався, віртуальні рахунки позначались «поза білою листою») та 7 дрібних; усе виправлено окремими комітами з тестами.
 - `npm run build`: ок (є роути `/[orgSlug]/settings/counterparties` і три роути `/api/orgs/[orgId]/counterparties`).
 - **Живий виклик Білої ліста MF** (Node `fetch`, не в CI): NIP 7740001454 дав HTTP 200, `statusVat` = `Czynny`.
 
