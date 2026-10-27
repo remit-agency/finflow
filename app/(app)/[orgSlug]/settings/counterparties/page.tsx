@@ -96,6 +96,10 @@ export default function CounterpartiesSettingsPage() {
           orgId={orgId}
           counterparty={editing === 'new' ? undefined : editing}
           onClose={() => setEditing(null)}
+          onOpenExisting={(id) => {
+            const existing = counterparties.find((c) => c.id === id)
+            if (existing) setEditing(existing)
+          }}
         />
       )}
     </Card>

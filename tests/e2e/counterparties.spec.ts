@@ -41,6 +41,35 @@ test.describe('counterparties (emulators)', () => {
     await page.getByLabel('Назва', { exact: true }).fill('ACME  SP Z O O')
     await page.getByRole('button', { name: 'Зберегти' }).click()
     await expect(page.getByText('Контрагент з такою назвою уже існує')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Відкрити' }).click()
+    await expect(page.getByRole('heading', { name: 'Редагування контрагента' })).toBeVisible()
+    await expect(page.getByLabel('Назва', { exact: true })).toHaveValue('Acme sp. z o.o.')
+  })
+
+  test('opens an ARCHIVED counterparty from the duplicate error', async ({ page }) => {
+    const user = await registerViaUi(page, 'cp-dup-arch')
+    await waitForShell(page, user.companyName)
+    await openPage(page, user.orgId)
+
+    await page.getByRole('button', { name: 'Додати контрагента' }).click()
+    await page.getByLabel('Назва', { exact: true }).fill('Old Partner Ltd')
+    await page.getByRole('button', { name: 'Зберегти' }).click()
+    const row = page.getByTestId('counterparty-row').filter({ hasText: 'Old Partner Ltd' })
+    await expect(row).toBeVisible()
+    await row.getByRole('button', { name: 'Редагувати Old Partner Ltd' }).click()
+    await page.getByRole('button', { name: 'Архівувати' }).click()
+    await expect(row).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Додати контрагента' }).click()
+    await page.getByLabel('Назва', { exact: true }).fill('Old Partner Ltd')
+    await page.getByRole('button', { name: 'Зберегти' }).click()
+    await expect(page.getByText('Контрагент з такою назвою уже існує')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Відкрити' }).click()
+    await expect(page.getByRole('heading', { name: 'Редагування контрагента' })).toBeVisible()
+    await expect(page.getByLabel('Назва', { exact: true })).toHaveValue('Old Partner Ltd')
+    await expect(page.getByRole('button', { name: 'Відновити' })).toBeVisible()
   })
 
   test('fills the form from the white list by NIP and refuses a second counterparty with that NIP', async ({ page }) => {

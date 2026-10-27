@@ -25,6 +25,8 @@ interface Props {
   /** Absent: a new counterparty. */
   counterparty?: Counterparty
   onClose: () => void
+  /** Called with the id of the counterparty a duplicate error points at; the parent may switch to it. */
+  onOpenExisting?: (id: string) => void
 }
 
 /** The NIP as 10 digits, or null when it is empty or not valid. */
@@ -40,7 +42,9 @@ function sameList(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((x, i) => x === b[i])
 }
 
-export function CounterpartyForm({ orgId, counterparty, onClose }: Props) {
+type Duplicate = { field: 'nip' | 'name'; existingId: string }
+
+export function CounterpartyForm({ orgId, counterparty, onClose, onOpenExisting }: Props) {
   const t = useTranslations('settings.counterparties')
   const tCommon = useTranslations('common')
   const { date } = useFormatters()
@@ -53,6 +57,8 @@ export function CounterpartyForm({ orgId, counterparty, onClose }: Props) {
   const [vat, setVat] = useState<Vat | null>(counterparty?.vat ?? null)
   const [errors, setErrors] = useState<{ name?: string; nip?: string; ibans?: string }>({})
   const [busy, setBusy] = useState<null | 'lookup' | 'save'>(null)
+  /** A refused save whose existing counterparty is known: shown under its field with a way to open it. */
+  const [duplicate, setDuplicate] = useState<Duplicate | null>(null)
 
   const nipDigits = nipOrNull(nip)
 
@@ -111,6 +117,7 @@ export function CounterpartyForm({ orgId, counterparty, onClose }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setDuplicate(null)
     const trimmedName = name.trim()
     const filled = ibans.map((i) => i.trim()).filter((i) => i !== '')
     const normalised = filled.map((i) => tryNormalizeIban(i))
@@ -144,11 +151,28 @@ export function CounterpartyForm({ orgId, counterparty, onClose }: Props) {
       }
       onClose()
     } catch (e) {
-      toast.error(errorText(e))
+      const found = duplicateOf(e)
+      if (found?.existingId !== undefined) setDuplicate({ field: found.field, existingId: found.existingId })
+      else toast.error(errorText(e))
     } finally {
       setBusy(null)
     }
   }
+
+  /** The refusal under its field, with a link-style button to the counterparty that already has the value. */
+  const duplicateNotice = (field: Duplicate['field']) =>
+    duplicate?.field === field && (
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <p role="alert" className="text-red-500">
+          {field === 'nip' ? t('errors.duplicateNip') : t('errors.duplicateName')}
+        </p>
+        {onOpenExisting && (
+          <button type="button" className="font-medium text-brand-soft-foreground underline underline-offset-2" onClick={() => onOpenExisting(duplicate.existingId)}>
+            {t('errors.openExisting')}
+          </button>
+        )}
+      </div>
+    )
 
   const handleArchive = async () => {
     if (!counterparty) return
@@ -175,6 +199,7 @@ export function CounterpartyForm({ orgId, counterparty, onClose }: Props) {
             <Label htmlFor="cp-name">{t('form.name')}</Label>
             <Input id="cp-name" value={name} onChange={(e) => setName(e.target.value)} aria-invalid={errors.name !== undefined} />
             {errors.name && <p role="alert" className="text-xs text-red-500">{errors.name}</p>}
+            {duplicateNotice('name')}
           </div>
 
           <div className="space-y-1">
@@ -194,6 +219,7 @@ export function CounterpartyForm({ orgId, counterparty, onClose }: Props) {
             </div>
             <p id="cp-nip-help" className="text-xs text-ink-muted">{t('form.nipHelp')}</p>
             {errors.nip && <p role="alert" className="text-xs text-red-500">{errors.nip}</p>}
+            {duplicateNotice('nip')}
             {vat && (
               <p data-testid="cp-vat" className="text-xs font-medium text-brand-soft-foreground">
                 {t(`vat.${vat.status}`)} · {t('vat.checkedOn', { date: date(new Date(`${vat.checkedOn}T00:00:00Z`)) })}

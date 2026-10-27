@@ -356,6 +356,7 @@
         "iban": "Podaj poprawny numer rachunku",
         "duplicateNip": "Kontrahent z tym NIP już istnieje",
         "duplicateName": "Kontrahent o tej nazwie już istnieje",
+        "openExisting": "Otwórz",
         "limit": "Osiągnięto limit kontrahentów",
         "lookupUnavailable": "Biała lista jest teraz niedostępna. Uzupełnij dane ręcznie.",
         "lookupNotFound": "Tego NIP nie ma w rejestrze VAT. Uzupełnij dane ręcznie.",

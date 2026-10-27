@@ -356,6 +356,7 @@
         "iban": "Enter a valid account number",
         "duplicateNip": "A counterparty with this NIP already exists",
         "duplicateName": "A counterparty with this name already exists",
+        "openExisting": "Open it",
         "limit": "The counterparty limit is reached",
         "lookupUnavailable": "The white list is not available now. Fill in the data by hand.",
         "lookupNotFound": "This NIP is not in the VAT register. Fill in the data by hand.",
