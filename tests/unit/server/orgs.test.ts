@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fakeMembers, fakeOrgs, fakeOtherDocs, fakeTxFault, resetFakeAdmin } from '@/tests/unit/helpers/fake-admin'
 import { HttpError } from '@/lib/server/http-error'
-import { parseCreateOrgInput } from '@/lib/server/orgs'
+import { createOrganizationForUser, parseCreateOrgInput } from '@/lib/server/orgs'
+
+vi.mock('@/lib/server/firebase-admin', async () => {
+  const { fakeAdmin: admin } = await import('@/tests/unit/helpers/fake-admin')
+  return { getAdmin: () => admin }
+})
 
 describe('parseCreateOrgInput', () => {
   it('accepts a valid body and trims the name', () => {
@@ -44,5 +50,37 @@ describe('parseCreateOrgInput', () => {
 
   it('rejects a __proto__ key', () => {
     expect(() => parseCreateOrgInput(JSON.parse('{"name":"A","currency":"PLN","__proto__":{"x":1}}'))).toThrow(HttpError)
+  })
+})
+
+describe('createOrganizationForUser seeds the system counterparties', () => {
+  beforeEach(() => {
+    resetFakeAdmin()
+  })
+
+  it('a successful create leaves exactly the two system records and their two name keys', async () => {
+    const orgId = await createOrganizationForUser('user-mallory', { name: 'New Co', currency: 'PLN' }, new Date('2026-10-27T10:00:00Z'))
+
+    expect(fakeOrgs.has(orgId)).toBe(true)
+    expect(fakeMembers.has(`${orgId}/user-mallory`)).toBe(true)
+    expect([...fakeOtherDocs.keys()].sort()).toEqual(
+      [
+        `organizations/${orgId}/counterparties/system_us`,
+        `organizations/${orgId}/counterparties/system_zus`,
+        `organizations/${orgId}/counterpartyKeys/name_urzad_skarbowy`,
+        `organizations/${orgId}/counterpartyKeys/name_zus`,
+      ].sort(),
+    )
+  })
+
+  it('is atomic: when a seeding write fails, neither the organization nor the membership is left behind', async () => {
+    fakeTxFault.failOnCreatePathIncludes = '/counterparties/'
+
+    await expect(createOrganizationForUser('user-mallory', { name: 'New Co', currency: 'PLN' })).rejects.toThrow()
+
+    expect(fakeOrgs.size).toBe(1) // only the fixture org-acme
+    expect(fakeMembers.has('org-acme/user-alice')).toBe(true)
+    expect([...fakeMembers.keys()].filter((k) => k.endsWith('/user-mallory'))).toEqual([])
+    expect(fakeOtherDocs.size).toBe(0)
   })
 })
