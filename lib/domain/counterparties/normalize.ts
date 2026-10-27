@@ -16,13 +16,16 @@ export function cleanName(v: unknown): string {
 /**
  * The comparable form of a name: Latin diacritics removed (`ł` counts as `l`), lower case, every run of
  * characters that are not letters or digits becomes one `_`. Other scripts keep their letters (only Latin
- * letters lose their marks, so Cyrillic `й` stays distinct from `и`).
+ * letters lose their marks, so Cyrillic `й` stays distinct from `и`; marks left over after recomposition, such
+ * as a stress mark, are dropped).
  */
 export function nameKeyText(name: string): string {
   return name
     .normalize('NFD')
     .replace(/(\p{Script=Latin})\p{M}+/gu, '$1')
     .normalize('NFC')
+    // What is still a combining mark now (a stress mark, say) is not part of a precomposed letter: `й` and `ї` stay.
+    .replace(/\p{M}+/gu, '')
     .replace(/ł/g, 'l')
     .replace(/Ł/g, 'L')
     .toLowerCase()
@@ -42,11 +45,11 @@ function nipChecksumOk(d: string): boolean {
   return sum === Number(d[9])
 }
 
-/** 10 digits with a valid checksum; accepts spaces, hyphens and a `PL` prefix. Throws `invalid_input` on `nip`. */
+/** 10 digits with a valid checksum (`0000000000` passes it but is never a real NIP); accepts spaces, hyphens and a `PL` prefix. Throws `invalid_input` on `nip`. */
 export function normalizeNip(v: unknown): string {
   if (typeof v !== 'string') bad('nip')
   const digits = v.replace(/[\s-]/g, '').replace(/^PL/i, '')
-  if (!/^\d{10}$/.test(digits) || !nipChecksumOk(digits)) bad('nip')
+  if (!/^\d{10}$/.test(digits) || digits === '0000000000' || !nipChecksumOk(digits)) bad('nip')
   return digits
 }
 

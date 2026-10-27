@@ -57,8 +57,20 @@ describe('nameKeyText and nameKey', () => {
     expect(nipKey('7740001454')).toBe('nip_7740001454')
   })
 
-  it('keeps distinct Cyrillic letters distinct (й is not и)', () => {
+  it('keeps distinct Cyrillic letters distinct (й is not и, ї is not і)', () => {
     expect(nameKeyText('й')).not.toBe(nameKeyText('и'))
+    expect(nameKeyText('ї')).not.toBe(nameKeyText('і'))
+    expect(nameKeyText('Ї')).not.toBe(nameKeyText('І'))
+  })
+
+  it('ignores a stress mark and other combining marks of non-Latin scripts', () => {
+    expect(nameKeyText('Ива́нов')).toBe(nameKeyText('Иванов'))
+    expect(nameKey('Ива́нов')).toBe('name_иванов')
+  })
+
+  it('still strips Latin diacritics, precomposed or combining', () => {
+    expect(nameKeyText('Café Zażółć')).toBe('cafe_zazolc')
+    expect(nameKeyText('Café')).toBe('cafe')
   })
 })
 
@@ -71,6 +83,10 @@ describe('normalizeNip', () => {
     ['5252344078', '5252344078'],
   ])('accepts %s', (raw, expected) => {
     expect(normalizeNip(raw)).toBe(expected)
+  })
+
+  it.each([['0000000000'], ['000-000-00-00'], ['PL0000000000']])('refuses %s (passes the checksum, never a real NIP)', (raw) => {
+    expect(field(() => normalizeNip(raw))).toBe('nip')
   })
 
   it.each([['7740001455'], ['123'], ['12345678901'], ['abcdefghij'], ['1234567890'], [''], [7740001454], [null]])(
