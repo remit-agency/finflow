@@ -160,6 +160,34 @@ describe('updateCounterparty', () => {
     expect(await auditActions(testDb(), ORG)).toEqual(['counterparty.create', 'counterparty.create', 'counterparty.update'])
   })
 
+  it('does not delete a name key that belongs to another counterparty when renaming', async () => {
+    const c = await createCounterparty(makeCpDeps(), ORG, UID, { name: 'Old Name', ibans: [] })
+    await testDb().doc(`organizations/${ORG}/counterpartyKeys/name_old_name`).set({ counterpartyId: 'someone-else' })
+    await updateCounterparty(makeCpDeps(), ORG, UID, c.id, { name: 'New Name' })
+    expect(await ids(`organizations/${ORG}/counterpartyKeys`)).toEqual(['name_new_name', 'name_old_name'])
+    expect(await readDoc(testDb(), `organizations/${ORG}/counterpartyKeys/name_old_name`)).toEqual({ counterpartyId: 'someone-else' })
+  })
+
+  it('renaming into a name another record has is a duplicate on the name and changes nothing', async () => {
+    const a = await createCounterparty(makeCpDeps(), ORG, UID, { name: 'Alpha', ibans: [] })
+    const b = await createCounterparty(makeCpDeps(), ORG, UID, { name: 'Beta', ibans: [] })
+    const e = await failure(updateCounterparty(makeCpDeps(), ORG, UID, b.id, { name: 'ALPHA' }))
+    expect(e).toMatchObject({ code: 'duplicate', field: 'name', existingId: a.id })
+    expect((await readDoc(testDb(), `organizations/${ORG}/counterparties/${b.id}`))?.name).toBe('Beta')
+    expect(await ids(`organizations/${ORG}/counterpartyKeys`)).toEqual(['name_alpha', 'name_beta'])
+    expect(await readDoc(testDb(), `organizations/${ORG}/counterpartyKeys/name_beta`)).toEqual({ counterpartyId: b.id })
+    expect(await auditActions(testDb(), ORG)).toEqual(['counterparty.create', 'counterparty.create'])
+  })
+
+  it('a key this counterparty already owns is not a duplicate of itself', async () => {
+    const c = await createCounterparty(makeCpDeps(), ORG, UID, { name: 'Alpha', ibans: [] })
+    await testDb().doc(`organizations/${ORG}/counterpartyKeys/name_beta`).set({ counterpartyId: c.id })
+    const after = await updateCounterparty(makeCpDeps(), ORG, UID, c.id, { name: 'Beta' })
+    expect(after.name).toBe('Beta')
+    expect(await ids(`organizations/${ORG}/counterpartyKeys`)).toEqual(['name_beta'])
+    expect(await readDoc(testDb(), `organizations/${ORG}/counterpartyKeys/name_beta`)).toEqual({ counterpartyId: c.id })
+  })
+
   it('refuses a NIP that another counterparty has and changes nothing', async () => {
     const a = await createCounterparty(makeCpDeps(), ORG, UID, { name: 'A', nip: '7740001454', ibans: [] })
     const b = await createCounterparty(makeCpDeps(), ORG, UID, { name: 'B', ibans: [] })

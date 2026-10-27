@@ -139,15 +139,23 @@ export async function updateCounterparty(
     if (!snap.exists) throw new CounterpartyError('not_found')
     // Someone saved this counterparty between our first read and now: the marks above may be stale.
     if (!pre.updateTime || !snap.updateTime || !snap.updateTime.isEqual(pre.updateTime)) throw new CounterpartyError('conflict')
+    // All reads first.
     const taken = await Promise.all(added.map((k) => t.get(keysCol.doc(k))))
+    const leaving = await Promise.all(removed.map((k) => t.get(keysCol.doc(k))))
+    const owned = (s: { exists: boolean; get: (f: string) => unknown }) => s.exists && s.get('counterpartyId') === id
     taken.forEach((s, i) => {
-      if (s.exists) throw duplicate(added[i], s)
+      if (s.exists && !owned(s)) throw duplicate(added[i], s)
     })
 
     const ts = Timestamp.fromDate(deps.now())
     t.set(ref, { ...counterpartyToDoc(after), orgId, createdAt: snap.get('createdAt'), updatedAt: ts })
-    for (const k of removed) t.delete(keysCol.doc(k))
-    for (const k of added) t.create(keysCol.doc(k), { counterpartyId: id })
+    // Only delete a key this counterparty owns; a key already owned by it needs no recreating.
+    leaving.forEach((s, i) => {
+      if (owned(s)) t.delete(keysCol.doc(removed[i]))
+    })
+    added.forEach((k, i) => {
+      if (!taken[i].exists) t.create(keysCol.doc(k), { counterpartyId: id })
+    })
     t.create(auditCol(deps.db, orgId).doc(), auditData(deps, 'counterparty.update', uid, id, counterpartyToDoc(prior), counterpartyToDoc(after)))
     return after
   })
