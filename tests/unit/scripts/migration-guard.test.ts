@@ -57,6 +57,22 @@ describe('assertProductionFlags', () => {
   it('accepts any iterable of arguments', () => {
     expect(assertProductionFlags({ emulator: false, apply: true, drop: false, args: new Set(['--apply', PROJECT]) })).toEqual({ ok: true })
   })
+
+  it('names the caller own drop flag and rules statement in the refusal (ledger migration)', () => {
+    const ledger = { dropFlag: '--drop-legacy', rulesStatement: 'the S05 app is deployed and the new rules are live' }
+    const noRules = assertProductionFlags({ emulator: false, apply: false, drop: true, args: ['--drop-legacy', PROJECT], ...ledger })
+    expect(noRules).toMatchObject({ ok: false, exitCode: 2 })
+    expect(noRules.ok === false && noRules.message).toContain('--drop-legacy')
+    expect(noRules.ok === false && noRules.message).toContain('S05 app')
+    expect(noRules.ok === false && noRules.message).not.toContain('members')
+
+    const noProject = assertProductionFlags({ emulator: false, apply: false, drop: true, args: ['--drop-legacy', '--rules-deployed'], ...ledger })
+    expect(noProject.ok === false && noProject.message).toContain('--drop-legacy')
+
+    expect(
+      assertProductionFlags({ emulator: false, apply: false, drop: true, args: ['--drop-legacy', PROJECT, '--rules-deployed'], ...ledger }),
+    ).toEqual({ ok: true })
+  })
 })
 
 describe('assertDropSkippedAllowed', () => {

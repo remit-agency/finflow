@@ -33,7 +33,7 @@ interface Job {
   next: Prepared | null
 }
 
-function evidenceOf(s: RateSnapshot): RateEvidence {
+export function evidenceOf(s: RateSnapshot): RateEvidence {
   // Only final snapshots may be stored for good (S04). The plan never asks for a date after today.
   if (!s.final) throw new Error('refusing to store a non-final rate snapshot')
   return { rate: s.rate, from: s.from, to: s.to, requestedDate: s.requestedDate, rateDate: s.rateDate, tableNo: s.tableNo, source: s.source }
