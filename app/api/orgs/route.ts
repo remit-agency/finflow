@@ -1,6 +1,7 @@
 import { requireUser } from '@/lib/server/auth'
-import { errorResponse, HttpError } from '@/lib/server/http-error'
+import { errorResponse } from '@/lib/server/http-error'
 import { createOrganizationForUser, parseCreateOrgInput } from '@/lib/server/orgs'
+import { readJsonBody } from '@/lib/server/request-body'
 
 export const runtime = 'nodejs'
 
@@ -14,22 +15,7 @@ export async function POST(req: Request) {
   try {
     const { uid } = await requireUser(req)
 
-    const declaredLength = req.headers.get('content-length')
-    if (declaredLength !== null && Number(declaredLength) > MAX_BODY_BYTES) {
-      throw new HttpError(413, 'payload too large')
-    }
-    if (!(req.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) {
-      throw new HttpError(415, 'unsupported media type')
-    }
-    const text = await req.text()
-    if (text.length > MAX_BODY_BYTES) throw new HttpError(413, 'payload too large')
-
-    let body: unknown
-    try {
-      body = JSON.parse(text)
-    } catch {
-      throw new HttpError(400, 'invalid_body')
-    }
+    const body = await readJsonBody(req, MAX_BODY_BYTES)
 
     const orgId = await createOrganizationForUser(uid, parseCreateOrgInput(body))
     return Response.json({ orgId }, { status: 201, headers: { 'Cache-Control': 'no-store' } })
