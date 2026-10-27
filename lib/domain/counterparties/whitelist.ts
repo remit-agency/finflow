@@ -8,6 +8,8 @@ export interface WhitelistSubject {
   vatStatus: VatStatus
   /** Normalised NRBs; entries that are not valid account numbers are dropped. */
   ibans: string[]
+  /** The company uses virtual accounts, so an account that is not in `ibans` may still be legitimate. */
+  hasVirtualAccounts: boolean
 }
 
 export type WhitelistLookup = { found: false } | { found: true; subject: WhitelistSubject }
@@ -47,5 +49,6 @@ export function parseWhitelistBody(body: unknown): WhitelistLookup {
 
   const ibans = s.accountNumbers.map((n) => tryNormalizeIban(n)).filter((n): n is string => n !== null)
   const address = text(s.workingAddress) ?? text(s.residenceAddress)
-  return { found: true, subject: { name, ...(address === undefined ? {} : { address }), vatStatus, ibans } }
+  const hasVirtualAccounts = s.hasVirtualAccounts === true
+  return { found: true, subject: { name, ...(address === undefined ? {} : { address }), vatStatus, ibans, hasVirtualAccounts } }
 }

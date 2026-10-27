@@ -28,9 +28,11 @@ async function ask(deps: CounterpartyDeps, nip: string): Promise<WhitelistLookup
 
 function marksFrom(found: WhitelistLookup, today: string, ibans: string[]): Marks {
   if (!found.found) return { ibans: unmarked(ibans) }
+  const { ibans: listed, hasVirtualAccounts } = found.subject
   return {
     vat: { status: found.subject.vatStatus, checkedOn: today },
-    ibans: ibans.map((iban) => ({ iban, onWhitelist: found.subject.ibans.includes(iban) })),
+    // A company with virtual accounts can have accounts the list does not show: an unlisted one is "not checked".
+    ibans: ibans.map((iban) => ({ iban, onWhitelist: listed.includes(iban) ? true : hasVirtualAccounts ? null : false })),
   }
 }
 

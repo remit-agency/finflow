@@ -15,15 +15,25 @@ describe('parseWhitelistBody', () => {
         address: 'CHEMIKÓW 7, 09-411 PŁOCK',
         vatStatus: 'active',
         ibans: ['61109010140000071219812874'],
+        hasVirtualAccounts: false,
       },
     })
+  })
+
+  it('reads hasVirtualAccounts: true', () => {
+    expect(parseWhitelistBody(fixture('found-virtual.json'))).toMatchObject({ found: true, subject: { hasVirtualAccounts: true } })
+  })
+
+  it.each([['missing', undefined], ['a string', 'true'], ['a number', 1], ['null', null]])('counts hasVirtualAccounts as false when it is %s', (_label, value) => {
+    const subject = { name: 'A', statusVat: 'Czynny', accountNumbers: [], hasVirtualAccounts: value }
+    expect(parseWhitelistBody({ result: { subject } })).toMatchObject({ found: true, subject: { hasVirtualAccounts: false } })
   })
 
   it('prefers the working address and maps Zwolniony to exempt', () => {
     const result = parseWhitelistBody(fixture('found-exempt.json'))
     expect(result).toEqual({
       found: true,
-      subject: { name: 'JAN KOWALSKI USŁUGI', address: 'ul. Robocza 2, 00-002 Warszawa', vatStatus: 'exempt', ibans: [] },
+      subject: { name: 'JAN KOWALSKI USŁUGI', address: 'ul. Robocza 2, 00-002 Warszawa', vatStatus: 'exempt', ibans: [], hasVirtualAccounts: false },
     })
   })
 
@@ -33,7 +43,7 @@ describe('parseWhitelistBody', () => {
 
   it('maps Niezarejestrowany to unregistered', () => {
     const body = { result: { subject: { name: 'A', statusVat: 'Niezarejestrowany', accountNumbers: [] } } }
-    expect(parseWhitelistBody(body)).toEqual({ found: true, subject: { name: 'A', vatStatus: 'unregistered', ibans: [] } })
+    expect(parseWhitelistBody(body)).toEqual({ found: true, subject: { name: 'A', vatStatus: 'unregistered', ibans: [], hasVirtualAccounts: false } })
   })
 
   it.each([

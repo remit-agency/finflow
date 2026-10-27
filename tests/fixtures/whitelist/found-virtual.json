@@ -1,0 +1,16 @@
+{
+  "result": {
+    "subject": {
+      "name": "ALLEGRO SP. Z O.O.",
+      "nip": "5252344078",
+      "statusVat": "Czynny",
+      "regon": "000000000",
+      "krs": "0000000000",
+      "residenceAddress": null,
+      "workingAddress": "UL. GRUNWALDZKA 182, 60-166 POZNAŃ",
+      "accountNumbers": ["61109010140000071219812874"],
+      "hasVirtualAccounts": true
+    },
+    "requestId": "W1rvo-virtual"
+  }
+}

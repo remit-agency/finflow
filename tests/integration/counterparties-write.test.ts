@@ -8,7 +8,8 @@ import { auditActions, clearFirestore, ORG, readDoc, seedOrg, testDb, TODAY, UID
 
 const NRB1 = '61109010140000071219812874'
 const NRB2 = '15109010140000071219812874'
-const FOUND: WhitelistLookup = { found: true, subject: { name: 'ORLEN', vatStatus: 'active', ibans: [NRB1] } }
+const FOUND: WhitelistLookup = { found: true, subject: { name: 'ORLEN', vatStatus: 'active', ibans: [NRB1], hasVirtualAccounts: false } }
+const FOUND_VIRTUAL: WhitelistLookup = { found: true, subject: { name: 'ORLEN', vatStatus: 'active', ibans: [NRB1], hasVirtualAccounts: true } }
 const NOT_FOUND: WhitelistLookup = { found: false }
 
 function makeCpDeps(over: Partial<CounterpartyDeps> = {}): CounterpartyDeps {
@@ -52,6 +53,17 @@ describe('createCounterparty', () => {
     expect(c.vat).toEqual({ status: 'active', checkedOn: TODAY })
     expect(c.ibans).toEqual([{ iban: NRB1, onWhitelist: true }, { iban: NRB2, onWhitelist: false }])
     expect(await ids(`organizations/${ORG}/counterpartyKeys`)).toEqual(['name_orlen', 'nip_7740001454'])
+  })
+
+  it('for a company with virtual accounts an IBAN not in the list is "not checked" (null), not "not on the list"', async () => {
+    const c = await createCounterparty(makeCpDeps({ lookup: async () => FOUND_VIRTUAL }), ORG, UID, { name: 'Orlen', nip: '7740001454', ibans: [NRB1, NRB2] })
+    expect(c.ibans).toEqual([{ iban: NRB1, onWhitelist: true }, { iban: NRB2, onWhitelist: null }])
+  })
+
+  it('on update too, a virtual-accounts company leaves an unlisted IBAN unchecked', async () => {
+    const c = await createCounterparty(makeCpDeps(), ORG, UID, { name: 'Orlen', nip: '7740001454', ibans: [] })
+    const after = await updateCounterparty(makeCpDeps({ lookup: async () => FOUND_VIRTUAL }), ORG, UID, c.id, { ibans: [NRB1, NRB2] })
+    expect(after.ibans).toEqual([{ iban: NRB1, onWhitelist: true }, { iban: NRB2, onWhitelist: null }])
   })
 
   it('with the white list unavailable still saves, with nothing marked', async () => {
