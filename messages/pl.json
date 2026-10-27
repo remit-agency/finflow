@@ -128,6 +128,7 @@
       "company": "Firma",
       "language": "Język",
       "categories": "Kategorie",
+      "counterparties": "Kontrahenci",
       "banks": "Banki",
       "subscription": "Subskrypcja"
     },
@@ -308,6 +309,75 @@
   },
   "settings": {
     "title": "Ustawienia",
+    "counterparties": {
+      "title": "Kontrahenci",
+      "description": "Dostawcy, klienci i urzędy, którym płacisz lub od których dostajesz zapłatę",
+      "searchPlaceholder": "Szukaj po nazwie lub NIP",
+      "add": "Dodaj kontrahenta",
+      "showArchived": "Pokaż zarchiwizowanych",
+      "empty": "Brak kontrahentów",
+      "noMatches": "Brak kontrahentów pasujących do wyszukiwania",
+      "archivedBadge": "Zarchiwizowany",
+      "systemBadge": "Systemowy",
+      "edit": "Edytuj {name}",
+      "vat": {
+        "active": "Czynny podatnik VAT",
+        "exempt": "Zwolniony z VAT",
+        "unregistered": "Niezarejestrowany jako podatnik VAT",
+        "checkedOn": "sprawdzono {date}"
+      },
+      "whitelist": {
+        "yes": "Na białej liście",
+        "no": "Poza białą listą",
+        "unknown": "Nie sprawdzono"
+      },
+      "form": {
+        "titleNew": "Nowy kontrahent",
+        "titleEdit": "Edycja kontrahenta",
+        "name": "Nazwa",
+        "nip": "NIP",
+        "nipHelp": "10 cyfr, z prefiksem PL i myślnikami lub bez",
+        "lookup": "Uzupełnij z białej listy",
+        "lookingUp": "Szukanie…",
+        "address": "Adres",
+        "ibans": "Rachunki bankowe",
+        "ibanPlaceholder": "Numer rachunku (26 cyfr)",
+        "addIban": "Dodaj rachunek",
+        "removeIban": "Usuń rachunek {iban}",
+        "save": "Zapisz",
+        "saving": "Zapisywanie…",
+        "cancel": "Anuluj",
+        "archive": "Archiwizuj",
+        "restore": "Przywróć"
+      },
+      "errors": {
+        "name": "Podaj nazwę",
+        "nip": "Podaj poprawny NIP",
+        "iban": "Podaj poprawny numer rachunku",
+        "duplicateNip": "Kontrahent z tym NIP już istnieje",
+        "duplicateName": "Kontrahent o tej nazwie już istnieje",
+        "openExisting": "Otwórz",
+        "limit": "Osiągnięto limit kontrahentów",
+        "lookupUnavailable": "Biała lista jest teraz niedostępna. Uzupełnij dane ręcznie.",
+        "lookupNotFound": "Tego NIP nie ma w rejestrze VAT. Uzupełnij dane ręcznie.",
+        "rateLimited": "Zbyt wiele zapytań. Spróbuj za minutę.",
+        "save": "Nie udało się zapisać kontrahenta"
+      },
+      "toast": {
+        "created": "Dodano kontrahenta",
+        "saved": "Zapisano kontrahenta",
+        "archived": "Zarchiwizowano kontrahenta",
+        "restored": "Przywrócono kontrahenta",
+        "filled": "Uzupełniono dane z białej listy"
+      },
+      "picker": {
+        "label": "Kontrahent",
+        "placeholder": "Szukaj kontrahenta",
+        "none": "Bez kontrahenta",
+        "create": "Dodaj kontrahenta",
+        "noMatches": "Nie znaleziono kontrahentów"
+      }
+    },
     "banks": {
       "title": "Połączenie z bankiem",
       "description": "Santander, PKO, mBank, ING i inne banki przez Enable Banking",

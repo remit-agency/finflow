@@ -1,0 +1,14 @@
+{
+  "result": {
+    "subject": {
+      "name": "JAN KOWALSKI USŁUGI",
+      "nip": "5252344078",
+      "statusVat": "Zwolniony",
+      "residenceAddress": "ul. Prosta 1, 00-001 Warszawa",
+      "workingAddress": "ul. Robocza 2, 00-002 Warszawa",
+      "accountNumbers": [],
+      "hasVirtualAccounts": false
+    },
+    "requestId": "W1rvo-aaaaaaa"
+  }
+}

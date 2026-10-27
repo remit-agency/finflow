@@ -12,6 +12,9 @@ export const fakeOrgs = new Map<string, Record<string, unknown>>()
 /** organizations/{orgId}/members/{uid}, keyed `${orgId}/${uid}`. */
 export const fakeMembers = new Map<string, Record<string, unknown>>()
 
+/** Any other document, keyed by its full path (for example organizations/{orgId}/counterparties/{id}). */
+export const fakeOtherDocs = new Map<string, Record<string, unknown>>()
+
 /** Set `failOnCreatePathIncludes` to make db.runTransaction's tx.create throw for matching paths (atomicity tests). */
 export const fakeTxFault: { failOnCreatePathIncludes: string | null } = { failOnCreatePathIncludes: null }
 
@@ -23,14 +26,14 @@ function readPath(path: string): Record<string, unknown> | undefined {
   if (s[0] !== 'organizations') return undefined
   if (s.length === 2) return fakeOrgs.get(s[1])
   if (s.length === 4 && s[2] === 'members') return fakeMembers.get(`${s[1]}/${s[3]}`)
-  return undefined
+  return fakeOtherDocs.get(path)
 }
 
 function writePath(path: string, data: Record<string, unknown>): void {
   const s = path.split('/')
   if (s.length === 2) fakeOrgs.set(s[1], data)
   else if (s.length === 4 && s[2] === 'members') fakeMembers.set(`${s[1]}/${s[3]}`, data)
-  else throw new Error(`fake admin cannot write ${path}`)
+  else fakeOtherDocs.set(path, data)
 }
 
 /** Accepted credential -> uid. Used for BOTH session-cookie values and ID tokens. */
@@ -153,6 +156,7 @@ export const fakeAdmin = {
 export function resetFakeAdmin(): void {
   fakeOrgs.clear()
   fakeMembers.clear()
+  fakeOtherDocs.clear()
   fakeTxFault.failOnCreatePathIncludes = null
   fakeTokens.clear()
   fakeUnverified.clear()

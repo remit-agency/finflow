@@ -4,14 +4,18 @@
  *
  * `status` is normalized: anything that is not an integer in 400-599 becomes 500, so a bad
  * status can never make `Response.json` throw a RangeError inside an error handler.
+ * `extra` adds fields to the JSON body (for example `field`, `existingId`); it cannot replace `error`.
  */
 export class HttpError extends Error {
   public readonly status: number
+  /** Extra JSON fields of the response body. The `error` code (the message) always wins over them. */
+  public readonly extra?: Record<string, unknown>
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, extra?: Record<string, unknown>) {
     super(message)
     this.name = 'HttpError'
     this.status = Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500
+    this.extra = extra
   }
 }
 
@@ -23,7 +27,7 @@ export class HttpError extends Error {
  */
 export function errorResponse(e: unknown): Response {
   if (e instanceof HttpError) {
-    return Response.json({ error: e.message }, { status: e.status })
+    return Response.json({ ...(e.extra ?? {}), error: e.message }, { status: e.status })
   }
   if (e instanceof Error) {
     console.error('unhandled error', { name: e.name, message: e.message, stack: e.stack })

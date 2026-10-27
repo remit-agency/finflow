@@ -18,6 +18,8 @@ const E2E_SERVER_ENV: Record<string, string> = {
   NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
   EB_STATE_SECRET: 'e2e-only-state-secret',
   NEXT_TELEMETRY_DISABLED: '1',
+  // The MF white list stub (tests/e2e/helpers/wl-stub.mjs): no e2e test calls the real government API.
+  WL_API_BASE: 'http://127.0.0.1:4010',
 }
 
 export default defineConfig({
@@ -43,14 +45,24 @@ export default defineConfig({
     video: 'off',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    env: E2E_SERVER_ENV,
-    // Never reuse a server: one started by hand may point at production Firebase.
-    reuseExistingServer: false,
-    timeout: 180_000,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  },
+  webServer: [
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:3000',
+      env: E2E_SERVER_ENV,
+      // Never reuse a server: one started by hand may point at production Firebase.
+      reuseExistingServer: false,
+      timeout: 180_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      command: 'node tests/e2e/helpers/wl-stub.mjs',
+      url: 'http://127.0.0.1:4010/health',
+      reuseExistingServer: false,
+      timeout: 30_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  ],
 })

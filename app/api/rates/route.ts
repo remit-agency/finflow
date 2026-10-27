@@ -3,6 +3,7 @@ import { FxError, resolveRate } from '@/lib/server/fx'
 import { isDay } from '@/lib/domain/ledger/days'
 import { isCurrencyCode } from '@/lib/server/fx/rates'
 import { errorResponse, HttpError } from '@/lib/server/http-error'
+import { enforceRateLimit, RATES_LIMITS } from '@/lib/server/rate-limit-guard'
 
 export const runtime = 'nodejs'
 
@@ -19,7 +20,7 @@ const STATUS = {
 // user may ask; no company is involved.
 export async function GET(req: Request) {
   try {
-    await requireUser(req)
+    const { uid } = await requireUser(req)
 
     const params = new URL(req.url).searchParams
     const keys = [...params.keys()]
@@ -34,6 +35,7 @@ export async function GET(req: Request) {
       throw new HttpError(400, 'invalid_params')
     }
 
+    await enforceRateLimit(uid, 'rates', RATES_LIMITS)
     const snapshot = await resolveRate(from, to, date)
     return Response.json(snapshot, { headers: { 'Cache-Control': 'private, max-age=300' } })
   } catch (e) {

@@ -13,6 +13,7 @@
     "test:rules": "firebase emulators:exec --only firestore --project demo-finflow \"vitest run --config vitest.rules.config.ts\"",
     "test:integration": "firebase emulators:exec --only firestore --project demo-finflow \"vitest run --config vitest.integration.config.ts\"",
     "migrate:ledger": "node --conditions=react-server --import tsx scripts/migrate-ledger-v2.ts",
+    "seed:counterparties": "node --conditions=react-server --import tsx scripts/seed-counterparties.ts",
     "test:e2e": "playwright test",
     "ui:shots": "firebase emulators:exec --only auth,firestore --project demo-finflow \"playwright test --config playwright.shots.config.ts\""
   },

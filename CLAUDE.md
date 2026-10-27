@@ -62,7 +62,7 @@ app/
   (auth)/login, register          ← auth pages (client components)
   (app)/[orgSlug]/                ← signed-in app; orgSlug is the Firestore orgId
     layout.tsx                    ← server layout: ShellProvider + AppShell (S01A)
-    transactions/  analytics/{cashflow,pl,balance,calendar}/  settings/{company,categories,banks,subscription}/ (layout.tsx = section menu; settings/ redirects)
+    transactions/  analytics/{cashflow,pl,balance,calendar}/  settings/{company,categories,counterparties,banks,subscription}/ (layout.tsx = section menu; settings/ redirects)
   api/health/route.ts             ← health check (firebase-admin)
   api/auth/{session,logout}/route.ts  ← mint / revoke the session cookie
   api/orgs/route.ts               ← POST: create a company + owner membership (S02)
@@ -96,7 +96,7 @@ docs/            ← research, specs, plans
 ## Firestore Data Model (S00, S02)
 - `organizations/{orgId}`: `{ name, currency, ownerId, plan, trialEndsAt, createdAt }` (no `members` map since S02; `ownerId` is informational, access is decided by the membership document)
   - `members/{uid}`: `{ uid, role: 'owner' | 'accountant' | 'viewer', createdAt, addedBy }` (`uid` repeats the document id: the collection-group query filters on it)
-  - subcollections: `accounts`, `categories`, `transactions`, `bankConnections`
+  - subcollections: `accounts`, `categories`, `transactions`, `bankConnections`, `counterparties` (S06, read-only for clients), `counterpartyKeys` (S06, server only; uniqueness keys)
 - `_meta/{docId}` — server-only (for example `_meta/health`); clients are denied by the rules
 - Membership lookup on the client (`lib/firebase/members.ts`): `getMemberships(uid)` is a collection-group query `collectionGroup('members').where('uid', '==', uid)` (the rules are not a filter, so the query must constrain `uid` to the caller's own uid); `getMyOrganizations(uid)` loads the organizations of those memberships by id (organizations cannot be listed); `getMembership(orgId, uid)` reads the caller's own member document (its role, or null = no access). The collection-group index is in `firestore.indexes.json` (`fieldOverrides` for `members.uid`).
 
@@ -155,6 +155,15 @@ docs/            ← research, specs, plans
 - **Currency freeze:** the company currency cannot change once the company has operations (409 `currency_locked`); name and currency go through `PATCH /api/orgs/{orgId}` only. An account that has operations cannot be deleted or change currency.
 - **Tests:** `npx vitest run --config vitest.config.ts` (unit and property tests), `npm run test:rules`, `npm run test:integration` (Admin SDK against the Firestore emulator; needs Java 21, prefix `PATH="$HOME/.jre/temurin-21/bin:$PATH"`), e2e as in `.github/workflows/ci.yml`.
 - **Migration:** `npm run migrate:ledger` (dry run by default; `-- --apply`, `--drop-legacy`, `--reset-opening=<ids>`, `--org=<id>`; arguments are validated by `scripts/lib/migrate-ledger-args.ts`, unknown flags exit 2). Production needs `--project=finflow-e94b5`; `--drop-legacy` also needs `--rules-deployed` and refuses a company with an invalid legacy document or a failing `verifyLedger`. One backup file per company: `.secrets/ledger-v2-backup-<ISO with : as ->-<orgId>.json`. Legacy `null`/non-string `categoryId`, `description`, `projectId`, `counterpartyId` are deleted. Do not run two migrations at once.
+
+## Counterparties (S06)
+- **Split:** `lib/domain/counterparties/` is pure (name/NIP/NRB normalisation and checksums, input parsing, document mapping, uniqueness keys, white list response parsing, search); `lib/server/counterparties/` writes. Every change to `counterparties` and `counterpartyKeys` goes through it in ONE Admin transaction (document + key documents + audit). The browser only reads `counterparties`; the rules close all client writes and all access to `counterpartyKeys` and the root `rateLimits`.
+- **Uniqueness:** `counterpartyKeys/nip_{10 digits}` and `counterpartyKeys/name_{normalised name}` are created in the same transaction as the counterparty; an existing key is a `409 duplicate` with `field` and `existingId`. The name key is `name_` + lower-case letters/digits with every other run of characters replaced by one `_` (no `encodeURIComponent`); it drops Latin diacritics (`ł` is `l`) and stray combining marks such as a stress mark, while Cyrillic letters keep their identity (`й` is not `и`). `0000000000` is not a valid NIP.
+- **White list (MF):** `lookupNip` (server only, `WL_API_BASE` overrides the host in tests, 8 s timeout, one retry after a network error or a timeout). An IBAN missing from the list of a company with `hasVirtualAccounts` is marked `onWhitelist: null` (not checked), not `false`. A failure is `502 lookup_unavailable` and never blocks saving: the counterparty is saved with no VAT status and `onWhitelist: null`. `vat` and `onWhitelist` are set by the server, never accepted from the client. Every white list call (the lookup route, create and update) counts against the per-user limit (`lib/server/rate-limit-guard.ts`: 30 per minute, 300 per hour); `/api/rates` shares the mechanism. Create checks the keys before asking MF, so a duplicate costs no call.
+- **System records:** `system_zus` and `system_us` (`kind: 'zus' | 'us'`) are created with every new company (without audit entries) and added to existing ones by `npm run seed:counterparties` (dry run by default; `-- --apply --project=finflow-e94b5`; idempotent, found by id). They are ordinary records: editable and archivable, never deletable (there is no delete at all, only `archived`).
+- **Operations:** the ledger write path checks a new `counterpartyId` in the same transaction: unknown is `422 counterparty_not_found`, archived is `422 counterparty_archived`; an edit that leaves the counterparty as it was is not re-checked.
+- **UI:** settings section «Контрагенти» (`app/(app)/[orgSlug]/settings/counterparties`) and `components/counterparties/CounterpartyPicker.tsx` (controlled combobox for S07; the operation form is not changed yet).
+- **Tests:** unit under `tests/unit/{domain,server,api}/counterparties/`, integration `tests/integration/counterparties-*.test.ts` and `rate-limit.test.ts` (Firestore emulator), rules in `tests/rules/`, e2e `tests/e2e/counterparties.spec.ts` (the dev server talks to `tests/e2e/helpers/wl-stub.mjs`, never to the real white list).
 
 ## Design System (S01A: Finmap ergonomics, FinFlow look)
 

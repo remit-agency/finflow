@@ -76,3 +76,15 @@ describe('errorResponse', () => {
     expect(await res.json()).toEqual({ error: 'internal' })
   })
 })
+
+describe('HttpError extra fields', () => {
+  it('adds them to the JSON body but never lets them replace the error code', async () => {
+    const res = errorResponse(new HttpError(409, 'duplicate', { field: 'nip', existingId: 'c1', error: 'hacked' }))
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ field: 'nip', existingId: 'c1', error: 'duplicate' })
+  })
+
+  it('leaves the body as before when there are none', async () => {
+    expect(await errorResponse(new HttpError(404, 'not_found')).json()).toEqual({ error: 'not_found' })
+  })
+})

@@ -3,6 +3,8 @@ import { resetFakeAdmin } from '@/tests/unit/helpers/fake-admin'
 import { GET } from '@/app/api/rates/route'
 import { resolveRate } from '@/lib/server/fx'
 import { FxError } from '@/lib/server/fx/types'
+import { HttpError } from '@/lib/server/http-error'
+import { enforceRateLimit, RATES_LIMITS } from '@/lib/server/rate-limit-guard'
 
 vi.mock('@/lib/server/firebase-admin', async () => {
   const { fakeAdmin: admin } = await import('@/tests/unit/helpers/fake-admin')
@@ -11,6 +13,10 @@ vi.mock('@/lib/server/firebase-admin', async () => {
 vi.mock('@/lib/server/fx', async () => {
   const actual = await vi.importActual<typeof import('@/lib/server/fx')>('@/lib/server/fx')
   return { ...actual, resolveRate: vi.fn() }
+})
+vi.mock('@/lib/server/rate-limit-guard', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/server/rate-limit-guard')>('@/lib/server/rate-limit-guard')
+  return { ...actual, enforceRateLimit: vi.fn(async () => {}) }
 })
 
 const SNAPSHOT = {
@@ -34,6 +40,7 @@ describe('GET /api/rates', () => {
   beforeEach(() => {
     resetFakeAdmin()
     vi.mocked(resolveRate).mockReset().mockResolvedValue(SNAPSHOT as never)
+    vi.mocked(enforceRateLimit).mockReset().mockResolvedValue(undefined)
     vi.spyOn(console, 'error').mockImplementation(() => {})
   })
   afterEach(() => vi.restoreAllMocks())
@@ -42,6 +49,25 @@ describe('GET /api/rates', () => {
     const res = await GET(req('?from=EUR&to=PLN&date=2026-10-27', null))
     expect(res.status).toBe(401)
     expect(resolveRate).not.toHaveBeenCalled()
+  })
+
+  it('counts a valid request against the caller rates limit', async () => {
+    const res = await GET(req('?from=EUR&to=PLN&date=2026-10-27'))
+    expect(res.status).toBe(200)
+    expect(enforceRateLimit).toHaveBeenCalledWith('user-alice', 'rates', RATES_LIMITS)
+  })
+
+  it('answers 429 when the caller is over the limit and asks NBP nothing', async () => {
+    vi.mocked(enforceRateLimit).mockRejectedValue(new HttpError(429, 'rate_limited'))
+    const res = await GET(req('?from=EUR&to=PLN&date=2026-10-27'))
+    expect(res.status).toBe(429)
+    expect(await res.json()).toEqual({ error: 'rate_limited' })
+    expect(resolveRate).not.toHaveBeenCalled()
+  })
+
+  it('does not count a request with bad parameters', async () => {
+    expect((await GET(req('?from=EUR'))).status).toBe(400)
+    expect(enforceRateLimit).not.toHaveBeenCalled()
   })
 
   it('200 with the snapshot and a short private cache', async () => {

@@ -7,6 +7,8 @@ export class LedgerApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: string,
+    /** The whole JSON error body (`field`, `existingId`), when the server sent one. */
+    public readonly details?: Record<string, unknown>,
   ) {
     super(code)
     this.name = 'LedgerApiError'
@@ -78,13 +80,15 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
   })
   if (!res.ok) {
     let code = 'unknown'
+    let details: Record<string, unknown> | undefined
     try {
-      const json = (await res.json()) as { error?: unknown }
+      const json = (await res.json()) as Record<string, unknown>
       if (typeof json.error === 'string') code = json.error
+      details = json
     } catch {
       // Not JSON: keep 'unknown'.
     }
-    throw new LedgerApiError(res.status, code)
+    throw new LedgerApiError(res.status, code, details)
   }
   return res.status === 204 ? null : res.json()
 }
@@ -126,3 +130,5 @@ export async function deleteAccount(orgId: string, accountId: string): Promise<v
 export async function updateOrganization(orgId: string, patch: { name?: string; currency?: string }): Promise<void> {
   await call('PATCH', org(orgId), patch)
 }
+
+export { call as apiCall }

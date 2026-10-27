@@ -2,6 +2,7 @@ import 'server-only'
 import { Timestamp } from 'firebase-admin/firestore'
 import { getAdmin } from '@/lib/server/firebase-admin'
 import { HttpError } from '@/lib/server/http-error'
+import { seedSystemCounterparties } from '@/lib/server/counterparties/seed'
 
 export const MAX_OWNED_ORGS = 3
 export const TRIAL_DAYS = 14
@@ -65,6 +66,7 @@ export async function createOrganizationForUser(uid: string, input: CreateOrgInp
       createdAt,
     })
     tx.create(memberRef, { uid, role: 'owner', createdAt, addedBy: uid })
+    seedSystemCounterparties(tx, db, orgRef.id, now)
   })
 
   return orgRef.id

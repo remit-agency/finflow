@@ -31,7 +31,7 @@ describe('isSettingsPath', () => {
 
 describe('SETTINGS_SECTIONS', () => {
   it('lists the sections in menu order', () => {
-    expect(SETTINGS_SECTIONS.map((s) => s.slug)).toEqual(['company', 'language', 'categories', 'banks', 'subscription'])
+    expect(SETTINGS_SECTIONS.map((s) => s.slug)).toEqual(['company', 'language', 'categories', 'counterparties', 'banks', 'subscription'])
   })
 })
 
@@ -50,6 +50,7 @@ describe('activeSettingsSection', () => {
     ['/org1/settings/company', 'company'],
     ['/org1/settings/language', 'language'],
     ['/org1/settings/categories', 'categories'],
+    ['/org1/settings/counterparties', 'counterparties'],
     ['/org1/settings/banks', 'banks'],
     ['/org1/settings/subscription/extra', 'subscription'],
   ])('%s -> %s', (path, section) => {
@@ -97,12 +98,12 @@ describe('role-aware settings sections', () => {
   const slugs = (role: Parameters<typeof visibleSettingsSections>[0]) => visibleSettingsSections(role).map((s) => s.slug)
 
   it('owner sees everything', () => {
-    expect(slugs('owner')).toEqual(['company', 'language', 'categories', 'banks', 'subscription'])
+    expect(slugs('owner')).toEqual(['company', 'language', 'categories', 'counterparties', 'banks', 'subscription'])
   })
 
   it('accountant and viewer do not see banks and subscription', () => {
-    expect(slugs('accountant')).toEqual(['company', 'language', 'categories'])
-    expect(slugs('viewer')).toEqual(['company', 'language', 'categories'])
+    expect(slugs('accountant')).toEqual(['company', 'language', 'categories', 'counterparties'])
+    expect(slugs('viewer')).toEqual(['company', 'language', 'categories', 'counterparties'])
   })
 
   it('without a role nothing opens', () => {

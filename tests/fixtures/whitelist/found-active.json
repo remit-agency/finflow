@@ -1,0 +1,16 @@
+{
+  "result": {
+    "subject": {
+      "name": "ORLEN SPÓŁKA AKCYJNA",
+      "nip": "7740001454",
+      "statusVat": "Czynny",
+      "regon": "610188201",
+      "krs": "0000028860",
+      "residenceAddress": "CHEMIKÓW 7, 09-411 PŁOCK",
+      "workingAddress": null,
+      "accountNumbers": ["61109010140000071219812874", "not-a-valid-number", "15109010140000071219812874"],
+      "hasVirtualAccounts": false
+    },
+    "requestId": "W1rvo-994f1dd"
+  }
+}

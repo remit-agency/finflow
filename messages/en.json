@@ -128,6 +128,7 @@
       "company": "Company",
       "language": "Language",
       "categories": "Categories",
+      "counterparties": "Counterparties",
       "banks": "Banks",
       "subscription": "Subscription"
     },
@@ -308,6 +309,75 @@
   },
   "settings": {
     "title": "Settings",
+    "counterparties": {
+      "title": "Counterparties",
+      "description": "Suppliers, customers and offices you pay or get paid by",
+      "searchPlaceholder": "Search by name or NIP",
+      "add": "Add counterparty",
+      "showArchived": "Show archived",
+      "empty": "No counterparties yet",
+      "noMatches": "No counterparties match your search",
+      "archivedBadge": "Archived",
+      "systemBadge": "System",
+      "edit": "Edit {name}",
+      "vat": {
+        "active": "VAT payer",
+        "exempt": "VAT exempt",
+        "unregistered": "Not VAT-registered",
+        "checkedOn": "checked {date}"
+      },
+      "whitelist": {
+        "yes": "On the white list",
+        "no": "Not on the white list",
+        "unknown": "Not checked"
+      },
+      "form": {
+        "titleNew": "New counterparty",
+        "titleEdit": "Edit counterparty",
+        "name": "Name",
+        "nip": "NIP",
+        "nipHelp": "10 digits, with or without PL and dashes",
+        "lookup": "Fill in from the white list",
+        "lookingUp": "Looking up…",
+        "address": "Address",
+        "ibans": "Bank accounts",
+        "ibanPlaceholder": "Account number (26 digits)",
+        "addIban": "Add account",
+        "removeIban": "Remove account {iban}",
+        "save": "Save",
+        "saving": "Saving…",
+        "cancel": "Cancel",
+        "archive": "Archive",
+        "restore": "Restore"
+      },
+      "errors": {
+        "name": "Enter a name",
+        "nip": "Enter a valid NIP",
+        "iban": "Enter a valid account number",
+        "duplicateNip": "A counterparty with this NIP already exists",
+        "duplicateName": "A counterparty with this name already exists",
+        "openExisting": "Open it",
+        "limit": "The counterparty limit is reached",
+        "lookupUnavailable": "The white list is not available now. Fill in the data by hand.",
+        "lookupNotFound": "This NIP is not in the VAT register. Fill in the data by hand.",
+        "rateLimited": "Too many lookups. Try again in a minute.",
+        "save": "Could not save the counterparty"
+      },
+      "toast": {
+        "created": "Counterparty added",
+        "saved": "Counterparty saved",
+        "archived": "Counterparty archived",
+        "restored": "Counterparty restored",
+        "filled": "Data filled in from the white list"
+      },
+      "picker": {
+        "label": "Counterparty",
+        "placeholder": "Search counterparties",
+        "none": "No counterparty",
+        "create": "Add counterparty",
+        "noMatches": "No counterparties found"
+      }
+    },
     "banks": {
       "title": "Bank connection",
       "description": "Santander, PKO, mBank, ING and other banks through Enable Banking",

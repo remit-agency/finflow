@@ -31,9 +31,9 @@ const PROJECT_ID = 'demo-finflow'
 const RULES_FILE = process.env.FIRESTORE_RULES_FILE ?? resolve(process.cwd(), 'firestore.rules')
 const DAY = 24 * 60 * 60 * 1000
 // Written by the server only (S05): clients may read accounts, transactions and rollups, the owner reads audit.
-const SERVER_WRITTEN_SUBS = ['accounts', 'transactions', 'rollups', 'audit'] as const
-const MEMBER_READ_SUBS = ['accounts', 'categories', 'transactions', 'rollups'] as const
-const ALL_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'audit', 'bankConnections'] as const
+const SERVER_WRITTEN_SUBS = ['accounts', 'transactions', 'rollups', 'audit', 'counterparties'] as const
+const MEMBER_READ_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'counterparties'] as const
+const ALL_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'audit', 'bankConnections', 'counterparties'] as const
 
 let testEnv: RulesTestEnvironment
 
@@ -266,7 +266,7 @@ describe('collection group query on members (the "my companies" query)', () => {
   })
 
   it('does not open other collection groups', async () => {
-    for (const group of ['accounts', 'transactions', 'categories', 'rollups', 'audit', 'bankConnections', 'ledger']) {
+    for (const group of ['accounts', 'transactions', 'categories', 'rollups', 'audit', 'bankConnections', 'ledger', 'counterparties', 'counterpartyKeys']) {
       await assertFails(getDocs(collectionGroup(as('alice'), group)))
     }
   })
@@ -370,6 +370,37 @@ describe('data subcollections by role', () => {
     await assertFails(setDoc(doc(as('alice'), 'organizations/orgA/secrets/x'), { a: 1 }))
     await assertFails(getDoc(doc(as('alice'), 'organizations/orgA/secrets/x')))
     await assertFails(setDoc(doc(as('alice'), 'organizations/orgA/accounts/seed/history/h1'), { a: 1 }))
+  })
+})
+
+describe('counterparty keys and rate limits are closed to every client', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(fs(ctx), 'organizations/orgA/counterpartyKeys/name_acme'), { counterpartyId: 'c1' })
+      await setDoc(doc(fs(ctx), 'rateLimits/lookup_alice_m_1'), { count: 1 })
+    })
+  })
+
+  it.each(['alice', 'carol', 'dave', 'erin'])('%s cannot read or write a counterparty key', async (uid) => {
+    const key = doc(as(uid), 'organizations/orgA/counterpartyKeys/name_acme')
+    await assertFails(getDoc(key))
+    await assertFails(getDocs(collection(as(uid), 'organizations/orgA/counterpartyKeys')))
+    await assertFails(setDoc(doc(as(uid), 'organizations/orgA/counterpartyKeys/name_new'), { counterpartyId: 'c2' }))
+    await assertFails(updateDoc(key, { counterpartyId: 'c2' }))
+    await assertFails(deleteDoc(key))
+  })
+
+  it.each(['alice', 'carol', 'dave', 'erin'])('%s cannot read or write a rate-limit counter', async (uid) => {
+    const counter = doc(as(uid), 'rateLimits/lookup_alice_m_1')
+    await assertFails(getDoc(counter))
+    await assertFails(setDoc(doc(as(uid), 'rateLimits/lookup_alice_m_2'), { count: 0 }))
+    await assertFails(updateDoc(counter, { count: 0 }))
+    await assertFails(deleteDoc(counter))
+  })
+
+  it('an anonymous caller cannot read them either', async () => {
+    await assertFails(getDoc(doc(anon(), 'organizations/orgA/counterpartyKeys/name_acme')))
+    await assertFails(getDoc(doc(anon(), 'rateLimits/lookup_alice_m_1')))
   })
 })
 

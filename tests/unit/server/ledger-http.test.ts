@@ -9,6 +9,8 @@ const LEDGER: Record<LedgerErrorCode, number> = {
   not_found: 404,
   account_not_found: 422,
   category_not_found: 422,
+  counterparty_not_found: 422,
+  counterparty_archived: 422,
   currency_mismatch: 422,
   future_actual: 422,
   account_has_operations: 409,

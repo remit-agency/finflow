@@ -3,6 +3,7 @@ import { getFirestore, type Firestore } from 'firebase-admin/firestore'
 import { addDays } from '@/lib/domain/ledger/days'
 import { accountToDoc } from '@/lib/domain/ledger/doc'
 import { flatten } from '@/lib/domain/ledger/rollups'
+import { counterpartyToDoc } from '@/lib/domain/counterparties/doc'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import type { RateSnapshot } from '@/lib/server/fx/types'
 
@@ -52,6 +53,11 @@ export async function seedCategory(db: Firestore, orgId: string, id: string, typ
 export async function seedAccount(db: Firestore, orgId: string, id: string, currency: string, openingMinor = 0): Promise<void> {
   const doc = accountToDoc({ id, name: id, type: 'bank', currency, color: '#00c896', openingMinor, balanceMinor: openingMinor })
   await db.doc(`organizations/${orgId}/accounts/${id}`).set({ ...doc, orgId })
+}
+
+export async function seedCounterparty(db: Firestore, orgId: string, id: string, options: { archived?: boolean } = {}): Promise<void> {
+  const doc = counterpartyToDoc({ id, name: id, ibans: [], archived: options.archived === true })
+  await db.doc(`organizations/${orgId}/counterparties/${id}`).set({ ...doc, orgId })
 }
 
 export async function readDoc(db: Firestore, path: string): Promise<Record<string, unknown> | undefined> {

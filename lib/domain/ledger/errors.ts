@@ -3,6 +3,8 @@ export type LedgerErrorCode =
   | 'not_found'
   | 'account_not_found'
   | 'category_not_found'
+  | 'counterparty_not_found'
+  | 'counterparty_archived'
   | 'currency_mismatch'
   | 'future_actual'
   | 'account_has_operations'
