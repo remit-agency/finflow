@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { LOCALES } from '@/lib/i18n/config'
-import { formatAmountInput, parseAmountInput, roundAmount } from '@/lib/utils/amount-input'
+import { formatAmountInput, parseAmountInput, parseSignedAmountInput, roundAmount } from '@/lib/utils/amount-input'
 
 describe('parseAmountInput', () => {
   it.each([
@@ -56,6 +56,43 @@ describe('parseAmountInput', () => {
     ['１２３'],
   ])('rejects %j', (input) => {
     expect(parseAmountInput(input)).toBeNull()
+  })
+})
+
+describe('parseSignedAmountInput', () => {
+  it.each([
+    ['0', 0],
+    ['12', 12],
+    ['1 234,50', 1234.5],
+    ['1,234.50', 1234.5],
+    ['-5', -5],
+    ['-0,10', -0.1],
+    ['-0.10', -0.1],
+    ['−5', -5],
+    ['−1 234,50', -1234.5],
+    ['- 5', -5],
+    ['  -5  ', -5],
+    ['-1.234,50', -1234.5],
+  ])('parses %j as %s', (input, expected) => {
+    expect(parseSignedAmountInput(input)).toBe(expected)
+  })
+
+  it('reads a negative zero as 0, not -0', () => {
+    expect(Object.is(parseSignedAmountInput('-0'), 0)).toBe(true)
+    expect(Object.is(parseSignedAmountInput('−0,00'), 0)).toBe(true)
+  })
+
+  it.each([[''], ['   '], ['-'], ['−'], ['abc'], ['--5'], ['-−5'], ['+5'], ['5-'], ['-abc'], ['-1e3'], ['-1,2,3'], ['1-5']])(
+    'rejects %j',
+    (input) => {
+      expect(parseSignedAmountInput(input)).toBeNull()
+    },
+  )
+
+  it.each(LOCALES)('reads back what formatAmountInput prefilled a negative opening balance with in %s', (locale) => {
+    for (const value of [-0.1, -1234.56, -5, 0, 7.25]) {
+      expect(parseSignedAmountInput(formatAmountInput(value, locale))).toBe(value)
+    }
   })
 })
 

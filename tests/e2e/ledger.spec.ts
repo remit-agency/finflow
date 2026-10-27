@@ -1,8 +1,8 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { registerViaUi, waitForShell } from './helpers/app-ui'
 import { signInEmulatorUser } from './helpers/emulator-auth'
-import { createDocAs, listDocs } from './helpers/emulator-firestore'
-import { seedLedgerAccount } from './helpers/ledger-seed'
+import { createDocAs, listDocs, readDoc, seedDoc } from './helpers/emulator-firestore'
+import { seedLedgerAccount, seedLedgerOperation } from './helpers/ledger-seed'
 
 const NEEDS_EMULATORS =
   'Needs the Auth + Firestore emulators. Run: firebase emulators:exec --only auth,firestore --project demo-finflow "npm run test:e2e"'
@@ -101,6 +101,63 @@ test.describe('ledger (emulators)', () => {
     // The income of 10 and the expense of 10 stay in the journal.
     await expect(page.getByRole('row').filter({ hasText: 'Плюс десять' })).toBeVisible()
     await expect(page.getByRole('row').filter({ hasText: 'Мінус десять' })).toBeVisible()
+  })
+
+  test('editing only the amount keeps the category, counterparty, tags and accrual period', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'ledgeredit', 'PLN')
+    await waitForShell(page, user.companyName)
+    await seedLedgerAccount(request, user.orgId, 'acc-edit', { name: 'Konto edit', balance: 100, currency: 'PLN' })
+    await seedDoc(request, `organizations/${user.orgId}/categories`, 'cat-edit-income', {
+      name: 'Retainers',
+      type: 'income',
+      color: '#22c55e',
+      orgId: user.orgId,
+      createdAt: new Date(),
+    })
+    await seedLedgerOperation(request, user.orgId, 'tx-edit', {
+      type: 'income',
+      accountId: 'acc-edit',
+      amount: 100,
+      currency: 'PLN',
+      date: '2026-10-05',
+      description: 'Abonament',
+      categoryId: 'cat-edit-income',
+      counterpartyId: 'cp-edit',
+      tags: ['q4', 'retainer'],
+      accrual: { mode: 'period', from: '2026-10-01', to: '2026-12-31' },
+    })
+    await page.goto(`/${user.orgId}/transactions`)
+    await waitForShell(page, user.companyName)
+
+    await page.getByRole('row').filter({ hasText: 'Abonament' }).getByRole('button', { name: /редагувати$/ }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByText('Редагувати транзакцію', { exact: true })).toBeVisible()
+    const panel = dialog.getByRole('tabpanel')
+    // The stored category is still selected when the form opens (it is not reset on mount).
+    await expect(panel.locator('select').nth(1)).toHaveValue('cat-edit-income')
+
+    await panel.getByLabel('Сума', { exact: true }).fill('250')
+    await dialog.getByRole('button', { name: 'Зберегти', exact: true }).click()
+    await expect(dialog).toBeHidden()
+
+    const fields = await readDoc(request, `organizations/${user.orgId}/transactions/tx-edit`)
+    expect(fields, 'the operation is still stored').not.toBeNull()
+    // The server stores integers: the REST read gives { integerValue: "25000" } (not in FirestoreValue), a seed gives doubles.
+    const amountMinor = fields!.amountMinor as { integerValue?: string; doubleValue?: number }
+    expect(Number(amountMinor.integerValue ?? amountMinor.doubleValue)).toBe(25000)
+    expect(fields!.categoryId).toEqual({ stringValue: 'cat-edit-income' })
+    expect(fields!.counterpartyId).toEqual({ stringValue: 'cp-edit' })
+    expect(fields!.description).toEqual({ stringValue: 'Abonament' })
+    expect(fields!.tags).toEqual({ arrayValue: { values: [{ stringValue: 'q4' }, { stringValue: 'retainer' }] } })
+    expect(fields!.accrual).toEqual({
+      mapValue: {
+        fields: {
+          mode: { stringValue: 'period' },
+          from: { stringValue: '2026-10-01' },
+          to: { stringValue: '2026-12-31' },
+        },
+      },
+    })
   })
 
   test('a cross-currency transfer asks for both amounts', async ({ page, request }) => {

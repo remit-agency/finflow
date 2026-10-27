@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { createAccount, updateAccount, LedgerApiError } from '@/lib/api/ledger-client'
 import { useFormatters } from '@/lib/i18n/useFormatters'
-import { formatAmountInput, parseAmountInput } from '@/lib/utils/amount-input'
+import { formatAmountInput, parseSignedAmountInput } from '@/lib/utils/amount-input'
 import type { Account } from '@/types'
 
 const PRESET_COLORS = [
@@ -62,9 +62,9 @@ export function AccountForm({ orgId, account, defaultCurrency, open, onClose }: 
   const validate = (): boolean => {
     const errs: typeof errors = {}
     if (!name.trim()) errs.name = t('errors.name')
-    // parseAmountInput reads only non-negative amounts (a minus sign gives null), which is the
-    // rule this form has always had: the opening balance may be 0 but not below it.
-    if (parseAmountInput(balance) === null) errs.balance = t('errors.balance')
+    // The opening balance may be negative: the migration stores the legacy balance minus the sum of
+    // the operations, and the prefilled `-0,10` must stay valid so the account can still be edited.
+    if (parseSignedAmountInput(balance) === null) errs.balance = t('errors.balance')
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -79,8 +79,8 @@ export function AccountForm({ orgId, account, defaultCurrency, open, onClose }: 
         type,
         currency,
         color,
-        // validate() has already refused anything parseAmountInput cannot read.
-        opening: parseAmountInput(balance) ?? 0,
+        // validate() has already refused anything parseSignedAmountInput cannot read.
+        opening: parseSignedAmountInput(balance) ?? 0,
       }
       if (isEdit) {
         await updateAccount(orgId, account.id, data)

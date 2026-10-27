@@ -17,7 +17,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
-import { createTransaction, updateTransaction, type TransactionDraft } from '@/lib/api/ledger-client'
+import { createTransaction, updateTransaction } from '@/lib/api/ledger-client'
+import {
+  buildCreateDraft,
+  buildEditDraft,
+  categoryAfterTypeChange,
+  type FormOwnedDraft,
+} from '@/lib/api/transaction-draft'
 import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { formatAmountInput, parseAmountInput } from '@/lib/utils/amount-input'
@@ -96,11 +102,6 @@ export function TransactionForm({
     }
   }, [open, defaultType, isEdit])
 
-  // Reset category when type changes
-  useEffect(() => {
-    setCategoryId('')
-  }, [type])
-
   // Focus amount on open
   useEffect(() => {
     if (open) {
@@ -124,8 +125,9 @@ export function TransactionForm({
     return Object.keys(errs).length === 0
   }
 
-  const buildDraft = (): TransactionDraft => {
-    const draft: TransactionDraft = {
+  // Only the fields this form shows. An edit carries the rest over from the stored operation.
+  const buildFormDraft = (): FormOwnedDraft => {
+    const draft: FormOwnedDraft = {
       type,
       accountId,
       // validate() has already refused anything parseAmountInput cannot read.
@@ -133,8 +135,6 @@ export function TransactionForm({
       // The input is the YYYY-MM-DD string of the date field; the accrual date follows it on the server.
       paymentDate: date,
       isRecurring,
-      tags: [],
-      fileUrls: [],
     }
     if (categoryId && type !== 'transfer') draft.categoryId = categoryId
     if (type === 'transfer') draft.toAccountId = toAccountId
@@ -143,14 +143,20 @@ export function TransactionForm({
     return draft
   }
 
+  // A category belongs to one type: it is cleared when the user picks another tab, never on mount.
+  const changeType = (next: Transaction['type']) => {
+    setCategoryId(categoryAfterTypeChange(categoryId, type, next))
+    setType(next)
+  }
+
   const handleSubmit = async (addAnother = false) => {
     if (!validate()) return
     setLoading(true)
     try {
       if (isEdit) {
-        await updateTransaction(orgId, transaction.id, buildDraft())
+        await updateTransaction(orgId, transaction.id, buildEditDraft(transaction, buildFormDraft()))
       } else {
-        await createTransaction(orgId, buildDraft(), clientIdRef.current)
+        await createTransaction(orgId, buildCreateDraft(buildFormDraft()), clientIdRef.current)
         clientIdRef.current = crypto.randomUUID()
       }
       if (addAnother) {
@@ -190,7 +196,7 @@ export function TransactionForm({
 
         <div className="space-y-4">
           {/* Type tabs */}
-          <Tabs value={type} onValueChange={(v) => setType(v as Transaction['type'])}>
+          <Tabs value={type} onValueChange={(v) => changeType(v as Transaction['type'])}>
             <TabsList className="w-full">
               <TabsTrigger value="income" className="flex-1 data-[state=active]:text-green-600">
                 {t('income')}

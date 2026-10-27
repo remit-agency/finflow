@@ -56,6 +56,11 @@ export interface SeedOperation {
   date?: Date | string
   description?: string
   categoryId?: string
+  counterpartyId?: string
+  projectId?: string
+  tags?: string[]
+  /** Default: the payment day. */
+  accrual?: { mode: 'date'; date: string } | { mode: 'period'; from: string; to: string }
   toAccountId?: string
   toAmount?: number
   toCurrency?: string
@@ -78,11 +83,13 @@ export async function seedLedgerOperation(
     toAmountMinor: data.toAmount === undefined ? undefined : minor(data.toAmount),
     toCurrency: data.toCurrency,
     paymentDate: day,
-    accrual: { mode: 'date', date: day },
+    accrual: data.accrual ?? { mode: 'date', date: day },
     categoryId: data.categoryId,
+    counterpartyId: data.counterpartyId,
+    projectId: data.projectId,
     description: data.description,
     isRecurring: false,
-    tags: [],
+    tags: data.tags ?? [],
     fileUrls: [],
     schemaVersion: 2,
     orgId,

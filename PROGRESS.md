@@ -225,13 +225,14 @@ CashFlowChart (Recharts), PLTable, CalendarView, BalanceSheet, all 4 analytics p
 
 ### Підсумок перевірок (2026-10-27, реально виміряно)
 - `npm run typecheck`: чисто (код 0).
-- `npm run lint`: 0 errors / 14 warnings (було 15 до гілки, нових немає).
+- `npm run lint`: 0 errors / 13 warnings (було 15 до гілки; після виправлення форми операції на одне менше).
 - `npm run check:server-imports`: ок (4 модулі).
-- unit (`npx vitest run --config vitest.config.ts`): 1356 тестів, 77 файлів.
+- unit (`npx vitest run --config vitest.config.ts`): 1420 тестів, 80 файлів (після огляду).
 - rules (`npm run test:rules`): 96 тестів, 2 файли.
-- integration (`npm run test:integration`, емулятор Firestore): 49 тестів, 4 файли.
-- e2e (`firebase emulators:exec --only auth,firestore … "npm run test:e2e"`): 64 passed (було 59 до S05).
+- integration (`npm run test:integration`, емулятор Firestore): 64 тести, 5 файлів.
+- e2e (`firebase emulators:exec --only auth,firestore … "npm run test:e2e"`): 65 passed (було 59 до S05, 64 до виправлень огляду).
 - `npm run build`: ок (є роути `/api/orgs/...`).
+- **Огляд opus** (9 знахідок, усі виправлено): ключі rollups (`constructor`/`toString`), власність замка (токен), валідація міграції, dry-run без записів у `fxTables`, втрата даних при редагуванні операції (категорія, контрагент, проєкт, теги, файли, період визнання; `lib/api/transaction-draft.ts`), підписаний початковий залишок (`parseSignedAmountInput`, від'ємний залишок з міграції тепер редагується).
 
 ### Ще зробити до мерджа
 1. `firebase deploy --only firestore:indexes --project finflow-e94b5 --account "$FIREBASE_ACCOUNT"` і дочекатися, поки три індекси за `paymentDate` стануть READY (перевірити запитом); це урок S02.
