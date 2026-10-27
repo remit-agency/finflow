@@ -207,3 +207,45 @@ CashFlowChart (Recharts), PLTable, CalendarView, BalanceSheet, all 4 analytics p
 - **Обмеження частоти на `/api/rates` для користувача немає:** `requireUser` лише перевіряє сесію (кеші в пам'яті й пам'ять про збій обмежують звернення до НБП, але не до роуту).
 - **Округлення `rate` до 8 знаків** губить точність для крихітних крос-курсів екзотичних валют; якщо S05 це знадобиться, зберігати `mid` або значущі цифри.
 - **Необов'язкове виключення з індексів Firestore для `fxTables.tables`**, щоб зменшити вартість запису.
+
+## 2026-10-27 — S05: рушій обліку v2
+
+Спека: `docs/superpowers/specs/2026-10-27-s05-accounting-engine-design.md`. План: `docs/superpowers/plans/2026-10-27-s05-accounting-engine.md`.
+
+**Статус:** реалізовано в гілці `s05-accounting-engine`, **чекає мерджа** (не змерджено, не розгорнуто, міграція на проді не запускалась). S04 змерджено й живе на production (PR #8, правила розгорнуто), тож `resolveRate` доступний для S05.
+
+### Зроблено
+- **Домен** (`lib/domain/ledger/`, чисті функції без I/O): гроші в мінімальних одиницях (`toMinor`/`fromMinor`), парсинг і валідація входу, `balanceEffects`, внески в rollups, розкладання періоду по місяцях, `changeSet` (create `+new`, delete `-prior`, update обидва), оракул очікуваного стану для property-тестів.
+- **Сервер** (`lib/server/ledger/`): кожна зміна рахунку чи операції це одна транзакція Firestore Admin (документ, баланси, прирости rollups, аудит). `verifyLedger` (лише читання), `rebuildLedger` під замком (оренда 5 хв, 409 `ledger_busy`), ідемпотентність `clientId`, знімки курсу НБП для платежу й визнання (дата визнання обмежена сьогоднішнім днем), заморожування валюти компанії (409 `currency_locked`), відмова видаляти рахунок з операціями.
+- **Роути** `app/api/orgs/[orgId]/`: операції (POST/PATCH/DELETE), рахунки (POST/PATCH/DELETE), `PATCH /api/orgs/{orgId}` (назва, валюта), `POST …/ledger/rebuild?apply=0|1` (owner).
+- **Правила Firestore:** `accounts`, `transactions`, `rollups`, `audit` лише читання за ролями (audit лише owner), `ledger/**` закрито, браузер більше не оновлює документ компанії.
+- **Клієнт:** `lib/api/ledger-client.ts` (fetch до роутів), `lib/firebase/{accounts,transactions}.ts` лише читають і мапляться зі схеми v2. Форма операції без вибору валюти (береться валюта рахунку), для переказу між різними валютами просить другу суму; журнал показує лише `actual`.
+- **Міграція** `npm run migrate:ledger` (`scripts/migrate-ledger-v2.ts`): dry-run за замовчуванням, `--apply`, `--drop-legacy`, `--reset-opening=<ids>`, `--org=<id>`; аргументи перевіряє `scripts/lib/migrate-ledger-args.ts` (невідомий прапорець дає код 2). Резервна копія: один файл на компанію `.secrets/ledger-v2-backup-<ISO із ':' → '-'>-<orgId>.json`. Застарілі `null`/нерядкові `categoryId`, `description`, `projectId`, `counterpartyId` під час міграції видаляються. `--drop-legacy` відмовляє для компанії з невалідним документом старої схеми або з помилкою `verifyLedger`. Не запускати дві міграції одночасно.
+- **Документація:** блок «Ledger (S05)» у `CLAUDE.md`, спека приведена у відповідність до реалізації.
+
+### Підсумок перевірок (2026-10-27, реально виміряно)
+- `npm run typecheck`: чисто (код 0).
+- `npm run lint`: 0 errors / 14 warnings (було 15 до гілки, нових немає).
+- `npm run check:server-imports`: ок (4 модулі).
+- unit (`npx vitest run --config vitest.config.ts`): 1356 тестів, 77 файлів.
+- rules (`npm run test:rules`): 96 тестів, 2 файли.
+- integration (`npm run test:integration`, емулятор Firestore): 49 тестів, 4 файли.
+- e2e (`firebase emulators:exec --only auth,firestore … "npm run test:e2e"`): 64 passed (було 59 до S05).
+- `npm run build`: ок (є роути `/api/orgs/...`).
+
+### Ще зробити до мерджа
+1. `firebase deploy --only firestore:indexes --project finflow-e94b5 --account "$FIREBASE_ACCOUNT"` і дочекатися, поки три індекси за `paymentDate` стануть READY (перевірити запитом); це урок S02.
+2. Dry-run міграції на проді разом із власником (розбіжності на кшталт Monobank 1234,50 проти 1234,60), рішення про `--reset-opening`.
+3. Порядок розгортання за спекою: індекси, dry-run, `--apply`, merge і Vercel, `firebase deploy --only firestore:rules`, повторний `--apply`, `POST …/ledger/rebuild?apply=0` на кожній компанії, після перевірки власником `--drop-legacy`.
+4. Перша авторизована перевірка на production (живий НБП, `/api/rates` із сесією) досі не виконана.
+
+### Known follow-ups (S05)
+- **Інтерфейс:** у списку операцій немає кнопки видалення (видалення є в API й у `ledger-client`); форма з двома датами й режимом «Період платежу» (S07); журнал і фільтри за двома датами (S08).
+- **Звіти:** перехід на rollups, курсові різниці, перегляд аудиту в інтерфейсі (S12).
+- **Банк і імпорт:** ingest і дедуплікація за зовнішнім id (S09); масове створення з пакетним записом до 500 операцій на транзакцію (S14).
+- **Гаряча точка запису:** `cash_*`, `pl_*` і замок отримують запис від кожної операції, близько 1 запис/с на документ; для S09 і S14 писати пакетами.
+- **Вартість індексів:** `pl_*` і `cashcat_*` можна виключити з вкладених індексів (як `fxTables`).
+- **Переказ між різними валютами:** базові суми не зберігаються, S12 вирішує щодо курсової різниці.
+- **Закриті періоди:** не входять, редагувати можна будь-яку дату (слід в аудиті).
+- **Прибирання старої схеми:** поля `date`, `amount`, `balance` лишаються до `--drop-legacy` після розгортання.
+- **Права на рівні окремих рахунків:** пізніше.
