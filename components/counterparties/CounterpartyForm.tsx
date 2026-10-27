@@ -211,7 +211,7 @@ export function CounterpartyForm({ orgId, counterparty, onClose, initial, onSave
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div className="space-y-1">
             <Label htmlFor="cp-name">{t('form.name')}</Label>
-            <Input id="cp-name" value={name} onChange={(e) => setName(e.target.value)} aria-invalid={errors.name !== undefined} />
+            <Input id="cp-name" maxLength={200} value={name} onChange={(e) => setName(e.target.value)} aria-invalid={errors.name !== undefined} />
             {errors.name && <p role="alert" className="text-xs text-red-500">{errors.name}</p>}
             {duplicateNotice('name')}
           </div>
@@ -243,7 +243,7 @@ export function CounterpartyForm({ orgId, counterparty, onClose, initial, onSave
 
           <div className="space-y-1">
             <Label htmlFor="cp-address">{t('form.address')}</Label>
-            <Input id="cp-address" value={address} onChange={(e) => setAddress(e.target.value)} />
+            <Input id="cp-address" maxLength={300} value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
 
           <fieldset className="space-y-2">
