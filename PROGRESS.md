@@ -212,7 +212,7 @@ CashFlowChart (Recharts), PLTable, CalendarView, BalanceSheet, all 4 analytics p
 
 Спека: `docs/superpowers/specs/2026-10-27-s05-accounting-engine-design.md`. План: `docs/superpowers/plans/2026-10-27-s05-accounting-engine.md`.
 
-**Статус:** реалізовано в гілці `s05-accounting-engine`, **чекає мерджа** (не змерджено, не розгорнуто, міграція на проді не запускалась). S04 змерджено й живе на production (PR #8, правила розгорнуто), тож `resolveRate` доступний для S05.
+**Статус:** змерджено (PR #10, `f9682ff`, 2026-10-27), на production. Розгортання за порядком зі спеки: індекси `paymentDate` (READY) → dry-run → `--apply` з `--reset-opening` для рахунку Monobank (початковий залишок 0, баланс 1234,60; Kasa лишилась з початковим залишком 500,00 і балансом 92,00) → merge і Vercel → правила Firestore → повторний `--apply` (нічого не лишилось) → `verifyLedger` по всіх 88 компаніях без розбіжностей, `verify-firestore-rules` ALL PASSED. Бекап міграції в `.secrets/`. **Відкрито:** ручна перевірка власником на production і лише після неї `--drop-legacy` (прибирає старі поля `balance`, `date`, `amount`; без бекапу не відновити).
 
 ### Зроблено
 - **Домен** (`lib/domain/ledger/`, чисті функції без I/O): гроші в мінімальних одиницях (`toMinor`/`fromMinor`), парсинг і валідація входу, `balanceEffects`, внески в rollups, розкладання періоду по місяцях, `changeSet` (create `+new`, delete `-prior`, update обидва), оракул очікуваного стану для property-тестів.
