@@ -2,13 +2,14 @@
 
 import { can, type Action, type Role } from '@/lib/shell/permissions'
 
-export type SettingsSection = 'company' | 'language' | 'categories' | 'banks' | 'subscription'
+export type SettingsSection = 'company' | 'language' | 'categories' | 'counterparties' | 'banks' | 'subscription'
 
 // The label of a section is `t('shell.settingsSections.<slug>')`.
 export const SETTINGS_SECTIONS: ReadonlyArray<{ slug: SettingsSection }> = [
   { slug: 'company' },
   { slug: 'language' },
   { slug: 'categories' },
+  { slug: 'counterparties' },
   { slug: 'banks' },
   { slug: 'subscription' },
 ]
@@ -57,7 +58,7 @@ const REQUIRED_ACTION: Partial<Record<SettingsSection, Action>> = {
   subscription: 'subscription.view',
 }
 
-/** Whether the role may open the section (company, language and categories are visible to every member). */
+/** Whether the role may open the section (company, language, categories and counterparties are visible to every member). */
 export function canOpenSection(role: Role | null, section: SettingsSection): boolean {
   const action = REQUIRED_ACTION[section]
   return action ? can(role, action) : role !== null

@@ -84,6 +84,16 @@ describe('createTransaction', () => {
     expect((err as LedgerApiError).code).toBe('ledger_busy')
   })
 
+  it('keeps the whole error body as details', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock.mockResolvedValue(json(409, { error: 'duplicate', field: 'nip', existingId: 'c1' }))
+
+    const err = await createTransaction('o1', draft).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(LedgerApiError)
+    expect((err as LedgerApiError).code).toBe('duplicate')
+    expect((err as LedgerApiError).details).toEqual({ error: 'duplicate', field: 'nip', existingId: 'c1' })
+  })
+
   it('uses the code "unknown" when the error body is not JSON', async () => {
     vi.stubGlobal('fetch', fetchMock)
     fetchMock.mockResolvedValue(new Response('<html>oops</html>', { status: 502 }))
