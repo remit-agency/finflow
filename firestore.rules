@@ -11,7 +11,8 @@ rules_version = '2';
 //
 // Data shape:
 //   organizations/{orgId} { name, currency, ownerId, plan, trialEndsAt, createdAt }
-//   organizations/{orgId}/{accounts|categories|transactions|bankConnections}/{docId}
+//   organizations/{orgId}/{accounts|categories|transactions|rollups|audit|bankConnections|ledger}/{docId}
+// Accounts, transactions, rollups, audit and ledger are written by the server only (S05).
 //
 // The name `members` is reserved for memberships: the collection-group rule below applies to
 // every collection called `members`. New subcollections must be added to the lists below.
@@ -34,27 +35,16 @@ service cloud.firestore {
         && get(memberPath(orgId)).data.role in roles;
     }
 
-    // Type and size checks for the fields the owner may edit.
-    function orgFieldsValid(o) {
-      return o.name is string && o.name.trim().size() > 0 && o.name.size() <= 120
-        && o.currency is string && o.currency in ['PLN', 'EUR', 'USD', 'UAH'];
-    }
-
     // A subcollection document may carry an `orgId`, but only its own org's.
     function orgIdMatchesPath(orgId) {
       return !('orgId' in request.resource.data) || request.resource.data.orgId == orgId;
     }
 
     match /organizations/{orgId} {
-      // Any member may read the company. There is no `list` (companies are loaded by id from
-      // the caller's memberships), no client `create` and no `delete`.
+      // Any member may read the company. There is no `list` (companies are loaded by id from the caller's
+      // memberships) and no client `create`, `update` or `delete`: the name and currency change through
+      // PATCH /api/orgs/{orgId} (S05), which freezes the currency once there are operations.
       allow get: if hasRole(orgId, ['owner', 'accountant', 'viewer']);
-
-      // Allow-list: the owner may change only name and currency (settings page). Everything
-      // else (ownerId, plan, trial, createdAt, any unknown field) is closed.
-      allow update: if hasRole(orgId, ['owner'])
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'currency'])
-        && orgFieldsValid(request.resource.data);
 
       // Memberships are written by the server only.
       match /members/{memberId} {
@@ -63,19 +53,20 @@ service cloud.firestore {
       }
 
       match /{subcollection}/{docId} {
-        allow read: if (subcollection in ['accounts', 'categories', 'transactions']
+        allow read: if (subcollection in ['accounts', 'categories', 'transactions', 'rollups']
             && hasRole(orgId, ['owner', 'accountant', 'viewer']))
-          || (subcollection == 'bankConnections' && hasRole(orgId, ['owner']));
+          || (subcollection in ['bankConnections', 'audit'] && hasRole(orgId, ['owner']));
 
-        allow create, update: if (subcollection in ['accounts', 'categories', 'transactions']
+        // The browser writes categories and bank connections only. Accounts, transactions, rollups and the
+        // audit log are written by the server (S05, lib/server/ledger); `ledger/lock` is server-only too.
+        allow create, update: if (subcollection == 'categories'
             && hasRole(orgId, ['owner', 'accountant'])
             && orgIdMatchesPath(orgId))
           || (subcollection == 'bankConnections'
             && hasRole(orgId, ['owner'])
             && orgIdMatchesPath(orgId));
 
-        allow delete: if (subcollection in ['accounts', 'categories', 'transactions']
-            && hasRole(orgId, ['owner', 'accountant']))
+        allow delete: if (subcollection == 'categories' && hasRole(orgId, ['owner', 'accountant']))
           || (subcollection == 'bankConnections' && hasRole(orgId, ['owner']));
       }
     }

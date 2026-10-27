@@ -30,8 +30,10 @@ const PROJECT_ID = 'demo-finflow'
 // FIRESTORE_RULES_FILE lets the "red" check run this suite against a deliberately open ruleset.
 const RULES_FILE = process.env.FIRESTORE_RULES_FILE ?? resolve(process.cwd(), 'firestore.rules')
 const DAY = 24 * 60 * 60 * 1000
-const DATA_SUBS = ['accounts', 'categories', 'transactions'] as const
-const ALL_SUBS = [...DATA_SUBS, 'bankConnections'] as const
+// Written by the server only (S05): clients may read accounts, transactions and rollups, the owner reads audit.
+const SERVER_WRITTEN_SUBS = ['accounts', 'transactions', 'rollups', 'audit'] as const
+const MEMBER_READ_SUBS = ['accounts', 'categories', 'transactions', 'rollups'] as const
+const ALL_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'audit', 'bankConnections'] as const
 
 let testEnv: RulesTestEnvironment
 
@@ -48,9 +50,9 @@ const as = (uid: string) => fs(testEnv.authenticatedContext(uid))
 //   frank  has a member doc in orgA with an unknown role ('admin')
 //   erin   no membership anywhere
 const ROLE_USERS = [
-  { role: 'owner', uid: 'alice', dataRead: true, dataWrite: true, bank: true },
-  { role: 'accountant', uid: 'carol', dataRead: true, dataWrite: true, bank: false },
-  { role: 'viewer', uid: 'dave', dataRead: true, dataWrite: false, bank: false },
+  { role: 'owner', uid: 'alice', categoryWrite: true, bank: true, audit: true },
+  { role: 'accountant', uid: 'carol', categoryWrite: true, bank: false, audit: false },
+  { role: 'viewer', uid: 'dave', categoryWrite: false, bank: false, audit: false },
 ] as const
 
 function orgDoc(ownerId: string) {
@@ -99,6 +101,8 @@ beforeEach(async () => {
         await setDoc(doc(db, `organizations/${orgId}/${sub}/seed`), { orgId, name: 'seed' })
       }
     }
+    await setDoc(doc(db, 'organizations/orgA/ledger/lock'), { holder: 'server' })
+    await setDoc(doc(db, 'organizations/orgB/ledger/lock'), { holder: 'server' })
     await setDoc(doc(db, '_meta/health'), { ok: true })
   })
 })
@@ -181,7 +185,8 @@ describe('organization document', () => {
     })
 
     await assertFails(getDoc(doc(as('mallory'), 'organizations/orgA')))
-    await assertFails(setDoc(doc(as('mallory'), 'organizations/orgA/accounts/x'), { orgId: 'orgA', name: 'x' }))
+    await assertFails(getDoc(doc(as('mallory'), 'organizations/orgA/accounts/seed')))
+    await assertFails(setDoc(doc(as('mallory'), 'organizations/orgA/categories/x'), { orgId: 'orgA', name: 'x' }))
   })
 
   it('a missing organization cannot be read', async () => {
@@ -196,40 +201,15 @@ describe('organization document', () => {
     await assertFails(getDocs(collectionGroup(as('alice'), 'organizations')))
   })
 
-  it('the owner can change name and currency', async () => {
-    await assertSucceeds(updateDoc(doc(as('alice'), 'organizations/orgA'), { name: 'Renamed' }))
-    await assertSucceeds(updateDoc(doc(as('alice'), 'organizations/orgA'), { currency: 'PLN' }))
-    await assertSucceeds(updateDoc(doc(as('alice'), 'organizations/orgA'), { name: 'New', currency: 'EUR' }))
-  })
-
-  it.each(['PLN', 'EUR', 'USD', 'UAH'])('the owner can set the currency %s', async (currency) => {
-    await assertSucceeds(updateDoc(doc(as('alice'), 'organizations/orgA'), { currency }))
-  })
-
-  it.each(['carol', 'dave', 'frank', 'erin', 'bob'])('%s cannot update it', async (uid) => {
-    await assertFails(updateDoc(doc(as(uid), 'organizations/orgA'), { name: 'pwned' }))
-  })
-
-  it.each([
-    ['plan', { plan: 'pro' }],
-    ['trialEndsAt', { trialEndsAt: Timestamp.fromMillis(Date.now() + 365 * DAY) }],
-    ['ownerId', { ownerId: 'bob' }],
-    ['createdAt', { createdAt: 'x' }],
-    ['a members map', { members: { alice: { role: 'owner' } } }],
-    ['an unknown field', { stripeCustomerId: 'x' }],
-    ['name plus plan', { name: 'ok', plan: 'pro' }],
-    ['deleting currency', { currency: deleteField() }],
-    ['deleting plan', { plan: deleteField() }],
-    ['a 5000 character name', { name: 'x'.repeat(5000) }],
-    ['an empty name', { name: '' }],
-    ['a non-string name', { name: 123 }],
-    ['a 4 letter currency', { currency: 'EURO' }],
-    ['the currency $$$', { currency: '$$$' }],
-    ['the unsupported currency GBP', { currency: 'GBP' }],
-    ['a lowercase currency', { currency: 'pln' }],
-    ['a name of only spaces', { name: '   ' }],
-  ])('even the owner cannot update with %s', async (_label, data) => {
-    await assertFails(updateDoc(doc(as('alice'), 'organizations/orgA'), data))
+  // The name and currency change through PATCH /api/orgs/{orgId} (S05); no client writes the organization.
+  it.each(['alice', 'carol', 'dave', 'frank', 'erin', 'bob'])('%s cannot update or delete the organization from a client', async (uid) => {
+    const ref = doc(as(uid), 'organizations/orgA')
+    await assertFails(updateDoc(ref, { name: 'Renamed' }))
+    await assertFails(updateDoc(ref, { currency: 'PLN' }))
+    await assertFails(updateDoc(ref, { name: 'New', currency: 'EUR' }))
+    await assertFails(updateDoc(ref, { plan: 'pro' }))
+    await assertFails(updateDoc(ref, { currency: deleteField() }))
+    await assertFails(deleteDoc(ref))
   })
 })
 
@@ -286,24 +266,44 @@ describe('collection group query on members (the "my companies" query)', () => {
   })
 
   it('does not open other collection groups', async () => {
-    for (const group of ['accounts', 'transactions', 'categories', 'bankConnections']) {
+    for (const group of ['accounts', 'transactions', 'categories', 'rollups', 'audit', 'bankConnections', 'ledger']) {
       await assertFails(getDocs(collectionGroup(as('alice'), group)))
     }
   })
 })
 
 describe('data subcollections by role', () => {
-  describe.each(ROLE_USERS)('$role ($uid) in orgA', ({ uid, dataRead, dataWrite, bank }) => {
-    it.each(DATA_SUBS)('%s: read per role', async (sub) => {
-      await expectOutcome(dataRead, getDoc(doc(as(uid), `organizations/orgA/${sub}/seed`)))
-      await expectOutcome(dataRead, getDocs(collection(as(uid), `organizations/orgA/${sub}`)))
+  describe.each(ROLE_USERS)('$role ($uid) in orgA', ({ uid, categoryWrite, bank, audit }) => {
+    it.each(MEMBER_READ_SUBS)('%s: every member can read', async (sub) => {
+      await assertSucceeds(getDoc(doc(as(uid), `organizations/orgA/${sub}/seed`)))
+      await assertSucceeds(getDocs(collection(as(uid), `organizations/orgA/${sub}`)))
     })
 
-    it.each(DATA_SUBS)('%s: create, update and delete per role', async (sub) => {
-      await expectOutcome(dataWrite, setDoc(doc(as(uid), `organizations/orgA/${sub}/new1`), { orgId: 'orgA', name: 'n' }))
-      await expectOutcome(dataWrite, addDoc(collection(as(uid), `organizations/orgA/${sub}`), { orgId: 'orgA', name: 'n' }))
-      await expectOutcome(dataWrite, updateDoc(doc(as(uid), `organizations/orgA/${sub}/seed`), { name: 'changed' }))
-      await expectOutcome(dataWrite, deleteDoc(doc(as(uid), `organizations/orgA/${sub}/seed`)))
+    it.each(SERVER_WRITTEN_SUBS)('%s: nobody creates, updates or deletes from a client', async (sub) => {
+      await assertFails(setDoc(doc(as(uid), `organizations/orgA/${sub}/new1`), { orgId: 'orgA', name: 'n' }))
+      await assertFails(addDoc(collection(as(uid), `organizations/orgA/${sub}`), { orgId: 'orgA', name: 'n' }))
+      await assertFails(updateDoc(doc(as(uid), `organizations/orgA/${sub}/seed`), { name: 'changed' }))
+      await assertFails(deleteDoc(doc(as(uid), `organizations/orgA/${sub}/seed`)))
+    })
+
+    it('audit: only the owner reads', async () => {
+      await expectOutcome(audit, getDoc(doc(as(uid), 'organizations/orgA/audit/seed')))
+      await expectOutcome(audit, getDocs(collection(as(uid), 'organizations/orgA/audit')))
+    })
+
+    it('ledger/lock: no read or write for any role', async () => {
+      await assertFails(getDoc(doc(as(uid), 'organizations/orgA/ledger/lock')))
+      await assertFails(getDocs(collection(as(uid), 'organizations/orgA/ledger')))
+      await assertFails(setDoc(doc(as(uid), 'organizations/orgA/ledger/lock'), { holder: uid }))
+      await assertFails(updateDoc(doc(as(uid), 'organizations/orgA/ledger/lock'), { holder: uid }))
+      await assertFails(deleteDoc(doc(as(uid), 'organizations/orgA/ledger/lock')))
+    })
+
+    it('categories: owner and accountant write, a viewer only reads', async () => {
+      await expectOutcome(categoryWrite, setDoc(doc(as(uid), 'organizations/orgA/categories/new1'), { orgId: 'orgA', name: 'n' }))
+      await expectOutcome(categoryWrite, addDoc(collection(as(uid), 'organizations/orgA/categories'), { orgId: 'orgA', name: 'n' }))
+      await expectOutcome(categoryWrite, updateDoc(doc(as(uid), 'organizations/orgA/categories/seed'), { name: 'changed' }))
+      await expectOutcome(categoryWrite, deleteDoc(doc(as(uid), 'organizations/orgA/categories/seed')))
     })
 
     it('bankConnections: owner only (read and write)', async () => {
@@ -315,7 +315,7 @@ describe('data subcollections by role', () => {
     })
   })
 
-  it.each([...ALL_SUBS])('%s: members of orgA have no access to orgB data (and vice versa)', async (sub) => {
+  it.each([...ALL_SUBS, 'ledger'])('%s: members of orgA have no access to orgB data (and vice versa)', async (sub) => {
     // alice (owner of A) and dave (viewer of A) have no membership in B; bob has none in A.
     for (const uid of ['alice', 'dave']) {
       await assertFails(getDoc(doc(as(uid), `organizations/orgB/${sub}/seed`)))
@@ -328,35 +328,35 @@ describe('data subcollections by role', () => {
     await assertFails(setDoc(doc(as('bob'), `organizations/orgA/${sub}/new1`), { orgId: 'orgA' }))
   })
 
-  it('the role is per organization: carol writes in orgA (accountant) but only reads in orgB (viewer)', async () => {
-    await assertSucceeds(setDoc(doc(as('carol'), 'organizations/orgA/accounts/new1'), { orgId: 'orgA' }))
+  it('the role is per organization: carol writes categories in orgA (accountant) but only reads in orgB (viewer)', async () => {
+    await assertSucceeds(setDoc(doc(as('carol'), 'organizations/orgA/categories/new1'), { orgId: 'orgA' }))
     await assertSucceeds(getDoc(doc(as('carol'), 'organizations/orgB/accounts/seed')))
-    await assertFails(setDoc(doc(as('carol'), 'organizations/orgB/accounts/new1'), { orgId: 'orgB' }))
+    await assertFails(setDoc(doc(as('carol'), 'organizations/orgB/categories/new1'), { orgId: 'orgB' }))
   })
 
   it('a membership with an unknown role grants nothing', async () => {
     await assertFails(getDoc(doc(as('frank'), 'organizations/orgA/accounts/seed')))
-    await assertFails(setDoc(doc(as('frank'), 'organizations/orgA/accounts/new1'), { orgId: 'orgA' }))
+    await assertFails(setDoc(doc(as('frank'), 'organizations/orgA/categories/new1'), { orgId: 'orgA' }))
   })
 
-  it.each(DATA_SUBS)('%s: orgId must match the path org (owner and accountant)', async (sub) => {
+  it('categories: orgId must match the path org (owner and accountant)', async () => {
     for (const uid of ['alice', 'carol']) {
       const db = as(uid)
-      await assertFails(setDoc(doc(db, `organizations/orgA/${sub}/x1`), { orgId: 'orgB', name: 'x' }))
-      await assertFails(addDoc(collection(db, `organizations/orgA/${sub}`), { orgId: 'orgB', name: 'x' }))
-      await assertFails(updateDoc(doc(db, `organizations/orgA/${sub}/seed`), { orgId: 'orgB' }))
-      await assertSucceeds(setDoc(doc(db, `organizations/orgA/${sub}/x2`), { orgId: 'orgA', name: 'x' }))
-      await assertSucceeds(setDoc(doc(db, `organizations/orgA/${sub}/x3`), { name: 'no orgId' }))
+      await assertFails(setDoc(doc(db, 'organizations/orgA/categories/x1'), { orgId: 'orgB', name: 'x' }))
+      await assertFails(addDoc(collection(db, 'organizations/orgA/categories'), { orgId: 'orgB', name: 'x' }))
+      await assertFails(updateDoc(doc(db, 'organizations/orgA/categories/seed'), { orgId: 'orgB' }))
+      await assertSucceeds(setDoc(doc(db, 'organizations/orgA/categories/x2'), { orgId: 'orgA', name: 'x' }))
+      await assertSucceeds(setDoc(doc(db, 'organizations/orgA/categories/x3'), { name: 'no orgId' }))
     }
   })
 
   it('a viewer can run the journal query with combined filters', async () => {
     const q = query(
       collection(as('dave'), 'organizations/orgA/transactions'),
-      orderBy('date', 'desc'),
+      orderBy('paymentDate', 'desc'),
       where('accountId', '==', 'acc1'),
       where('categoryId', '==', 'cat1'),
-      where('date', '>=', Timestamp.fromDate(new Date('2026-01-01'))),
+      where('paymentDate', '>=', '2026-01-01'),
     )
     await assertSucceeds(getDocs(q))
   })
