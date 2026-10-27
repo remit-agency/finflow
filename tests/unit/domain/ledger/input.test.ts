@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { LedgerError } from '@/lib/domain/ledger/errors'
-import { applyPatch, parseTransactionInput, parseTransactionPatch, toRawInput } from '@/lib/domain/ledger/input'
+import { applyPatch, fullPatch, parseTransactionInput, parseTransactionPatch, toRawInput } from '@/lib/domain/ledger/input'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
 
 const BASE = { type: 'expense', accountId: 'acc1', amountMinor: 1234, paymentDate: '2026-10-20' }
@@ -137,5 +137,11 @@ describe('patches', () => {
 
   it('applyPatch revalidates the merged result', () => {
     expect(code(() => applyPatch(toRawInput(existing), { type: 'transfer' }))).toBe('invalid_input:toAccountId')
+  })
+
+  it('fullPatch nulls the absent optional fields and passes parseTransactionPatch', () => {
+    const patch = fullPatch({ type: 'income', status: 'actual', accountId: 'a', amountMinor: 5, paymentDate: '2026-10-20', isRecurring: false, tags: [], fileUrls: [] })
+    expect(patch).toMatchObject({ categoryId: null, accrual: null, description: null, toAccountId: null })
+    expect(() => parseTransactionPatch(patch)).not.toThrow()
   })
 })

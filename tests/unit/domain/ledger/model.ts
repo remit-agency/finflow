@@ -56,7 +56,7 @@ export function randomTx(r: () => number, id: string): LedgerTransaction | null 
     input.toAccountId = toAccount.id
     if (toAccount.currency !== account.currency) input.toAmountMinor = int(r, 1, 200000)
   } else {
-    if (r() < 0.7) input.categoryId = pick(r, ['c1', 'c2', 'c3'])
+    if (r() < 0.7) input.categoryId = pick(r, type === 'income' ? ['ci1', 'ci2'] : ['ce1', 'ce2'])
     const kind = r()
     if (kind < 0.25) input.accrual = { mode: 'date', date: addDays(payment, -int(r, 1, 90)) }
     else if (kind < 0.5) {

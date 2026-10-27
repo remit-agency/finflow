@@ -154,6 +154,13 @@ export function parseTransactionPatch(body: unknown): TransactionPatch {
   return r
 }
 
+/** A patch that replaces every editable field: optional fields absent from `raw` become null (cleared). */
+export function fullPatch(raw: RawInput): TransactionPatch {
+  const patch: TransactionPatch = { ...raw }
+  for (const key of NULLABLE) if (!(key in patch)) patch[key] = null
+  return patch
+}
+
 /** The editable fields of an existing operation. An accrual that just follows the payment date is left out. */
 export function toRawInput(tx: LedgerTransaction): RawInput {
   const raw: RawInput = {
