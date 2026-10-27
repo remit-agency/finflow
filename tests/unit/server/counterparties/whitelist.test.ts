@@ -17,7 +17,7 @@ const code = async (p: Promise<unknown>) => {
 
 describe('lookupNip', () => {
   it('asks the white list for the NIP and day and parses the answer', async () => {
-    const fetchFn = vi.fn(async (_url: string) => json(fixtureText('found-active.json')))
+    const fetchFn = vi.fn<typeof fetch>(async () => json(fixtureText('found-active.json')))
     const result = await lookupNip('7740001454', '2026-10-27', { fetch: fetchFn as unknown as typeof fetch, baseUrl: 'https://wl.example/' })
     expect(result).toMatchObject({ found: true, subject: { name: 'ORLEN SPÓŁKA AKCYJNA', vatStatus: 'active' } })
     expect(String(fetchFn.mock.calls[0][0])).toBe('https://wl.example/api/search/nip/7740001454?date=2026-10-27')
@@ -53,7 +53,7 @@ describe('lookupNip', () => {
 
   it('takes the base URL from WL_API_BASE when no option is given', async () => {
     vi.stubEnv('WL_API_BASE', 'http://127.0.0.1:4010/')
-    const fetchFn = vi.fn(async (_url: string) => json(fixtureText('not-found.json')))
+    const fetchFn = vi.fn<typeof fetch>(async () => json(fixtureText('not-found.json')))
     await lookupNip('5252344078', '2026-10-27', { fetch: fetchFn as unknown as typeof fetch })
     expect(String(fetchFn.mock.calls[0][0]).startsWith('http://127.0.0.1:4010/api/search/nip/')).toBe(true)
   })
