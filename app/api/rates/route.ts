@@ -1,6 +1,6 @@
 import { requireUser } from '@/lib/server/auth'
 import { FxError, resolveRate } from '@/lib/server/fx'
-import { isDay } from '@/lib/server/fx/days'
+import { isDay } from '@/lib/domain/ledger/days'
 import { isCurrencyCode } from '@/lib/server/fx/rates'
 import { errorResponse, HttpError } from '@/lib/server/http-error'
 

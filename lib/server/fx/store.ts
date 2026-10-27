@@ -1,5 +1,5 @@
 import 'server-only'
-import { isDay } from '@/lib/server/fx/days'
+import { isDay } from '@/lib/domain/ledger/days'
 import type { MonthDoc, NbpTable } from '@/lib/server/fx/types'
 
 export interface FxStore {
