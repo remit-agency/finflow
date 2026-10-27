@@ -10,7 +10,7 @@ import type { RateSnapshot } from '@/lib/server/fx/types'
 import { auditData, type AuditAction } from './audit'
 import type { LedgerDeps } from './deps'
 import { assertUnlocked } from './lock'
-import { accountsCol, auditCol, categoriesCol, orgRef, rollupsCol, transactionsCol } from './paths'
+import { accountsCol, auditCol, categoriesCol, counterpartiesCol, orgRef, rollupsCol, transactionsCol } from './paths'
 
 export interface WriteResult {
   transaction: LedgerTransaction
@@ -95,6 +95,11 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
     for (const id of involved) accountSnaps.set(id, await t.get(accountsCol(db, orgId).doc(id)))
     const categoryId = job.next?.tx.categoryId
     const categorySnap = categoryId === undefined ? null : await t.get(categoriesCol(db, orgId).doc(categoryId))
+    // A counterparty is checked only when this write gives the operation a new one: an edit of something else
+    // must not fail because the counterparty was archived after the operation was made.
+    const counterpartyId = job.next?.tx.counterpartyId
+    const counterpartyIsNew = counterpartyId !== undefined && counterpartyId !== job.prior?.tx.counterpartyId
+    const counterpartySnap = counterpartyId !== undefined && counterpartyIsNew ? await t.get(counterpartiesCol(db, orgId).doc(counterpartyId)) : null
 
     // ---- checks (nothing is written yet) ----
     if (!orgSnap.exists) throw new LedgerError('not_found', 'org')
@@ -120,6 +125,10 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
     }
     if (categorySnap !== null && job.next) {
       if (!categorySnap.exists || categorySnap.get('type') !== job.next.tx.type) throw new LedgerError('category_not_found', 'categoryId')
+    }
+    if (counterpartySnap !== null) {
+      if (!counterpartySnap.exists) throw new LedgerError('counterparty_not_found', 'counterpartyId')
+      if (counterpartySnap.get('archived') === true) throw new LedgerError('counterparty_archived', 'counterpartyId')
     }
 
     // ---- writes ----
