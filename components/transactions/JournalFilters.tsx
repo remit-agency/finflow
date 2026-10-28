@@ -52,7 +52,8 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
   }
 
   const active = hasActiveFilters(filters)
-  const clear = () => onChange({ filters: { ...EMPTY_FILTERS, accountId: filters.accountId }, period: { preset: 'allTime' } })
+  // «Очистити» clears everything the bar shows, the account too (the page passes that on to the sidebar selection).
+  const clear = () => onChange({ filters: { ...EMPTY_FILTERS }, period: { preset: 'allTime' } })
 
   const toggleType = (type: TxType) =>
     set({ types: filters.types.includes(type) ? filters.types.filter((x) => x !== type) : [...filters.types, type] })
