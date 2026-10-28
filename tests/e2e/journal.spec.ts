@@ -104,6 +104,41 @@ test.describe('journal (emulators)', () => {
     await expect(page.getByRole('row').filter({ hasText: 'Sprzedaż' })).toBeVisible()
   })
 
+  test('typing an amount quickly lands in the address and the field keeps what was typed', async ({ page, request }) => {
+    const user = await setup(page, request, 'jr-amount')
+    await page.goto(`/${user.orgId}/transactions`)
+    await page.getByRole('button', { name: 'Додаткові фільтри' }).click()
+    const from = page.getByLabel('Сума від')
+    await from.pressSequentially('150')
+    await expect(page).toHaveURL(/min=15000/)
+    await expect(from).toHaveValue('150')
+    // Once the address has caught up the field must not jump back to an older value.
+    await page.waitForTimeout(600)
+    await expect(from).toHaveValue('150')
+    await expect(page).toHaveURL(/min=15000/)
+  })
+
+  test('a search keeps its space after the pause and a filter picked inside the pause is not undone', async ({ page, request }) => {
+    const user = await setup(page, request, 'jr-space')
+    await page.goto(`/${user.orgId}/transactions`)
+    const search = page.getByLabel('Пошук за рахунками, контрагентами і коментарями')
+    await search.pressSequentially('Jan ')
+    await expect(page).toHaveURL(/q=Jan(&|$)/)
+    await expect(search).toHaveValue('Jan ')
+    await search.pressSequentially('Kowalski')
+    await expect(page).toHaveURL(/q=Jan(%20|\+)Kowalski/)
+    await expect(search).toHaveValue('Jan Kowalski')
+
+    // A type picked right after typing, inside the 300 ms pause, ends in the address together with the text.
+    await search.fill('')
+    await expect(page).not.toHaveURL(/q=/)
+    await page.getByRole('button', { name: 'Додаткові фільтри' }).click()
+    await search.pressSequentially('Czynsz')
+    await page.getByRole('checkbox', { name: 'Дохід' }).click()
+    await expect(page).toHaveURL(/q=Czynsz/)
+    await expect(page).toHaveURL(/types=income/)
+  })
+
   test('a bulk category change can be undone', async ({ page, request }) => {
     const user = await setup(page, request, 'jr-bulk')
     for (let i = 0; i < 5; i++) {

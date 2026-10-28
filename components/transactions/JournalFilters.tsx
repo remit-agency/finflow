@@ -1,7 +1,7 @@
 // components/transactions/JournalFilters.tsx
 'use client'
 
-import { useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 import { PeriodSelect } from '@/components/analytics/PeriodSelect'
@@ -20,7 +20,7 @@ import { JOURNAL_PERIOD_PRESETS, type JournalView } from '@/lib/utils/journal-ur
 import type { Account, Category } from '@/types'
 
 const FIELD_CLASS = 'h-9 rounded-control border-line bg-surface'
-const SEARCH_DEBOUNCE_MS = 300
+const DEBOUNCE_MS = 300
 
 interface Props {
   view: JournalView
@@ -33,6 +33,40 @@ interface Props {
   accessory?: ReactNode
 }
 
+/** The amount a typed text stands for, in minor units; undefined for an empty or invalid text. */
+function parseAmountMinor(raw: string): number | undefined {
+  const n = parseFloat(raw.replace(',', '.'))
+  return Number.isFinite(n) && n >= 0 ? toMinor(n) : undefined
+}
+
+/**
+ * A text field whose value lives in the address, applied after a pause. The person's draft is shown while the
+ * address has not taken it over yet (`from` is what the address held when the draft was typed) and for as long as
+ * the address holds the same value; once something else changes the address (clear, back), the address wins.
+ * `apply` runs from a timer, so it is read through a ref kept current by an effect and never closes over the
+ * view of the keystroke.
+ */
+function useDraftField(external: string, same: (draft: string) => boolean, apply: (draft: string) => void) {
+  const [draft, setDraft] = useState<{ from: string; text: string } | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const applyRef = useRef(apply)
+  useEffect(() => {
+    applyRef.current = apply
+  })
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const type = (text: string) => {
+    setDraft({ from: external, text })
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => applyRef.current(text), DEBOUNCE_MS)
+  }
+  const cancel = useCallback(() => {
+    clearTimeout(timer.current)
+    setDraft(null)
+  }, [])
+  const shown = draft && (draft.from === external || same(draft.text)) ? draft.text : external
+  return { shown, type, cancel }
+}
+
 const TYPES: TxType[] = ['income', 'expense', 'transfer']
 
 export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, expenseCategories, counterparties, accessory }: Props) {
@@ -42,30 +76,57 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
   const phone = useIsPhone()
   const [showExtra, setShowExtra] = useState(false)
   const { filters } = view
-  const set = (patch: Partial<JournalFilters>) => onChange({ ...view, filters: { ...filters, ...patch } })
-
-  // The text is applied after a pause; the field keeps what is typed meanwhile.
-  const [draft, setDraft] = useState<{ from: string | undefined; text: string }>({ from: filters.q, text: filters.q ?? '' })
-  const text = draft.from === filters.q ? draft.text : (filters.q ?? '')
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const typeSearch = (value: string) => {
-    setDraft({ from: filters.q, text: value })
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => set({ q: value.trim() || undefined }), SEARCH_DEBOUNCE_MS)
+  // Every change builds on the view as last REQUESTED, not on the one last rendered: the address updates a moment
+  // after `onChange`, and a text field's timer (or a second click) inside that moment must not undo the first change
+  // (nor must the account picked in the sidebar or «Очистити» be reverted by a view from the keystroke). The ref
+  // follows the props whenever the address really changes.
+  const viewRef = useRef(view)
+  const onChangeRef = useRef(onChange)
+  useEffect(() => {
+    onChangeRef.current = onChange
+  })
+  useEffect(() => {
+    viewRef.current = { filters, period: view.period }
+  }, [filters, view.period])
+  const apply = (next: JournalView) => {
+    viewRef.current = next
+    onChangeRef.current(next)
   }
+  const set = (patch: Partial<JournalFilters>) => apply({ ...viewRef.current, filters: { ...viewRef.current.filters, ...patch } })
+
+  const search = useDraftField(
+    filters.q ?? '',
+    (draft) => draft.trim() === (filters.q ?? ''),
+    (draft) => set({ q: draft.trim() || undefined }),
+  )
+  const minField = useDraftField(
+    filters.minMinor === undefined ? '' : String(fromMinor(filters.minMinor)),
+    (draft) => parseAmountMinor(draft) === filters.minMinor,
+    (draft) => set({ minMinor: parseAmountMinor(draft) }),
+  )
+  const maxField = useDraftField(
+    filters.maxMinor === undefined ? '' : String(fromMinor(filters.maxMinor)),
+    (draft) => parseAmountMinor(draft) === filters.maxMinor,
+    (draft) => set({ maxMinor: parseAmountMinor(draft) }),
+  )
 
   const active = hasActiveFilters(filters)
   // «Очистити» clears everything the bar shows, the account too (the page passes that on to the sidebar selection).
-  const clear = () => onChange({ filters: { ...EMPTY_FILTERS }, period: { preset: 'allTime' } })
+  const clear = () => {
+    search.cancel()
+    minField.cancel()
+    maxField.cancel()
+    apply({ filters: { ...EMPTY_FILTERS }, period: { preset: 'allTime' } })
+  }
 
   const toggleType = (type: TxType) =>
-    set({ types: filters.types.includes(type) ? filters.types.filter((x) => x !== type) : [...filters.types, type] })
+    set({ types: viewRef.current.filters.types.includes(type) ? viewRef.current.filters.types.filter((x) => x !== type) : [...viewRef.current.filters.types, type] })
   const toggleCounterparty = (id: string) =>
-    set({ counterpartyIds: filters.counterpartyIds.includes(id) ? filters.counterpartyIds.filter((x) => x !== id) : [...filters.counterpartyIds, id] })
-  const amountField = (key: 'minMinor' | 'maxMinor', raw: string) => {
-    const n = parseFloat(raw.replace(',', '.'))
-    set({ [key]: Number.isFinite(n) && n >= 0 ? toMinor(n) : undefined })
-  }
+    set({
+      counterpartyIds: viewRef.current.filters.counterpartyIds.includes(id)
+        ? viewRef.current.filters.counterpartyIds.filter((x) => x !== id)
+        : [...viewRef.current.filters.counterpartyIds, id],
+    })
   const allCategories = [...incomeCategories, ...expenseCategories]
   const selectedCategory = filters.categoryIds[0] ?? '_all'
 
@@ -75,15 +136,15 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
         <div className="relative w-full sm:w-auto sm:min-w-[260px] sm:flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-subtle" />
           <Input
-            value={text}
-            onChange={(e) => typeSearch(e.target.value)}
+            value={search.shown}
+            onChange={(e) => search.type(e.target.value)}
             placeholder={phone ? t('searchPlaceholderShort') : t('searchPlaceholder')}
             aria-label={t('search')}
             className={cn(FIELD_CLASS, 'pl-9')}
           />
         </div>
 
-        <PeriodSelect value={view.period} presets={JOURNAL_PERIOD_PRESETS} onChange={(period) => onChange({ ...view, period })} />
+        <PeriodSelect value={view.period} presets={JOURNAL_PERIOD_PRESETS} onChange={(period) => apply({ ...viewRef.current, period })} />
 
         {/* Below sm the two selects take a row of their own (after the period, filter and export buttons); from sm up the wrapper vanishes and they sit in the toolbar row. */}
         <div className="order-last flex w-full gap-2 sm:contents">
@@ -180,8 +241,8 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
                 min={0}
                 step="0.01"
                 className={cn(FIELD_CLASS, 'w-[110px] tabular-nums')}
-                value={filters.minMinor === undefined ? '' : fromMinor(filters.minMinor)}
-                onChange={(e) => amountField('minMinor', e.target.value)}
+                value={minField.shown}
+                onChange={(e) => minField.type(e.target.value)}
               />
             </label>
             <label className="flex items-center gap-2 text-sm text-ink-muted">
@@ -191,8 +252,8 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
                 min={0}
                 step="0.01"
                 className={cn(FIELD_CLASS, 'w-[110px] tabular-nums')}
-                value={filters.maxMinor === undefined ? '' : fromMinor(filters.maxMinor)}
-                onChange={(e) => amountField('maxMinor', e.target.value)}
+                value={maxField.shown}
+                onChange={(e) => maxField.type(e.target.value)}
               />
             </label>
           </div>
