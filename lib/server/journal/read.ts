@@ -31,11 +31,16 @@ export interface ReadStats {
 
 export type ReadResult = JournalPage & { stats: ReadStats }
 
+/**
+ * The position of a document in the listing, or null when it has no payment date to sit under. A creation time that
+ * is not a timestamp counts as the oldest possible one (the operation is still listed, last in its day).
+ */
 function keyOf(d: DocumentSnapshot): JournalKey | null {
   const created = d.get('createdAt')
   const paymentDate = d.get('paymentDate')
-  if (!(created instanceof Timestamp) || typeof paymentDate !== 'string') return null
-  return { paymentDate, createdAtS: created.seconds, createdAtN: created.nanoseconds, id: d.id }
+  if (typeof paymentDate !== 'string') return null
+  const [createdAtS, createdAtN] = created instanceof Timestamp ? [created.seconds, created.nanoseconds] : [0, 0]
+  return { paymentDate, createdAtS, createdAtN, id: d.id }
 }
 
 function needsScan(f: JournalFilters): boolean {
@@ -99,7 +104,10 @@ export async function readJournalPage(deps: LedgerDeps, orgId: string, opts: Rea
   const base = baseQuery(deps, orgId, filters)
   const scan = needsScan(filters)
   const rows: JournalRow[] = []
+  // `lastKey` is the last VALID position (what the next cursor encodes); `position` is the last document read, valid or
+  // not, so a document that cannot be placed never makes the next query return it again.
   let lastKey = opts.cursor
+  let position: DocumentSnapshot | null = null
   let scanned = 0
   let more = true
   let full = false
@@ -107,13 +115,16 @@ export async function readJournalPage(deps: LedgerDeps, orgId: string, opts: Rea
   while (rows.length < limit && scanned < cap && more) {
     // The chunk never goes past the cap, so one request reads at most `cap` documents for the scan.
     const size = scan ? Math.min(SCAN_CHUNK, cap - scanned) : Math.min(SCAN_CHUNK, limit - rows.length)
-    const snap = await (lastKey ? after(base, lastKey) : base).limit(size).get()
+    // The incoming cursor is a key; inside one request the query continues from the document itself.
+    const from: Query = position ? base.startAfter(position) : opts.cursor ? after(base, opts.cursor) : base
+    const snap = await from.limit(size).get()
     stats.docsRead += snap.size
     for (const d of snap.docs) {
+      position = d
+      scanned++
       const key = keyOf(d)
       if (!key) continue
       lastKey = key
-      scanned++
       const tx = parseTransaction(d.id, d.data())
       if (tx && matchesFilters(tx, filters, ctx)) {
         rows.push({ tx, balanceAfterMinor: null })
@@ -202,26 +213,30 @@ async function attachBalances(deps: LedgerDeps, orgId: string, rows: JournalRow[
     byAccount.set(row.tx.accountId, [...(byAccount.get(row.tx.accountId) ?? []), row])
   }
 
-  for (const [accountId, accountRows] of byAccount) {
-    const account = accounts.get(accountId)
-    if (!account) continue
-    const days = [...new Set(accountRows.map((r) => r.tx.paymentDate))].sort().reverse() // newest first
-    const newest = days[0]
-    const oldest = days[days.length - 1]
+  // The accounts are independent, and so are the reads of one account: all of them go out together.
+  await Promise.all(
+    [...byAccount].map(async ([accountId, accountRows]) => {
+      const account = accounts.get(accountId)
+      if (!account) return
+      const days = [...new Set(accountRows.map((r) => r.tx.paymentDate))].sort().reverse() // newest first
+      const newest = days[0]
+      const oldest = days[days.length - 1]
 
-    const netAfter = await netAfterDay(deps, orgId, accountId, newest, stats)
-    const nets = days.length > 1 ? await netsBetween(deps, orgId, accountId, oldest, newest, stats) : new Map<string, number>()
-    const dayOps: DayOps[] = []
-    for (const day of days) dayOps.push({ day, ops: await opsOfDay(deps, orgId, accountId, day, stats) })
+      const [netAfter, nets, dayOps] = await Promise.all([
+        netAfterDay(deps, orgId, accountId, newest, stats),
+        days.length > 1 ? netsBetween(deps, orgId, accountId, oldest, newest, stats) : Promise.resolve(new Map<string, number>()),
+        Promise.all(days.map(async (day): Promise<DayOps> => ({ day, ops: await opsOfDay(deps, orgId, accountId, day, stats) }))),
+      ])
 
-    const netBetween = days.slice(0, -1).map((newer, i) => {
-      const older = days[i + 1]
-      let sum = 0
-      for (const [day, net] of nets) if (day > older && day < newer) sum += net
-      return sum
-    })
+      const netBetween = days.slice(0, -1).map((newer, i) => {
+        const older = days[i + 1]
+        let sum = 0
+        for (const [day, net] of nets) if (day > older && day < newer) sum += net
+        return sum
+      })
 
-    const result = balancesAfter(account.balanceMinor, netAfter, dayOps, netBetween)
-    for (const row of accountRows) row.balanceAfterMinor = result.get(row.tx.id) ?? null
-  }
+      const result = balancesAfter(account.balanceMinor, netAfter, dayOps, netBetween)
+      for (const row of accountRows) row.balanceAfterMinor = result.get(row.tx.id) ?? null
+    }),
+  )
 }

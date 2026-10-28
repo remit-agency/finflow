@@ -190,3 +190,45 @@ describe('readOneTransaction', () => {
     expect(await readOneTransaction(deps, ORG, 'legacy1')).toBeNull()
   })
 })
+
+describe('documents the listing cannot place', () => {
+  const mk = async (over: Record<string, unknown>) =>
+    (await createTransaction(deps, ORG, UID, parseTransactionInput({ type: 'income', accountId: 'a1', amountMinor: 1_000, paymentDate: '2026-10-20', ...over }))).transaction.id
+
+  beforeEach(async () => {
+    await clearFirestore()
+    await seedOrg(db)
+    await seedAccount(db, ORG, 'a1', 'PLN', 0)
+  })
+
+  /** Pages with `limit` through the cursors until the end; a stuck read fails the test instead of hanging it. */
+  async function pageAll(limit: number): Promise<string[]> {
+    const ids: string[] = []
+    let cursor: JournalKey | null = null
+    for (let i = 0; i < 50; i++) {
+      const page = await readJournalPage(deps, ORG, { filters: EMPTY_FILTERS, cursor, limit })
+      ids.push(...page.rows.map((r) => r.tx.id))
+      if (page.next === null) return ids
+      cursor = decodeCursor(page.next)
+    }
+    throw new Error('the listing did not end')
+  }
+
+  it('a document without a string payment date is skipped and does not stall a one-row page', async () => {
+    const a = await mk({ paymentDate: '2026-10-21' })
+    const b = await mk({ paymentDate: '2026-10-20' })
+    await db.doc(`organizations/${ORG}/transactions/${await mk({})}`).update({ paymentDate: 20_261_020 })
+    expect(await pageAll(1)).toEqual([a, b])
+    expect(await pageAll(100)).toEqual([a, b])
+  })
+
+  it('a document whose creation time is not a timestamp is still listed, in one request', async () => {
+    const a = await mk({ paymentDate: '2026-10-21' })
+    const odd = await mk({ paymentDate: '2026-10-20' })
+    const c = await mk({ paymentDate: '2026-10-20' })
+    await db.doc(`organizations/${ORG}/transactions/${odd}`).update({ createdAt: 'yesterday' })
+    const page = await readJournalPage(deps, ORG, { filters: EMPTY_FILTERS, cursor: null, limit: 100 })
+    expect(page.rows.map((r) => r.tx.id).sort()).toEqual([a, odd, c].sort())
+    expect(page.next).toBeNull()
+  })
+})
