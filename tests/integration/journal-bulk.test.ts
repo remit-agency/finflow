@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseBulkRequest } from '@/lib/domain/journal/bulk-input'
 import { parseTransactionInput } from '@/lib/domain/ledger/input'
 import { runBulk } from '@/lib/server/journal/bulk'
@@ -77,5 +77,38 @@ describe('runBulk', () => {
     expect(out.every((o) => o.ok)).toBe(true)
     expect(await balanceOf(db, ORG, 'a1')).toBe(100_000)
     expect((await verifyLedger(deps, ORG)).ok).toBe(true)
+  })
+
+  describe('an unexpected error on one row', () => {
+    afterEach(() => vi.restoreAllMocks())
+
+    it('becomes the row outcome `unknown`; the rows before and after are applied and the failure is logged once', async () => {
+      const ids = [await make({}), await make({ amountMinor: 2_500 }), await make({ amountMinor: 700 })]
+      const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const flaky = {
+        ...ledger,
+        updateTransaction: (orgId: string, uid: string, id: string, patch: Parameters<typeof updateTransaction>[4]) => {
+          if (id === ids[1]) throw new Error('socket hang up')
+          return ledger.updateTransaction(orgId, uid, id, patch)
+        },
+      }
+      const out = await runBulk(flaky, ORG, UID, parseBulkRequest({ action: 'update', ids, patch: { categoryId: 'k1' } }))
+      expect(out).toEqual([{ id: ids[0], ok: true }, { id: ids[1], ok: false, code: 'unknown' }, { id: ids[2], ok: true }])
+      expect((await readDoc(db, `organizations/${ORG}/transactions/${ids[2]}`))?.categoryId).toBe('k1')
+      expect((await readDoc(db, `organizations/${ORG}/transactions/${ids[1]}`))?.categoryId).toBeUndefined()
+      expect(log).toHaveBeenCalledTimes(1)
+      expect(JSON.stringify(log.mock.calls[0])).toContain(ids[1])
+    })
+
+    it('a delete that throws a plain error is the same', async () => {
+      const ids = [await make({}), await make({})]
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const flaky = {
+        ...ledger,
+        deleteTransaction: (orgId: string, uid: string, id: string) => (id === ids[0] ? Promise.reject(new TypeError('boom')) : ledger.deleteTransaction(orgId, uid, id)),
+      }
+      const out = await runBulk(flaky, ORG, UID, parseBulkRequest({ action: 'delete', ids }))
+      expect(out).toEqual([{ id: ids[0], ok: false, code: 'unknown' }, { id: ids[1], ok: true }])
+    })
   })
 })

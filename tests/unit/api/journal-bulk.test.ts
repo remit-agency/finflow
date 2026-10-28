@@ -31,4 +31,24 @@ describe('runChunked', () => {
     const { outcomes } = await runChunked(['a', 'b'], async (chunk) => chunk.map((id) => (id === 'b' ? { id, ok: false as const, code: 'future_actual' } : { id, ok: true as const })))
     expect(outcomes).toEqual([{ id: 'a', ok: true }, { id: 'b', ok: false, code: 'future_actual' }])
   })
+  it('keeps the earlier chunks and marks the failing chunk unknown when a request throws, then stops', async () => {
+    let calls = 0
+    const { outcomes, stopped } = await runChunked(ids(60), async (chunk) => {
+      calls++
+      if (calls === 2) throw new Error('network')
+      return okAll(chunk)
+    })
+    expect(calls).toBe(2)
+    expect(stopped).toBe(true)
+    expect(outcomes).toHaveLength(50)
+    expect(outcomes.slice(0, 25).every((o) => o.ok)).toBe(true)
+    expect(outcomes.slice(25)).toEqual(ids(60).slice(25, 50).map((id) => ({ id, ok: false, code: 'unknown' })))
+  })
+  it('a throw in the first chunk gives only unknown outcomes for that chunk', async () => {
+    const { outcomes, stopped } = await runChunked(ids(30), async () => {
+      throw new Error('503')
+    })
+    expect(stopped).toBe(true)
+    expect(outcomes).toEqual(ids(30).slice(0, 25).map((id) => ({ id, ok: false, code: 'unknown' })))
+  })
 })

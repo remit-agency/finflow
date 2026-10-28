@@ -14,7 +14,10 @@ export interface ChunkedResult {
   stopped: boolean
 }
 
-/** Runs `send` over the ids in chunks, one after another; the signal is checked between chunks. */
+/**
+ * Runs `send` over the ids in chunks, one after another; the signal is checked between chunks. A chunk whose request
+ * throws ends the run (`stopped`) with the earlier outcomes and that chunk's ids as `unknown`; it never throws.
+ */
 export async function runChunked(
   ids: string[],
   send: (chunk: string[]) => Promise<BulkOutcome[]>,
@@ -23,7 +26,16 @@ export async function runChunked(
   const outcomes: BulkOutcome[] = []
   for (let i = 0; i < ids.length; i += MAX_BULK_IDS) {
     if (opts.signal?.aborted) return { outcomes, stopped: true }
-    outcomes.push(...(await send(ids.slice(i, i + MAX_BULK_IDS))))
+    const chunk = ids.slice(i, i + MAX_BULK_IDS)
+    try {
+      outcomes.push(...(await send(chunk)))
+    } catch {
+      // The request failed (network, a 5xx): what the earlier chunks did stays reported, this chunk's rows are unknown
+      // (the server may or may not have applied them) and nothing further is sent.
+      outcomes.push(...chunk.map((id): BulkOutcome => ({ id, ok: false, code: 'unknown' })))
+      opts.onProgress?.(Math.min(i + MAX_BULK_IDS, ids.length), ids.length)
+      return { outcomes, stopped: true }
+    }
     opts.onProgress?.(Math.min(i + MAX_BULK_IDS, ids.length), ids.length)
     if (opts.signal?.aborted && i + MAX_BULK_IDS < ids.length) return { outcomes, stopped: true }
   }
