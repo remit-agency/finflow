@@ -66,7 +66,8 @@ app/
   api/health/route.ts             ← health check (firebase-admin)
   api/auth/{session,logout}/route.ts  ← mint / revoke the session cookie
   api/orgs/route.ts               ← POST: create a company + owner membership (S02)
-  api/enablebanking/{institutions,session,callback,accounts}/route.ts
+  api/enablebanking/{institutions,session,callback}/route.ts
+  api/orgs/[orgId]/bank/{route,sync,accounts,connections/[connectionId]}/route.ts  ← bank status, link, sync, connection (S09; owner-only except the status read)
   page.tsx (landing), pricing/, layout.tsx, globals.css, robots.ts, sitemap.ts
 components/
   ui/            ← shadcn generated files (CLI only; the hand edits are marked `FinFlow (S01A)`)

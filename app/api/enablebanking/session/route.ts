@@ -17,11 +17,13 @@ export async function POST(req: Request) {
     const { uid } = await requireVerifiedUser(req)
 
     const body: unknown = await req.json().catch(() => null)
-    const { aspspName, aspspCountry = 'PL', orgId } = (body ?? {}) as Record<string, unknown>
+    const { aspspName, aspspCountry = 'PL', orgId, psuType = 'business' } = (body ?? {}) as Record<string, unknown>
     if (typeof aspspName !== 'string' || aspspName.length === 0 || aspspName.length > 200) {
       throw new HttpError(400, 'Missing params')
     }
     if (typeof orgId !== 'string' || !ID_RE.test(orgId)) throw new HttpError(400, 'Missing params')
+    // The kind of customer the access is granted for (S09): business by default, personal when the owner chose it.
+    if (psuType !== 'business' && psuType !== 'personal') throw new HttpError(400, 'Missing params')
     if (typeof aspspCountry !== 'string' || !COUNTRY_RE.test(aspspCountry)) {
       throw new HttpError(400, 'invalid country')
     }
@@ -49,7 +51,7 @@ export async function POST(req: Request) {
         },
         aspsp: { name: aspspName, country: aspspCountry },
         redirect_url: `${appUrl}/api/enablebanking/callback`,
-        psu_type: 'personal',
+        psu_type: psuType,
         state,
       }),
     })

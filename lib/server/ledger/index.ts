@@ -13,18 +13,19 @@ import { createTransaction, deleteTransaction, updateTransaction } from './write
 
 export type { LedgerReport } from './verify'
 
-function deps(): LedgerDeps {
+/** The production dependencies of the ledger: Admin Firestore, NBP rates, the Warsaw clock. Shared with S09. */
+export function ledgerDeps(): LedgerDeps {
   return { db: getAdmin().db, resolveRate, now: () => new Date(), today: () => toDay(todayUtcDay()) }
 }
 
 /** The ledger bound to the production Firestore, NBP rates and the Warsaw clock. */
 export const ledger = {
-  createTransaction: (orgId: string, uid: string, input: TransactionInput) => createTransaction(deps(), orgId, uid, input),
-  updateTransaction: (orgId: string, uid: string, txId: string, patch: TransactionPatch) => updateTransaction(deps(), orgId, uid, txId, patch),
-  deleteTransaction: (orgId: string, uid: string, txId: string) => deleteTransaction(deps(), orgId, uid, txId),
-  createAccount: (orgId: string, uid: string, input: AccountInput) => createAccount(deps(), orgId, uid, input),
-  updateAccount: (orgId: string, uid: string, accountId: string, patch: AccountPatch) => updateAccount(deps(), orgId, uid, accountId, patch),
-  deleteAccount: (orgId: string, uid: string, accountId: string) => deleteAccount(deps(), orgId, uid, accountId),
-  updateOrganization: (orgId: string, uid: string, patch: OrgPatch) => updateOrganization(deps(), orgId, uid, patch),
-  rebuild: (orgId: string, uid: string, apply: boolean) => rebuildLedger(deps(), orgId, uid, { apply }),
+  createTransaction: (orgId: string, uid: string, input: TransactionInput) => createTransaction(ledgerDeps(), orgId, uid, input),
+  updateTransaction: (orgId: string, uid: string, txId: string, patch: TransactionPatch) => updateTransaction(ledgerDeps(), orgId, uid, txId, patch),
+  deleteTransaction: (orgId: string, uid: string, txId: string) => deleteTransaction(ledgerDeps(), orgId, uid, txId),
+  createAccount: (orgId: string, uid: string, input: AccountInput) => createAccount(ledgerDeps(), orgId, uid, input),
+  updateAccount: (orgId: string, uid: string, accountId: string, patch: AccountPatch) => updateAccount(ledgerDeps(), orgId, uid, accountId, patch),
+  deleteAccount: (orgId: string, uid: string, accountId: string) => deleteAccount(ledgerDeps(), orgId, uid, accountId),
+  updateOrganization: (orgId: string, uid: string, patch: OrgPatch) => updateOrganization(ledgerDeps(), orgId, uid, patch),
+  rebuild: (orgId: string, uid: string, apply: boolean) => rebuildLedger(ledgerDeps(), orgId, uid, { apply }),
 }

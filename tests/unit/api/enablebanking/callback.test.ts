@@ -8,6 +8,20 @@ vi.mock('@/lib/server/firebase-admin', async () => {
   return { getAdmin: () => admin }
 })
 vi.mock('@/lib/enablebanking/jwt', () => ({ createJwt: vi.fn(async () => 'eb-jwt') }))
+const bank = vi.hoisted(() => ({ getSession: vi.fn(), saveSession: vi.fn() }))
+vi.mock('@/lib/server/banking', () => ({
+  bankDeps: () => ({ eb: { getSession: bank.getSession } }),
+  banking: { saveSession: bank.saveSession },
+}))
+
+const SESSION = {
+  sessionId: 'sess-123',
+  institutionName: 'Millennium',
+  institutionCountry: 'PL',
+  psuType: 'business',
+  validUntil: '2027-01-21T10:00:00.000Z',
+  accounts: [],
+}
 
 const fetchMock = vi.fn()
 
@@ -27,6 +41,8 @@ describe('GET /api/enablebanking/callback', () => {
   beforeEach(() => {
     resetFakeAdmin()
     fetchMock.mockReset()
+    bank.getSession.mockReset().mockResolvedValue(SESSION)
+    bank.saveSession.mockReset().mockResolvedValue({ connectionId: 'sess-123', relinked: 0, unlinked: 0 })
     vi.stubGlobal('fetch', fetchMock)
     vi.stubEnv('EB_STATE_SECRET', TEST_EB_STATE_SECRET)
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -115,7 +131,7 @@ describe('GET /api/enablebanking/callback', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('exchanges the code and redirects to /{orgId}/settings/banks?eb_auth=...', async () => {
+  it('exchanges the code, saves the session on the server and redirects to /{orgId}/settings/banks?eb_connected=1', async () => {
     fetchMock.mockResolvedValueOnce(upstreamJson({ session_id: 'sess-123', accounts: [] }))
 
     const res = await GET(callbackRequest({ code: 'auth-code', state: aliceState() }))
@@ -124,8 +140,9 @@ describe('GET /api/enablebanking/callback', () => {
     const location = new URL(res.headers.get('location')!)
     expect(location.origin).toBe('http://localhost:3000')
     expect(location.pathname).toBe('/org-acme/settings/banks')
-    const payload = JSON.parse(Buffer.from(location.searchParams.get('eb_auth')!, 'base64url').toString('utf8'))
-    expect(payload).toEqual({ sessionId: 'sess-123' })
+    expect(location.searchParams.get('eb_connected')).toBe('1')
+    expect(location.searchParams.has('eb_auth')).toBe(false)
+    expect(location.href).not.toContain('sess-123')
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
@@ -133,6 +150,26 @@ describe('GET /api/enablebanking/callback', () => {
     expect(init.method).toBe('POST')
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer eb-jwt')
     expect(JSON.parse(String(init.body))).toEqual({ code: 'auth-code' })
+
+    expect(bank.getSession).toHaveBeenCalledWith('sess-123')
+    expect(bank.saveSession).toHaveBeenCalledWith(expect.anything(), 'org-acme', 'user-alice', SESSION)
+  })
+
+  it('redirects with eb_error=1 and does not claim a connection when the save fails', async () => {
+    fetchMock.mockResolvedValueOnce(upstreamJson({ session_id: 'sess-123', accounts: [] }))
+    bank.saveSession.mockRejectedValueOnce(new Error('firestore down'))
+    const res = await GET(callbackRequest({ code: 'auth-code', state: aliceState() }))
+    expect(res.status).toBe(307)
+    expect(res.headers.get('location')).toBe('http://localhost:3000/org-acme/settings/banks?eb_error=1')
+  })
+
+  it('redirects with eb_error=1 when the session cannot be read from the bank', async () => {
+    fetchMock.mockResolvedValueOnce(upstreamJson({ session_id: 'sess-123', accounts: [] }))
+    bank.getSession.mockRejectedValueOnce(new Error('bank down'))
+    const res = await GET(callbackRequest({ code: 'auth-code', state: aliceState() }))
+    expect(res.status).toBe(307)
+    expect(res.headers.get('location')).toBe('http://localhost:3000/org-acme/settings/banks?eb_error=1')
+    expect(bank.saveSession).not.toHaveBeenCalled()
   })
 
   it('redirects to settings with eb_error=1 when the bank returns no code (user cancelled)', async () => {

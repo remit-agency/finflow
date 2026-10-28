@@ -14,7 +14,9 @@ test.describe('API guards', () => {
     })
     expect(session.status()).toBe(401)
     expect((await request.get('/api/enablebanking/institutions?country=PL')).status()).toBe(401)
-    expect((await request.get('/api/enablebanking/accounts?sessionId=s&orgId=victim-org')).status()).toBe(401)
+    expect((await request.get('/api/orgs/victim-org/bank')).status()).toBe(401)
+    expect((await request.get('/api/orgs/victim-org/bank/connections/s1')).status()).toBe(401)
+    expect((await request.post('/api/orgs/victim-org/bank/sync', { headers: { Origin: 'http://localhost:3000' }, data: { bankAccountId: 'ba1' } })).status()).toBe(401)
   })
 
   // S05: every ledger write endpoint refuses a request without a session cookie, before it reads any data.
