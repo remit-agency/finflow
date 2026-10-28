@@ -1,11 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { ReceiptText } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { LazyTransactionForm } from '@/components/forms/lazy'
+import { FillChip } from '@/components/transactions/FillChip'
+import type { Counterparty } from '@/lib/domain/counterparties/types'
+import { fromMinor } from '@/lib/domain/ledger/money'
 import { useShell } from '@/lib/hooks/useShell'
 import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { useFormatters } from '@/lib/i18n/useFormatters'
@@ -20,17 +23,27 @@ const AMOUNT_STYLE: Record<Transaction['type'], { sign: string; className: strin
   transfer: { sign: '', className: 'text-ink-muted' },
 }
 
-// Date, Amount, Account, Category, Comment, plus the phone-only trailing Amount cell.
+// Checkbox, Date, Amount, Account, Category, Comment, plus the phone-only trailing Amount cell.
 // The day header spans all of them; the browser clamps it to the columns that are visible.
-const COLUMN_COUNT = 6
+const COLUMN_COUNT = 7
 
 interface TransactionListProps {
   grouped: Record<string, Transaction[]>
   accounts: Account[]
   incomeCategories: Category[]
   expenseCategories: Category[]
+  counterparties: Counterparty[]
   orgId: string
   loading: boolean
+  /** Balance of the account after each operation, in minor units; null for a planned one. */
+  balances: Record<string, number | null>
+  canSelect: boolean
+  selection: { has: (id: string) => boolean; toggle: (id: string) => void; add: (ids: string[]) => void; remove: (ids: string[]) => void }
+  hasMore: boolean
+  loadingMore: boolean
+  onLoadMore: () => void
+  /** Sets one category or counterparty from a «вкажіть» chip; rejects when the server refused. */
+  onFill: (tx: Transaction, field: 'category' | 'counterparty', value: string) => Promise<void>
 }
 
 export function TransactionList({
@@ -38,8 +51,16 @@ export function TransactionList({
   accounts,
   incomeCategories,
   expenseCategories,
+  counterparties,
   orgId,
   loading,
+  balances,
+  canSelect,
+  selection,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+  onFill,
 }: TransactionListProps) {
   const t = useTranslations('journal.list')
   const tAccountTypes = useTranslations('common.accountTypes')
@@ -48,6 +69,24 @@ export function TransactionList({
   const { can, org } = useShell()
   const canEdit = can('data.write')
   const [editTx, setEditTx] = useState<Transaction | null>(null)
+  const hasRows = Object.keys(grouped).length > 0
+
+  // The next page loads when the sentinel under the table scrolls near the viewport. `loadingMore` is a
+  // dependency so the observer is armed again after a page arrives: a short page that leaves the sentinel
+  // in view then loads the next one.
+  const sentinel = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = sentinel.current
+    if (!el || !hasMore) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) onLoadMore()
+      },
+      { rootMargin: '400px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, onLoadMore, loadingMore, loading, hasRows])
 
   // The amount cell exists twice (a column from `sm`, a trailing cell below it) and both read from here.
   // A transfer between currencies shows what left and what arrived.
@@ -56,6 +95,20 @@ export function TransactionList({
     const crossCurrency =
       tx.type === 'transfer' && tx.toAmount !== undefined && !!tx.toCurrency && tx.toCurrency !== tx.currency
     return crossCurrency ? `${base} → ${money(tx.toAmount!, tx.toCurrency!)}` : base
+  }
+
+  // The transaction (accrual) date or period shown under the payment date, when it differs from it.
+  const accrualText = (tx: Transaction): string | null => {
+    if (tx.type === 'transfer') return null
+    if (tx.accrual.mode === 'date') {
+      return tx.accrual.date === tx.date.toISOString().slice(0, 10)
+        ? null
+        : t('accrualDate', { value: formatDayShortUtc(new Date(`${tx.accrual.date}T00:00:00Z`), locale) })
+    }
+    return t('accrualPeriod', {
+      from: formatDayShortUtc(new Date(`${tx.accrual.from}T00:00:00Z`), locale),
+      to: formatDayShortUtc(new Date(`${tx.accrual.to}T00:00:00Z`), locale),
+    })
   }
 
   // The group key is a UTC calendar day (`2026-10-23`), formatted in UTC like every stored date.
@@ -71,6 +124,7 @@ export function TransactionList({
   }
 
   const accountMap = Object.fromEntries(accounts.map((a) => [a.id, a]))
+  const counterpartyMap = Object.fromEntries(counterparties.map((c) => [c.id, c]))
   const allCategories = [...incomeCategories, ...expenseCategories]
   const categoryMap = Object.fromEntries(allCategories.map((c) => [c.id, c]))
 
@@ -85,6 +139,7 @@ export function TransactionList({
   }
 
   const keys = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
+  const allIds = keys.flatMap((k) => grouped[k].map((tx) => tx.id))
 
   if (keys.length === 0) {
     return (
@@ -103,6 +158,17 @@ export function TransactionList({
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
+              {canSelect && (
+                <TableHead className="w-8 pl-4 sm:pl-2">
+                  <input
+                    type="checkbox"
+                    className="accent-brand"
+                    aria-label={t('selectAll')}
+                    checked={allIds.length > 0 && allIds.every((id) => selection.has(id))}
+                    onChange={(e) => (e.target.checked ? selection.add(allIds) : selection.remove(allIds))}
+                  />
+                </TableHead>
+              )}
               <TableHead className="hidden w-32 pl-4 sm:table-cell sm:pl-2">{t('date')}</TableHead>
               <TableHead className="hidden w-40 text-right sm:table-cell">{t('amount')}</TableHead>
               <TableHead className="pl-4 sm:pl-6">{t('account')}</TableHead>
@@ -139,12 +205,17 @@ export function TransactionList({
                   const toAccount =
                     tx.type === 'transfer' && tx.toAccountId ? accountMap[tx.toAccountId] : null
                   const category = tx.categoryId ? categoryMap[tx.categoryId] : null
+                  const counterparty = tx.counterpartyId ? counterpartyMap[tx.counterpartyId] : null
                   const categoryName = category
                     ? categoryLabel(category)
                     : tx.type === 'transfer'
                       ? t('transfer')
                       : t('noCategory')
                   const accountLabel = toAccount ? `${account?.name ?? '—'} → ${toAccount.name}` : (account?.name ?? '—')
+                  const selected = selection.has(tx.id)
+                  const balance = balances[tx.id]
+                  const accrual = accrualText(tx)
+                  const canFill = canEdit && tx.type !== 'transfer'
 
                   return (
                     // A click anywhere on the row edits it (mouse). Keyboard and screen readers use
@@ -152,15 +223,33 @@ export function TransactionList({
                     <TableRow
                       key={tx.id}
                       data-status={tx.status === 'planned' ? 'planned' : undefined}
+                      data-selected={selected || undefined}
                       onClick={canEdit ? () => setEditTx(tx) : undefined}
                       className={cn(
                         canEdit ? 'cursor-pointer hover:bg-canvas has-[button:focus-visible]:bg-brand-soft' : 'hover:bg-transparent',
                         tx.status === 'planned' && 'text-ink-muted',
+                        selected && 'bg-brand-soft hover:bg-brand-soft-hover',
                       )}
                     >
+                      {canSelect && (
+                        <TableCell className="w-8 py-3.5 pl-4 sm:pl-2" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            className="accent-brand"
+                            aria-label={t('selectRow', {
+                              account: accountLabel,
+                              amount: amountLabel(tx),
+                              date: formatDayShortUtc(tx.date, locale),
+                            })}
+                            checked={selected}
+                            onChange={() => selection.toggle(tx.id)}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell className="hidden py-3.5 pl-4 tabular-nums sm:table-cell sm:pl-2">
                         <span className="block text-ink">{formatDayShortUtc(tx.date, locale)}</span>
                         <span className="block text-xs text-ink-muted">{formatWeekdayShortUtc(tx.date, locale)}</span>
+                        {accrual && <span className="block text-xs text-ink-muted">{accrual}</span>}
                       </TableCell>
                       <TableCell className={cn('hidden py-3.5 text-right font-semibold tabular-nums sm:table-cell', amount.className)}>
                         {amountLabel(tx)}
@@ -194,6 +283,11 @@ export function TransactionList({
                         <span className="hidden max-w-56 truncate text-xs text-ink-muted md:block">
                           {account ? tAccountTypes(account.type) : ''}
                         </span>
+                        {balance != null && account && (
+                          <span className="block max-w-56 truncate text-xs tabular-nums text-ink-muted" aria-label={t('balanceAfter')}>
+                            {money(fromMinor(balance), account.currency)}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {category ? (
@@ -203,12 +297,32 @@ export function TransactionList({
                           </Badge>
                         ) : tx.type === 'transfer' ? (
                           <Badge variant="chip">{t('transfer')}</Badge>
+                        ) : canEdit && !tx.categoryId ? (
+                          <FillChip
+                            field="category"
+                            categories={tx.type === 'income' ? incomeCategories : expenseCategories}
+                            counterparties={counterparties}
+                            onSave={(value) => onFill(tx, 'category', value)}
+                          />
                         ) : (
                           <span className="text-ink-subtle">{t('noCategory')}</span>
                         )}
                       </TableCell>
                       <TableCell className="hidden pr-2 text-ink-muted md:table-cell">
-                        <span className="block max-w-72 truncate">{tx.description || '—'}</span>
+                        {counterparty ? (
+                          <span className="block max-w-72 truncate text-ink">{counterparty.name}</span>
+                        ) : canFill ? (
+                          <FillChip
+                            field="counterparty"
+                            categories={[]}
+                            counterparties={counterparties}
+                            onSave={(value) => onFill(tx, 'counterparty', value)}
+                          />
+                        ) : null}
+                        {/* A dash only when nothing else fills the cell. */}
+                        {(tx.description || (!counterparty && !canFill)) && (
+                          <span className="block max-w-72 truncate">{tx.description || '—'}</span>
+                        )}
                       </TableCell>
                       <TableCell className={cn('py-3.5 pr-4 text-right font-semibold tabular-nums sm:hidden', amount.className)}>
                         {amountLabel(tx)}
@@ -221,6 +335,8 @@ export function TransactionList({
           })}
         </Table>
       </div>
+      <div ref={sentinel} aria-hidden className="h-4" />
+      {loadingMore && <p className="py-3 text-center text-sm text-ink-muted">{t('loadingMore')}</p>}
 
       {canEdit && editTx && (
         <LazyTransactionForm
