@@ -20,7 +20,3 @@ export function rateLine(spent: number, from: string, received: number, to: stri
 export function convertApprox(amount: number, rate: number): number {
   return Math.round(amount * rate * 100) / 100
 }
-
-export function formatRate(rate: number, locale: string): string {
-  return new Intl.NumberFormat(locale, { minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(rate)
-}

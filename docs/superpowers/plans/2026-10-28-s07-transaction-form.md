@@ -335,7 +335,7 @@ git commit -m "feat(transaction-form): accrual date and period state"
 
 ```ts
 import { describe, expect, it } from 'vitest'
-import { convertApprox, formatRate, rateLine } from '@/lib/domain/transaction-form/rate'
+import { convertApprox, rateLine } from '@/lib/domain/transaction-form/rate'
 
 describe('rateLine', () => {
   it('names the stronger currency as the base: 440 PLN → 100 EUR is 1 EUR = 4.4 PLN', () => {
@@ -357,14 +357,6 @@ describe('convertApprox', () => {
   it('rounds the converted amount to 2 decimals', () => {
     expect(convertApprox(100, 4.2531)).toBe(425.31)
     expect(convertApprox(10.05, 4.5)).toBe(45.23)
-  })
-})
-
-describe('formatRate', () => {
-  it('shows at least 4 and at most 6 decimals in the UI locale', () => {
-    expect(formatRate(4.4, 'en')).toBe('4.4000')
-    expect(formatRate(4.123456789, 'en')).toBe('4.123457')
-    expect(formatRate(4.4, 'pl')).toBe('4,4000')
   })
 })
 ```
@@ -398,10 +390,6 @@ export function rateLine(spent: number, from: string, received: number, to: stri
 /** An amount converted at a rate, for a hint (the server stores the real conversion). */
 export function convertApprox(amount: number, rate: number): number {
   return Math.round(amount * rate * 100) / 100
-}
-
-export function formatRate(rate: number, locale: string): string {
-  return new Intl.NumberFormat(locale, { minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(rate)
 }
 ```
 
@@ -1855,7 +1843,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import type { TxStatus, TxType } from '@/lib/domain/ledger/types'
-import { convertApprox, formatRate, rateLine } from '@/lib/domain/transaction-form/rate'
+import { convertApprox, rateLine } from '@/lib/domain/transaction-form/rate'
 import type { FormErrors, FormState } from '@/lib/domain/transaction-form/state'
 import { useRatePreview } from '@/lib/hooks/useRatePreview'
 import { useFormatters } from '@/lib/i18n/useFormatters'
@@ -1885,7 +1873,7 @@ interface Props {
 
 export function AmountFields({ state, status, accounts, baseCurrency, currency, toCurrency, errors, amountRef, onChange }: Props) {
   const t = useTranslations('forms.transaction')
-  const { locale, money } = useFormatters()
+  const { money, number } = useFormatters()
   const isTransfer = state.type === 'transfer'
   const typedAmount = parseAmountInput(state.amount)
 
@@ -1991,7 +1979,7 @@ export function AmountFields({ state, status, accounts, baseCurrency, currency, 
           </div>
           {line && (
             <p className="text-xs tabular-nums text-ink-muted">
-              {t('rateLine', { base: line.base, value: formatRate(line.value, locale), quote: line.quote })}
+              {t('rateLine', { base: line.base, value: number(line.value, { minimumFractionDigits: 4, maximumFractionDigits: 6 }), quote: line.quote })}
             </p>
           )}
         </>
