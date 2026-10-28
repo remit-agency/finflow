@@ -88,7 +88,8 @@ test.describe('ui shots', () => {
     // Start from an empty folder: no stale images from an older list of screens. Removing also
     // avoids a Windows quirk where overwriting a PNG that an image viewer holds open fails.
     for (const old of readdirSync(OUT_DIR)) {
-      if (old.endsWith('.png')) rmSync(join(OUT_DIR, old), { force: true })
+      // journal-*.png belong to journal.spec.ts, which clears its own.
+      if (old.endsWith('.png') && !old.startsWith('journal-')) rmSync(join(OUT_DIR, old), { force: true })
     }
   })
 
