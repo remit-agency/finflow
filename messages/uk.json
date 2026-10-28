@@ -269,6 +269,8 @@
       "accrualDate": "Дата транзакції",
       "accrualFrom": "Період з",
       "accrualTo": "Період до",
+      "datePlaceholder": "ДД.ММ.РРРР",
+      "openCalendar": "Відкрити календар",
       "accrualHint": "Операція враховується в P&L у вказаному періоді",
       "counterparty": "Контрагент",
       "rateHint": "≈ {amount} за курсом НБП на {date}",

@@ -269,6 +269,8 @@
       "accrualDate": "Transaction date",
       "accrualFrom": "Period from",
       "accrualTo": "Period to",
+      "datePlaceholder": "DD.MM.YYYY",
+      "openCalendar": "Open calendar",
       "accrualHint": "The operation is counted in the P&L in the period given here",
       "counterparty": "Counterparty",
       "rateHint": "≈ {amount} at the NBP rate of {date}",
