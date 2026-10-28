@@ -22,7 +22,8 @@ export default function TransactionsPage() {
     accountId: selectedAccountId ?? undefined,
   }
 
-  const { grouped, loading } = useTransactions(orgId, effectiveFilters)
+  // The journal also lists planned operations; the flag stays out of `filters` so it never counts as an active filter.
+  const { grouped, loading } = useTransactions(orgId, { ...effectiveFilters, includePlanned: true })
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? null
 
   return (

@@ -1,30 +1,52 @@
 import type { TransactionDraft } from '@/lib/api/ledger-client'
+import { accrualFor } from '@/lib/domain/transaction-form/accrual'
+import type { FormState } from '@/lib/domain/transaction-form/state'
+import { effectiveStatus } from '@/lib/domain/transaction-form/status'
+import { parseAmountInput } from '@/lib/utils/amount-input'
 import type { Transaction } from '@/types'
 
-/** What the transaction form edits itself: everything in a draft except the fields it has no control for. */
-export type FormOwnedDraft = Omit<TransactionDraft, 'accrual' | 'counterpartyId' | 'projectId' | 'tags' | 'fileUrls'>
+/** What the transaction form edits itself: everything in a draft except what it has no control for (project, tags, files). */
+export type FormOwnedDraft = Omit<TransactionDraft, 'projectId' | 'tags' | 'fileUrls'>
 
 /** The `YYYY-MM-DD` UTC day of a stored payment date. */
 function paymentDay(date: Date): string {
   return date.toISOString().split('T')[0]
 }
 
-/** A draft for a new operation: it has no tags, files, counterparty, project or own accrual yet. */
+/** The draft the form sends for what is typed. `validateState` has already refused anything unparseable. */
+export function stateToDraft(state: FormState, o: { today: string; crossCurrency: boolean }): FormOwnedDraft {
+  const draft: FormOwnedDraft = {
+    type: state.type,
+    status: effectiveStatus(state.status, state.paymentDate, o.today),
+    accountId: state.accountId,
+    amount: parseAmountInput(state.amount) ?? 0,
+    paymentDate: state.paymentDate,
+    isRecurring: state.isRecurring,
+  }
+  if (state.type === 'transfer') {
+    draft.toAccountId = state.toAccountId
+    if (o.crossCurrency) draft.toAmount = parseAmountInput(state.toAmount) ?? 0
+  } else {
+    if (state.categoryId) draft.categoryId = state.categoryId
+    if (state.counterpartyId) draft.counterpartyId = state.counterpartyId
+    const accrual = accrualFor(state.accrual, state.paymentDate)
+    if (accrual) draft.accrual = accrual
+  }
+  const description = state.description.trim()
+  if (description) draft.description = description
+  return draft
+}
+
+/** A draft for a new operation: it has no tags, files or project yet. */
 export function buildCreateDraft(form: FormOwnedDraft): TransactionDraft {
   return { ...form, tags: [], fileUrls: [] }
 }
 
 /**
- * A draft for saving an edited operation. The edit is sent as a full replace (absent optional
- * fields are cleared), so every field the form has no control for must be carried over from the
- * stored operation, or an edit of the amount alone would erase them: counterparty, project, tags,
- * files and the accrual period. Fields the form owns (category, description, transfer fields) are
- * taken from the form as they are, so the user can still clear them.
- *
- * The accrual is kept unless it merely followed the payment date (mode `date`, equal to the stored
- * payment date): then none is sent and the server makes it follow the new payment date, as
- * `toRawInput` does there. A transfer has neither accrual nor counterparty, and the server refuses
- * both, so nothing is carried for them when the form saves a transfer.
+ * A draft for saving an edited operation. The edit is sent as a full replace (absent optional fields are
+ * cleared), so the three fields the form has no control for must be carried over from the stored operation,
+ * or an edit of the amount alone would erase them: project, tags and files. Everything else (category,
+ * counterparty, accrual, status, description) comes from the form, so the person can still change or clear it.
  */
 export function buildEditDraft(transaction: Transaction, form: FormOwnedDraft): TransactionDraft {
   const draft: TransactionDraft = {
@@ -33,12 +55,37 @@ export function buildEditDraft(transaction: Transaction, form: FormOwnedDraft): 
     fileUrls: [...transaction.fileUrls],
   }
   if (transaction.projectId !== undefined) draft.projectId = transaction.projectId
-  if (form.type !== 'transfer') {
-    if (transaction.counterpartyId !== undefined) draft.counterpartyId = transaction.counterpartyId
-    const { accrual } = transaction
-    const followedPaymentDate = accrual.mode === 'date' && accrual.date === paymentDay(transaction.date)
-    if (!followedPaymentDate) draft.accrual = accrual
+  return draft
+}
+
+/**
+ * The full draft of a stored operation: what a create (restoring a deleted operation) or a full replace
+ * (undoing an edit) needs to give the same operation back. An accrual that merely followed the payment date
+ * is left out so it follows again. A transfer has neither accrual nor counterparty (the server refuses both),
+ * and its second amount only matters across currencies.
+ */
+export function transactionToDraft(tx: Transaction): TransactionDraft {
+  const draft: TransactionDraft = {
+    type: tx.type,
+    status: tx.status,
+    accountId: tx.accountId,
+    amount: tx.amount,
+    paymentDate: paymentDay(tx.date),
+    isRecurring: tx.isRecurring,
+    tags: [...tx.tags],
+    fileUrls: [...tx.fileUrls],
   }
+  if (tx.description !== undefined) draft.description = tx.description
+  if (tx.projectId !== undefined) draft.projectId = tx.projectId
+  if (tx.type === 'transfer') {
+    if (tx.toAccountId !== undefined) draft.toAccountId = tx.toAccountId
+    if (tx.toAmount !== undefined && tx.toCurrency !== undefined && tx.toCurrency !== tx.currency) draft.toAmount = tx.toAmount
+    return draft
+  }
+  if (tx.categoryId !== undefined) draft.categoryId = tx.categoryId
+  if (tx.counterpartyId !== undefined) draft.counterpartyId = tx.counterpartyId
+  const followedPaymentDate = tx.accrual.mode === 'date' && tx.accrual.date === paymentDay(tx.date)
+  if (!followedPaymentDate) draft.accrual = tx.accrual
   return draft
 }
 

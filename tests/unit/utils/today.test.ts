@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { todayUtcDay } from '@/lib/utils/today'
+import { todayDay, todayUtcDay } from '@/lib/utils/today'
 
 const iso = (d: Date) => d.toISOString()
 
@@ -26,5 +26,16 @@ describe('todayUtcDay', () => {
 
   it('defaults to the current time', () => {
     expect(todayUtcDay().getUTCHours()).toBe(0)
+  })
+})
+
+describe('todayDay', () => {
+  it('is the Warsaw calendar day as YYYY-MM-DD', () => {
+    expect(todayDay(new Date('2026-10-28T12:00:00Z'))).toBe('2026-10-28')
+  })
+
+  it('moves to the next day once Warsaw is past midnight while UTC is not', () => {
+    // 2026-10-28 23:30 UTC is 00:30 on the 29th in Warsaw (CET, UTC+1).
+    expect(todayDay(new Date('2026-10-28T23:30:00Z'))).toBe('2026-10-29')
   })
 })

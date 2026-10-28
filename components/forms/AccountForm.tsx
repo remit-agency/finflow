@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
 import { toast } from 'sonner'
 import { createAccount, updateAccount, LedgerApiError } from '@/lib/api/ledger-client'
 import { useFormatters } from '@/lib/i18n/useFormatters'
@@ -110,20 +111,20 @@ export function AccountForm({ orgId, account, defaultCurrency, open, onClose }: 
               onChange={(e) => setName(e.target.value)}
               placeholder={t('namePlaceholder')}
             />
-            {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
+            {errors.name && <p className="text-xs text-expense">{errors.name}</p>}
           </div>
 
           <div className="space-y-1">
             <Label>{t('type')}</Label>
-            <select
+            <NativeSelect
+              wrapperClassName="w-full"
               value={type}
               onChange={(e) => setType(e.target.value as Account['type'])}
-              className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus:border-[#00c896]"
             >
               {ACCOUNT_TYPES.map((accountType) => (
                 <option key={accountType} value={accountType}>{t(`types.${accountType}`)}</option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -138,19 +139,19 @@ export function AccountForm({ orgId, account, defaultCurrency, open, onClose }: 
                 onChange={(e) => setBalance(e.target.value)}
                 className="font-tabular"
               />
-              {errors.balance && <p className="text-xs text-red-500">{errors.balance}</p>}
+              {errors.balance && <p className="text-xs text-expense">{errors.balance}</p>}
             </div>
             <div className="space-y-1">
               <Label>{t('currency')}</Label>
-              <select
+              <NativeSelect
+                wrapperClassName="w-full"
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus:border-[#00c896]"
               >
                 {CURRENCIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
           </div>
 
@@ -162,12 +163,8 @@ export function AccountForm({ orgId, account, defaultCurrency, open, onClose }: 
                   key={c}
                   type="button"
                   onClick={() => setColor(c)}
-                  className="w-8 h-8 rounded-full border-2 transition-all"
-                  style={{
-                    backgroundColor: c,
-                    borderColor: color === c ? '#111' : 'transparent',
-                    transform: color === c ? 'scale(1.15)' : 'scale(1)',
-                  }}
+                  className={`w-8 h-8 rounded-full border-2 transition-all ${color === c ? 'border-ink scale-115' : 'border-transparent'}`}
+                  style={{ backgroundColor: c }}
                 />
               ))}
             </div>
@@ -177,7 +174,7 @@ export function AccountForm({ orgId, account, defaultCurrency, open, onClose }: 
             <Button type="button" variant="outline" onClick={onClose}>
               {tCommon('cancel')}
             </Button>
-            <Button type="submit" disabled={loading} style={{ backgroundColor: '#00c896' }}>
+            <Button type="submit" disabled={loading}>
               {loading ? tForms('saving') : isEdit ? tCommon('save') : t('create')}
             </Button>
           </DialogFooter>
