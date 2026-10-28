@@ -16,6 +16,8 @@ export interface UseJournalResult {
   error: boolean
   hasMore: boolean
   loadingMore: boolean
+  /** The last «load more» failed; the rows stay and `loadMore` asks again. */
+  moreError: boolean
   loadMore: () => void
 }
 
@@ -35,6 +37,11 @@ export function useJournal(orgId: string | null, filters: JournalFilters): UseJo
     latest.current = { state, key }
   })
 
+  // The reload in flight (its id grows with every reload; only the latest may touch the list) and the «load more»
+  // request in flight. Both are aborted when something newer replaces them.
+  const reloadRef = useRef<{ id: number; ac: AbortController | null }>({ id: 0, ac: null })
+  const moreRef = useRef<AbortController | null>(null)
+
   // First page. Nothing is set synchronously: `loading` is derived from the key the rows belong to.
   useEffect(() => {
     if (!orgId) return
@@ -45,44 +52,84 @@ export function useJournal(orgId: string | null, filters: JournalFilters): UseJo
         if (!ac.signal.aborted) dispatch({ type: 'fail', key })
       },
     )
-    return () => ac.abort()
+    return () => {
+      ac.abort()
+      moreRef.current?.abort()
+      moreRef.current = null
+    }
   }, [orgId, filters, key])
 
   const loadMore = useCallback(() => {
-    const current = latest.current
-    if (!orgId || current.key !== key || current.state.next === null || current.state.moreLoading || current.state.phase !== 'ready') return
-    dispatch({ type: 'moreStart', key })
-    fetchJournalPage(orgId, filters, current.state.next).then(
-      (page) => dispatch({ type: 'more', key, page }),
-      () => dispatch({ type: 'fail', key }),
+    const { state: s, key: k } = latest.current
+    // `moreRef` closes the gap before the next render: a second call right after the first must not start a request.
+    if (!orgId || k !== key || s.next === null || s.moreLoading || s.phase !== 'ready' || moreRef.current) return
+    const after = s.next
+    const ac = new AbortController()
+    moreRef.current = ac
+    dispatch({ type: 'moreStart', key, after })
+    fetchJournalPage(orgId, filters, after, { signal: ac.signal }).then(
+      (page) => {
+        if (moreRef.current === ac) moreRef.current = null
+        if (!ac.signal.aborted) dispatch({ type: 'more', key, after, page })
+      },
+      () => {
+        if (moreRef.current === ac) moreRef.current = null
+        if (!ac.signal.aborted) dispatch({ type: 'failMore', key, after })
+      },
     )
   }, [orgId, filters, key])
 
-  // Reload to the depth the person has scrolled to, after this browser changed operations.
+  // Reload to the depth the person has scrolled to, after this browser changed operations or when the tab comes
+  // back to the front (a journal left open for hours catches up).
   useEffect(() => {
     if (!orgId) return
+    const reloads = reloadRef.current
     let timer: ReturnType<typeof setTimeout> | undefined
     const reload = async () => {
       const { state: s, key: k } = latest.current
       if (k !== key || s.phase === 'loading') return
-      const want = Math.max(s.rows.length, PAGE_SIZE)
-      const rows: JournalRow[] = []
-      let cursor: string | null = null
-      for (let i = 0; i < MAX_RELOAD_PAGES; i++) {
-        const page = await fetchJournalPage(orgId, filters, cursor)
-        rows.push(...page.rows)
-        cursor = page.next
-        if (cursor === null || rows.length >= want) break
+      // Newer wins: the previous reload and a «load more» still in flight are cancelled, their answers are void.
+      reloads.ac?.abort()
+      moreRef.current?.abort()
+      moreRef.current = null
+      const ac = new AbortController()
+      const id = ++reloads.id
+      reloads.ac = ac
+      const isLatest = () => reloads.id === id && !ac.signal.aborted
+      try {
+        const want = Math.max(s.rows.length, PAGE_SIZE)
+        const rows: JournalRow[] = []
+        let cursor: string | null = null
+        for (let i = 0; i < MAX_RELOAD_PAGES; i++) {
+          const page = await fetchJournalPage(orgId, filters, cursor, { signal: ac.signal })
+          if (!isLatest()) return
+          rows.push(...page.rows)
+          cursor = page.next
+          if (cursor === null || rows.length >= want) break
+        }
+        if (isLatest()) dispatch({ type: 'replace', key, rows, next: cursor })
+      } catch {
+        if (isLatest()) dispatch({ type: 'fail', key })
+      } finally {
+        if (reloads.ac === ac) reloads.ac = null
       }
-      dispatch({ type: 'replace', key, rows, next: cursor })
     }
-    const off = onLedgerChanged(() => {
+    const schedule = () => {
       clearTimeout(timer)
-      timer = setTimeout(() => void reload().catch(() => dispatch({ type: 'fail', key })), RELOAD_DEBOUNCE_MS)
-    })
+      timer = setTimeout(() => void reload(), RELOAD_DEBOUNCE_MS)
+    }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') schedule()
+    }
+    const off = onLedgerChanged(schedule)
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       off()
+      document.removeEventListener('visibilitychange', onVisible)
       clearTimeout(timer)
+      reloads.id++
+      reloads.ac?.abort()
+      reloads.ac = null
     }
   }, [orgId, filters, key])
 
@@ -93,6 +140,7 @@ export function useJournal(orgId: string | null, filters: JournalFilters): UseJo
     error: current && state.phase === 'error',
     hasMore: current && state.next !== null,
     loadingMore: current && state.moreLoading,
+    moreError: current && state.moreError,
     loadMore,
   }
 }
