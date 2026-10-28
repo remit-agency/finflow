@@ -42,3 +42,12 @@ export function decodeCursor(cursor: string): JournalKey | null {
     return null
   }
 }
+
+export const DEFAULT_PAGE = 50
+export const MAX_PAGE = 100
+
+/** The page size from a query string: 50 by default, 1 to 100. */
+export function parseLimit(raw: string | null): number {
+  if (raw === null || !/^-?\d+$/.test(raw)) return DEFAULT_PAGE
+  return Math.min(MAX_PAGE, Math.max(1, Number(raw)))
+}
