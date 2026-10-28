@@ -315,7 +315,7 @@
       }
     },
     "delete": {
-      "title": "Delete {count} operations?",
+      "title": "{count, plural, one {Delete # operation?} other {Delete # operations?}}",
       "body": "Net amount: {amount}. You can undo this for a few seconds afterwards.",
       "confirm": "Delete",
       "cancel": "Cancel",

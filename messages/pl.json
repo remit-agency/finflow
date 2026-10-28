@@ -263,14 +263,14 @@
     "selection": {
       "region": "Zaznaczone operacje",
       "selected": "Zaznaczono: {count}",
-      "change": "Zmienić dane",
-      "delete": "Usunąć",
+      "change": "Zmień dane",
+      "delete": "Usuń",
       "clear": "Wyczyść zaznaczenie",
-      "field_category": "Zmienić kategorię",
-      "field_counterparty": "Zmienić kontrahenta",
-      "field_comment": "Zmienić komentarz",
-      "field_paymentDate": "Zmienić datę płatności",
-      "field_accrual": "Zmienić datę transakcji lub okres"
+      "field_category": "Zmień kategorię",
+      "field_counterparty": "Zmień kontrahenta",
+      "field_comment": "Zmień komentarz",
+      "field_paymentDate": "Zmień datę płatności",
+      "field_accrual": "Zmień datę transakcji lub okres"
     },
     "bulk": {
       "title_category": "Zmiana kategorii",
@@ -315,7 +315,7 @@
       }
     },
     "delete": {
-      "title": "Usunąć operacje: {count}?",
+      "title": "Usunąć {count, plural, one {# operację} few {# operacje} many {# operacji} other {# operacji}}?",
       "body": "Kwota netto: {amount}. Przez kilka sekund po usunięciu możesz to cofnąć.",
       "confirm": "Usuń",
       "cancel": "Anuluj",
