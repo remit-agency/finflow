@@ -227,6 +227,7 @@
       "category": "Категорія",
       "comment": "Коментар",
       "transfer": "Переказ",
+      "planned": "План",
       "noCategory": "Без категорії",
       "rowEdit": "{account}: {amount}, {date}, редагувати"
     }

@@ -227,6 +227,7 @@
       "category": "Kategoria",
       "comment": "Komentarz",
       "transfer": "Przelew",
+      "planned": "Plan",
       "noCategory": "Bez kategorii",
       "rowEdit": "{account}: {amount}, {date}, edytuj"
     }

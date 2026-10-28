@@ -151,8 +151,12 @@ export function TransactionList({
                     // the real button in the account cell: the row itself is not a Tab stop.
                     <TableRow
                       key={tx.id}
+                      data-status={tx.status === 'planned' ? 'planned' : undefined}
                       onClick={canEdit ? () => setEditTx(tx) : undefined}
-                      className={canEdit ? 'cursor-pointer hover:bg-canvas has-[button:focus-visible]:bg-brand-soft' : 'hover:bg-transparent'}
+                      className={cn(
+                        canEdit ? 'cursor-pointer hover:bg-canvas has-[button:focus-visible]:bg-brand-soft' : 'hover:bg-transparent',
+                        tx.status === 'planned' && 'text-ink-muted',
+                      )}
                     >
                       <TableCell className="hidden py-3.5 pl-4 tabular-nums sm:table-cell sm:pl-2">
                         <span className="block text-ink">{formatDayShortUtc(tx.date, locale)}</span>
@@ -184,6 +188,7 @@ export function TransactionList({
                         ) : (
                           <span className="block max-w-44 truncate text-ink sm:max-w-56">{accountLabel}</span>
                         )}
+                        {tx.status === 'planned' && <Badge variant="chip" className="mt-1">{t('planned')}</Badge>}
                         {/* Second line: the category below md (its column is hidden there), the account type above. */}
                         <span className="block max-w-44 truncate text-xs text-ink-muted md:hidden">{categoryName}</span>
                         <span className="hidden max-w-56 truncate text-xs text-ink-muted md:block">

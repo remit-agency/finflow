@@ -21,19 +21,27 @@ export function formatWeekdayShortUtc(date: Date, locale: Locale): string {
  * accounts and do not count. Returns null when the day's non-transfer transactions use more than
  * one currency (a sum would be meaningless; conversion belongs to S04) or when there are no
  * transactions. A transfer-only day totals exactly 0 in the currency of its first transfer.
+ * Planned operations are not money moved yet, so they stay out of the sum (a day holding only
+ * planned ones has no sum).
  */
 export function summarizeDay(
-  txs: ReadonlyArray<Pick<Transaction, 'type' | 'amount' | 'currency'>>,
+  txs: ReadonlyArray<Pick<Transaction, 'type' | 'amount' | 'currency' | 'status'>>,
 ): { total: number; currency: string } | null {
-  if (txs.length === 0) return null
-  const counted = txs.filter((t) => t.type !== 'transfer')
+  const actual = txs.filter((t) => t.status === 'actual')
+  if (actual.length === 0) return null
+  const counted = actual.filter((t) => t.type !== 'transfer')
   const currencies = new Set(counted.map((t) => t.currency))
   if (currencies.size > 1) return null
 
-  const currency = counted[0]?.currency ?? txs[0].currency
+  const currency = counted[0]?.currency ?? actual[0].currency
   const cents = counted.reduce(
     (sum, t) => sum + (t.type === 'income' ? 1 : -1) * Math.round(t.amount * 100),
     0,
   )
   return { total: cents / 100, currency }
+}
+
+/** Whether the journal lists an operation: planned ones only when it asks for them (reports and the calendar never do). */
+export function isListed(tx: Pick<Transaction, 'status'>, includePlanned: boolean): boolean {
+  return tx.status === 'actual' || includePlanned
 }

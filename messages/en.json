@@ -227,6 +227,7 @@
       "category": "Category",
       "comment": "Comment",
       "transfer": "Transfer",
+      "planned": "Planned",
       "noCategory": "No category",
       "rowEdit": "{account}: {amount}, {date}, edit"
     }

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { formatDayShortUtc, formatWeekdayShortUtc, summarizeDay } from '@/lib/utils/journal'
+import { formatDayShortUtc, formatWeekdayShortUtc, isListed, summarizeDay } from '@/lib/utils/journal'
 
-const tx = (type: 'income' | 'expense' | 'transfer', amount: number, currency = 'UAH') => ({ type, amount, currency })
+const tx = (
+  type: 'income' | 'expense' | 'transfer',
+  amount: number,
+  currency = 'UAH',
+  status: 'actual' | 'planned' = 'actual',
+) => ({ type, amount, currency, status })
 
 describe('formatDayShortUtc', () => {
   // The journal groups by the UTC day (toISOString), so a row must read the same UTC day
@@ -82,5 +87,23 @@ describe('summarizeDay', () => {
 
   it('gives null for no transactions', () => {
     expect(summarizeDay([])).toBeNull()
+  })
+
+  it('does not count planned operations in the sum of the day', () => {
+    expect(summarizeDay([tx('income', 1000), { ...tx('expense', 400), status: 'planned' }])).toEqual({ total: 1000, currency: 'UAH' })
+  })
+
+  it('has no sum for a day that holds only planned operations', () => {
+    expect(summarizeDay([{ ...tx('expense', 400), status: 'planned' }])).toBeNull()
+  })
+})
+
+describe('isListed', () => {
+  it('actual operations are always listed', () => {
+    expect(isListed({ status: 'actual' }, false)).toBe(true)
+  })
+  it('planned ones only when the journal asks for them', () => {
+    expect(isListed({ status: 'planned' }, false)).toBe(false)
+    expect(isListed({ status: 'planned' }, true)).toBe(true)
   })
 })
