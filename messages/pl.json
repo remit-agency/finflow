@@ -29,6 +29,7 @@
     "switchOrg": "Nie udało się przełączyć firmy",
     "deleteAccount": "Nie udało się usunąć konta",
     "accountHasOperations": "Konto ma operacje, nie można go usunąć.",
+    "accountLinkedToBank": "Rachunek jest połączony z bankiem. Najpierw odłącz bank w ustawieniach",
     "loadOrgs": "Nie udało się wczytać firm",
     "auth": {
       "wrongPassword": "Nieprawidłowy adres e-mail lub hasło.",

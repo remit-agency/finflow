@@ -16,6 +16,12 @@ async function hasOperations(t: Transaction, deps: LedgerDeps, orgId: string, ac
   return !asSource.empty || !asTarget.empty
 }
 
+/** True when a bank account (any status, also a disconnected one) is linked to the FinFlow account. S09 writes `bankAccounts`. */
+async function isLinkedToBank(t: Transaction, deps: LedgerDeps, orgId: string, accountId: string): Promise<boolean> {
+  const linked = await t.get(orgRef(deps.db, orgId).collection('bankAccounts').where('accountId', '==', accountId).limit(1))
+  return !linked.empty
+}
+
 export async function createAccount(deps: LedgerDeps, orgId: string, uid: string, input: AccountInput): Promise<LedgerAccount> {
   const ref = accountsCol(deps.db, orgId).doc()
   const account: LedgerAccount = { id: ref.id, ...input, balanceMinor: input.openingMinor }
@@ -64,6 +70,7 @@ export async function deleteAccount(deps: LedgerDeps, orgId: string, uid: string
     const snap = await t.get(ref)
     const before = snap.exists ? parseAccount(snap.id, snap.data()) : null
     if (!before) throw new LedgerError('not_found')
+    if (await isLinkedToBank(t, deps, orgId, accountId)) throw new LedgerError('account_linked_to_bank')
     if (await hasOperations(t, deps, orgId, accountId)) throw new LedgerError('account_has_operations')
     t.delete(ref)
     t.create(auditCol(deps.db, orgId).doc(), auditData(deps, 'account.delete', uid, accountId, accountToDoc(before), null))

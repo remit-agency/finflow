@@ -29,6 +29,7 @@
     "switchOrg": "Could not switch company",
     "deleteAccount": "Could not delete the account",
     "accountHasOperations": "The account has transactions and cannot be deleted.",
+    "accountLinkedToBank": "The account is linked to a bank. Disconnect the bank in settings first",
     "loadOrgs": "Could not load companies",
     "auth": {
       "wrongPassword": "Incorrect email or password.",

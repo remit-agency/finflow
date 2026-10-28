@@ -90,11 +90,9 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
     try {
       await deleteAccount(orgId, account.id)
     } catch (e) {
-      toast.error(
-        e instanceof LedgerApiError && e.code === 'account_has_operations'
-          ? tErrors('accountHasOperations')
-          : tErrors('deleteAccount'),
-      )
+      if (e instanceof LedgerApiError && e.code === 'account_has_operations') toast.error(tErrors('accountHasOperations'))
+      else if (e instanceof LedgerApiError && e.code === 'account_linked_to_bank') toast.error(tErrors('accountLinkedToBank'))
+      else toast.error(tErrors('deleteAccount'))
     }
   }
 

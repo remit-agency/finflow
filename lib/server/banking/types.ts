@@ -4,6 +4,7 @@ export interface BankConnection {
   institutionName: string
   /** Null for a connection saved by the old browser flow (renewal then assumes Poland). */
   institutionCountry: string | null
+  /** Business or personal access. A document of the old browser flow (no psuType, no validUntil) was always personal. */
   psuType: 'business' | 'personal' | null
   connectedAt: string
   /** ISO instant the bank access ends. */
@@ -44,8 +45,9 @@ function rec(v: unknown): Record<string, unknown> | null {
 }
 
 /**
- * A connection document. One saved by the old browser flow (S00) has no `validUntil`/`status`: the access
- * was requested for 90 days from `connectedAt`, so that is what it gets. Null when it cannot be read.
+ * A connection document. One saved by the old browser flow (S00) has neither `validUntil` nor `psuType`: the access
+ * was requested for 90 days from `connectedAt`, always as personal access, so that is what it gets. A new document
+ * with `psuType` null stays null. Null when the document cannot be read.
  */
 export function parseConnection(data: unknown): BankConnection | null {
   const d = rec(data)
@@ -53,11 +55,12 @@ export function parseConnection(data: unknown): BankConnection | null {
   const connectedMs = Date.parse(d.connectedAt)
   if (Number.isNaN(connectedMs)) return null
   const validUntil = typeof d.validUntil === 'string' && !Number.isNaN(Date.parse(d.validUntil)) ? d.validUntil : new Date(connectedMs + NINETY_DAYS_MS).toISOString()
+  const legacyBrowserFlow = !Object.hasOwn(d, 'psuType') && !Object.hasOwn(d, 'validUntil')
   return {
     sessionId: d.sessionId,
     institutionName: typeof d.institutionName === 'string' ? d.institutionName : '',
     institutionCountry: typeof d.institutionCountry === 'string' ? d.institutionCountry : null,
-    psuType: d.psuType === 'business' || d.psuType === 'personal' ? d.psuType : null,
+    psuType: legacyBrowserFlow ? 'personal' : d.psuType === 'business' || d.psuType === 'personal' ? d.psuType : null,
     connectedAt: d.connectedAt,
     validUntil,
     status: d.status === 'expired' ? 'expired' : 'active',

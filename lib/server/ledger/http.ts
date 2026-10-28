@@ -12,6 +12,7 @@ const LEDGER_STATUS: Record<LedgerErrorCode, number> = {
   currency_mismatch: 422,
   future_actual: 422,
   account_has_operations: 409,
+  account_linked_to_bank: 409,
   currency_locked: 409,
   ledger_busy: 409,
   conflict: 409,

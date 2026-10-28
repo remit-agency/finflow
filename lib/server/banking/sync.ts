@@ -10,7 +10,7 @@ import { parseTransactionInput } from '@/lib/domain/ledger/input'
 import { MAX_MINOR } from '@/lib/domain/ledger/money'
 import { updateAccount } from '@/lib/server/ledger/accounts'
 import { accountsCol } from '@/lib/server/ledger/paths'
-import { createTransaction } from '@/lib/server/ledger/write'
+import { createTransaction, type WriteResult } from '@/lib/server/ledger/write'
 import { todayDay } from '@/lib/utils/today'
 import type { BankDeps } from './deps'
 import type { EbTxPage } from './eb-api'
@@ -37,8 +37,12 @@ export interface SyncResult {
   differenceMinor: number | null
 }
 
-/** Ledger refusals that retrying cannot fix: the operation is marked seen with the reason and left out. */
-const PERMANENT: ReadonlySet<LedgerErrorCode> = new Set(['future_actual', 'currency_mismatch', 'account_not_found', 'invalid_input'])
+/**
+ * Ledger refusals that retrying cannot fix, for a bank import (no category, no counterparty, no transfer): the operation
+ * is marked seen with the reason and left out. The ledger throws `invalid_input` here for a value outside its limits
+ * (an amount too large, a date before 2000). Every other LedgerError aborts the step (see `syncStep`).
+ */
+const PERMANENT: ReadonlySet<LedgerErrorCode> = new Set(['invalid_input'])
 
 async function acquire(deps: BankDeps, ref: DocumentReference, token: string): Promise<BankAccount> {
   return deps.db.runTransaction(async (t) => {
@@ -74,6 +78,17 @@ async function assertConsent(deps: BankDeps, orgId: string, acc: BankAccount): P
   }
 }
 
+/**
+ * The FinFlow account must still exist and have the bank account's currency; checked before the bank is asked, so a
+ * deleted or re-currencied account stops the sync with nothing consumed.
+ */
+async function assertAccount(deps: BankDeps, orgId: string, acc: BankAccount): Promise<void> {
+  const snap = await accountsCol(deps.db, orgId).doc(acc.accountId).get()
+  const account = snap.exists ? parseAccount(snap.id, snap.data()) : null
+  if (!account) throw new BankError('not_found')
+  if (account.currency !== acc.currency) throw new BankError('currency_mismatch')
+}
+
 function startDay(acc: BankAccount): string {
   if (acc.syncedThrough === null) return acc.importFrom
   const from = addDays(acc.syncedThrough, -OVERLAP_DAYS)
@@ -92,8 +107,13 @@ export async function syncStep(deps: BankDeps, orgId: string, uid: string, bankA
   const acc = await acquire(deps, ref, token)
   try {
     await assertConsent(deps, orgId, acc)
+    await assertAccount(deps, orgId, acc)
 
-    const cursor: BankCursor = acc.cursor ?? { from: startDay(acc), continuationKey: null, startedOn: deps.today() }
+    // A cursor is resumed only within the Warsaw day it was made on; a later run starts over (the marks make that safe).
+    const today = deps.today()
+    const cursor: BankCursor = acc.cursor !== null && acc.cursor.startedOn === today
+      ? acc.cursor
+      : { from: startDay(acc), continuationKey: null, startedOn: today }
     let page: EbTxPage
     try {
       page = await deps.eb.getTransactions(acc.ebAccountUid, { dateFrom: cursor.from, continuationKey: cursor.continuationKey })
@@ -132,19 +152,38 @@ export async function syncStep(deps: BankDeps, orgId: string, uid: string, bankA
         failed++
         continue
       }
+      let written: WriteResult
       try {
-        await createTransaction(deps.ledger, orgId, uid, parseTransactionInput(mapped.input), mapped.bank)
+        written = await createTransaction(deps.ledger, orgId, uid, parseTransactionInput(mapped.input), mapped.bank)
       } catch (e) {
-        if (e instanceof LedgerError && PERMANENT.has(e.code)) {
-          await seenCol.doc(key).set({ txId: clientId, at: deps.now().toISOString(), reason: e.code })
-        } else if (!(e instanceof LedgerError)) {
-          throw e
+        if (!(e instanceof LedgerError)) throw e
+        // Not an operation yet: no mark, it arrives on a later sync once the date is today or before.
+        if (e.code === 'future_actual') {
+          skipped++
+          continue
         }
+        // Anything else that may pass later (ledger_busy, conflict, account_not_found, ...) aborts the step: the cursor
+        // stays where it was, the lock is released, and the next call repeats this page without losing it.
+        if (!PERMANENT.has(e.code)) throw e
+        await seenCol.doc(key).set({ txId: clientId, at: deps.now().toISOString(), reason: e.code })
         failed++
         continue
       }
-      await seenCol.doc(key).set({ txId: clientId, at: deps.now().toISOString() })
-      imported++
+      // The mark is written after the operation. A crash in between is healed by the replay of this create (same id).
+      await seenCol.doc(key).set({
+        txId: clientId,
+        at: deps.now().toISOString(),
+        bank: mapped.bank,
+        snapshot: {
+          type: mapped.input.type,
+          accountId: mapped.input.accountId,
+          amountMinor: mapped.input.amountMinor,
+          paymentDate: mapped.input.paymentDate,
+        },
+      })
+      // A replayed create is an operation that already exists (the heal above): nothing new arrived.
+      if (written.replayed) skipped++
+      else imported++
     }
 
     const progress = { imported, skipped, failed, bankBalanceMinor: null, differenceMinor: null }
