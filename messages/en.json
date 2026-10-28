@@ -199,6 +199,18 @@
       "sending": "Sending…",
       "resendShort": "Send",
       "resendLong": "Send the email again"
+    },
+    "bankNotice": {
+      "tomorrow": "The bank connection must be renewed tomorrow",
+      "inDays": "The bank connection must be renewed in {days, plural, one {# day} other {# days}}",
+      "today": "Bank access ends today. Renew the connection",
+      "expired": "Bank access has ended, new transactions are not being imported",
+      "reconnect": "Renew connection",
+      "askOwner": "The company owner needs to renew the connection",
+      "withBank": "{bank}: {message}"
+    },
+    "bankSync": {
+      "autoSynced": "{count, plural, one {# transaction} other {# transactions}} imported from the bank"
     }
   },
   "journal": {

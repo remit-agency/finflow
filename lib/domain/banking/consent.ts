@@ -17,3 +17,27 @@ export function consentNotice(validUntilDay: string, today: string): ConsentNoti
   if (left <= NOTICE_DAYS) return { kind: 'days', days: left as 1 | 2 | 3 }
   return { kind: 'none' }
 }
+
+export interface NoticeConnection {
+  id: string
+  institutionName: string
+  /** The Warsaw day the access ends. */
+  validUntilDay: string
+  status: 'active' | 'expired'
+}
+
+/** A notice that has something to say. */
+export type ActiveNotice = Exclude<ConsentNotice, { kind: 'none' }>
+
+const SEVERITY = (n: ActiveNotice): number => (n.kind === 'expired' ? 100 : n.kind === 'today' ? 50 : 10 - n.days)
+
+/** The connection that most needs a message and the message; null when none does. */
+export function mostUrgentNotice(connections: NoticeConnection[], today: string): { connection: NoticeConnection; notice: ActiveNotice } | null {
+  let best: { connection: NoticeConnection; notice: ActiveNotice } | null = null
+  for (const connection of connections) {
+    const notice: ConsentNotice = connection.status === 'expired' ? { kind: 'expired' } : consentNotice(connection.validUntilDay, today)
+    if (notice.kind === 'none') continue
+    if (best === null || SEVERITY(notice) > SEVERITY(best.notice)) best = { connection, notice }
+  }
+  return best
+}

@@ -15,7 +15,8 @@ describe('bank block in the operation document', () => {
     expect(parseTransaction('bk_1', doc)).toEqual(tx)
   })
   it('a manual operation has neither', () => {
-    const { bank: _bank, ...manual } = tx
+    const manual: LedgerTransaction = { ...tx }
+    delete manual.bank
     const doc = transactionToDoc(manual)
     expect('source' in doc).toBe(false)
     expect(parseTransaction('bk_1', doc)?.bank).toBeUndefined()

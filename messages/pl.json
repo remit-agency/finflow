@@ -199,6 +199,18 @@
       "sending": "Wysyłanie…",
       "resendShort": "Wyślij",
       "resendLong": "Wyślij wiadomość ponownie"
+    },
+    "bankNotice": {
+      "tomorrow": "Jutro trzeba odnowić połączenie z bankiem",
+      "inDays": "Za {days, plural, one {# dzień} few {# dni} many {# dni} other {# dnia}} trzeba odnowić połączenie z bankiem",
+      "today": "Dziś kończy się dostęp do banku. Odnów połączenie",
+      "expired": "Dostęp do banku wygasł, nowe operacje nie są pobierane",
+      "reconnect": "Odnów połączenie",
+      "askOwner": "Właściciel firmy musi odnowić połączenie",
+      "withBank": "{bank}: {message}"
+    },
+    "bankSync": {
+      "autoSynced": "Z banku dodano {count, plural, one {# operację} few {# operacje} many {# operacji} other {# operacji}}"
     }
   },
   "journal": {
