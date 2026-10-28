@@ -9,7 +9,8 @@ const deps = makeDeps(db)
 const bank = { accountRef: 'ba1', entryReference: 'ref-1', counterpartyName: 'ACME', remittance: 'Faktura 1' }
 
 async function importOne(clientId = 'bk_00000000000000000000000000000001') {
-  return createTransaction(deps, ORG, UID, parseTransactionInput({ clientId, type: 'expense', accountId: 'a1', amountMinor: 12_300, paymentDate: '2026-10-20' }), bank)
+  // A bank operation: the sync's internal parse (bk_ ids are internal), and the bank block it is imported with.
+  return createTransaction(deps, ORG, UID, parseTransactionInput({ clientId, type: 'expense', accountId: 'a1', amountMinor: 12_300, paymentDate: '2026-10-20' }, { internal: true }), bank)
 }
 
 beforeEach(async () => {

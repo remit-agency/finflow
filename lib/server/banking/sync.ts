@@ -154,7 +154,7 @@ export async function syncStep(deps: BankDeps, orgId: string, uid: string, bankA
       }
       let written: WriteResult
       try {
-        written = await createTransaction(deps.ledger, orgId, uid, parseTransactionInput(mapped.input), mapped.bank)
+        written = await createTransaction(deps.ledger, orgId, uid, parseTransactionInput(mapped.input, { internal: true }), mapped.bank)
       } catch (e) {
         if (!(e instanceof LedgerError)) throw e
         // Not an operation yet: no mark, it arrives on a later sync once the date is today or before.

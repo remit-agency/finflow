@@ -116,6 +116,20 @@ describe('POST /transactions', () => {
     expect(await res.json()).toEqual({ transaction: TX })
   })
 
+  it('passes a bank-prefixed client id on to the ledger, which accepts it only with the bank mark (undo of a bank operation)', async () => {
+    vi.mocked(ledger.createTransaction).mockResolvedValue({ transaction: TX, replayed: false } as never)
+    const res = await postTx(req('POST', '/api/orgs/org-acme/transactions', { ...BODY_TX, clientId: 'bk_0123456789abcdef0123456789abcdef' }, 'token-alice'), ctx())
+    expect(res.status).toBe(201)
+    expect(ledger.createTransaction).toHaveBeenCalledWith('org-acme', 'user-alice', expect.objectContaining({ clientId: 'bk_0123456789abcdef0123456789abcdef' }))
+  })
+
+  it('answers 400 invalid_input for a bank-prefixed client id the ledger refuses (no bank mark)', async () => {
+    vi.mocked(ledger.createTransaction).mockRejectedValue(new LedgerError('invalid_input', 'clientId'))
+    const res = await postTx(req('POST', '/api/orgs/org-acme/transactions', { ...BODY_TX, clientId: 'bk_0123456789abcdef0123456789abcdef' }), ctx())
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'invalid_input' })
+  })
+
   it('answers 400 invalid_input for an unknown key and does not call the ledger', async () => {
     const res = await postTx(req('POST', '/api/orgs/org-acme/transactions', { ...BODY_TX, surprise: 1 }), ctx())
     expect(res.status).toBe(400)

@@ -4,7 +4,7 @@ import { assertBankUnlocked } from '@/lib/domain/ledger/bank-lock'
 import { changeSet } from '@/lib/domain/ledger/change'
 import { parseAccount, parseTransaction, transactionToDoc } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
-import { applyPatch, toRawInput, type TransactionInput, type TransactionPatch } from '@/lib/domain/ledger/input'
+import { applyPatch, BANK_CLIENT_ID_PREFIX, toRawInput, type TransactionInput, type TransactionPatch } from '@/lib/domain/ledger/input'
 import { nest } from '@/lib/domain/ledger/rollups'
 import type { BankInfo, LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
 import type { RateSnapshot } from '@/lib/server/fx/types'
@@ -176,6 +176,43 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
   })
 }
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
+/** The `bank` block of a bank mark, or null when the mark has none (a failed import) or it cannot be read. */
+function readBankBlock(v: unknown): BankInfo | null {
+  if (!isRecord(v) || typeof v.accountRef !== 'string') return null
+  const bank: BankInfo = { accountRef: v.accountRef }
+  if (typeof v.entryReference === 'string') bank.entryReference = v.entryReference
+  if (typeof v.counterpartyName === 'string') bank.counterpartyName = v.counterpartyName
+  if (typeof v.remittance === 'string') bank.remittance = v.remittance
+  return bank
+}
+
+/**
+ * The provenance of a create whose id is a bank operation id (`bk_` + key). Only the bank's own mark for that key
+ * (`bankSeen/{key}`, written by the sync at import) can say what the operation was. The create must repeat the
+ * locked fields of that import (type, account, amount, payment date) and be an actual operation, otherwise it is
+ * refused. This is how an undo of a deleted bank operation comes back with its bank block, and how a client cannot
+ * make one. Ids without the prefix return undefined (an ordinary create).
+ */
+async function bankProvenanceOf(deps: LedgerDeps, orgId: string, input: TransactionInput): Promise<BankInfo | undefined> {
+  const clientId = input.clientId
+  if (clientId === undefined || !clientId.startsWith(BANK_CLIENT_ID_PREFIX)) return undefined
+  const snap = await orgRef(deps.db, orgId).collection('bankSeen').doc(clientId.slice(BANK_CLIENT_ID_PREFIX.length)).get()
+  const mark = snap.exists ? snap.data() : undefined
+  const bank = readBankBlock(mark?.bank)
+  const s = isRecord(mark?.snapshot) ? mark.snapshot : null
+  const sameImport = s !== null
+    && s.type === input.type
+    && s.accountId === input.accountId
+    && s.amountMinor === input.amountMinor
+    && s.paymentDate === input.paymentDate
+  if (bank === null || !sameImport || input.status !== 'actual') throw new LedgerError('invalid_input', 'clientId')
+  return bank
+}
+
 export async function createTransaction(
   deps: LedgerDeps,
   orgId: string,
@@ -184,8 +221,9 @@ export async function createTransaction(
   bank?: BankInfo,
 ): Promise<WriteResult> {
   const txId = input.clientId ?? transactionsCol(deps.db, orgId).doc().id
+  const provenance = bank ?? (await bankProvenanceOf(deps, orgId, input))
   const next = await prepare(deps, orgId, txId, input)
-  if (bank !== undefined) next.tx = { ...next.tx, bank }
+  if (provenance !== undefined) next.tx = { ...next.tx, bank: provenance }
   return commit(deps, orgId, uid, { action: 'tx.create', txId, prior: null, next })
 }
 

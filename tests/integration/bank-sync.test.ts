@@ -297,7 +297,7 @@ describe('pages, parallel steps and a crash between the write and the mark', () 
     const [{ key }] = bankTxKeys('ba1', [tx])
     const mapped = mapBankTransaction(tx, { bankAccountId: 'ba1', accountId: 'a1', accountCurrency: 'PLN', clientId: `bk_${key}` })
     if (!mapped.ok) throw new Error('the fixture must map')
-    await createTransaction(bankDeps(db, fakeEb({})).ledger, ORG, UID, parseTransactionInput(mapped.input), mapped.bank)
+    await createTransaction(bankDeps(db, fakeEb({})).ledger, ORG, UID, parseTransactionInput(mapped.input, { internal: true }), mapped.bank)
     expect(await readDoc(db, `organizations/${ORG}/bankSeen/${key}`)).toBeUndefined()
 
     const deps = bankDeps(db, fakeEb({ '': { transactions: [tx], continuationKey: null } }, '100.00'))
