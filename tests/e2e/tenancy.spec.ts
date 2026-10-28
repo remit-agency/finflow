@@ -90,6 +90,8 @@ test.describe('tenancy (emulators)', () => {
       // A journal row is not editable: no edit button, and a click on the row opens no dialog.
       const row = v.getByRole('row').filter({ hasText: 'Alpha' })
       await expect(row).toBeVisible()
+      await expect(v.getByRole('checkbox')).toHaveCount(0)
+      await expect(v.getByRole('region', { name: 'Вибрані операції' })).toHaveCount(0)
       await expect(v.getByRole('button', { name: /редагувати/ })).toHaveCount(0)
       await row.click()
       await v.waitForTimeout(1_000) // the edit form is lazy-loaded: give it the time it would need to appear

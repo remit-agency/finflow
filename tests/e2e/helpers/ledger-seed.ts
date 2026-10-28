@@ -1,5 +1,5 @@
 import type { APIRequestContext } from '@playwright/test'
-import { seedDoc } from './emulator-firestore'
+import { replaceDoc, seedDoc } from './emulator-firestore'
 
 /**
  * Seeds for the schema 2 ledger (S05). The browser can no longer write accounts or operations
@@ -66,14 +66,9 @@ export interface SeedOperation {
   toCurrency?: string
 }
 
-export async function seedLedgerOperation(
-  request: APIRequestContext,
-  orgId: string,
-  id: string,
-  data: SeedOperation,
-): Promise<void> {
+function operationFields(orgId: string, data: SeedOperation) {
   const day = typeof data.date === 'string' ? data.date : utcDay(data.date ?? new Date())
-  await seedDoc(request, `organizations/${orgId}/transactions`, id, {
+  return {
     type: data.type,
     status: 'actual',
     accountId: data.accountId,
@@ -94,5 +89,24 @@ export async function seedLedgerOperation(
     schemaVersion: 2,
     orgId,
     createdAt: new Date(),
-  })
+  }
+}
+
+export async function seedLedgerOperation(
+  request: APIRequestContext,
+  orgId: string,
+  id: string,
+  data: SeedOperation,
+): Promise<void> {
+  await seedDoc(request, `organizations/${orgId}/transactions`, id, operationFields(orgId, data))
+}
+
+/** Writes the operation again under the same id (a change made behind the app's back); `createdAt` becomes new. */
+export async function replaceLedgerOperation(
+  request: APIRequestContext,
+  orgId: string,
+  id: string,
+  data: SeedOperation,
+): Promise<void> {
+  await replaceDoc(request, `organizations/${orgId}/transactions/${id}`, operationFields(orgId, data))
 }

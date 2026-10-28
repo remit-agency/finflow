@@ -1,5 +1,6 @@
 import { fullPatch } from '@/lib/domain/ledger/input'
 import { toMinor } from '@/lib/domain/ledger/money'
+import { notifyLedgerChanged } from './ledger-events'
 import type { Accrual, AccountType, TxStatus, TxType } from '@/lib/domain/ledger/types'
 
 /** A failed call: the HTTP status and the short error code the server answered with. */
@@ -71,6 +72,19 @@ export function draftToPatch(d: TransactionDraft): Record<string, unknown> {
   return fullPatch(draftToBody(d))
 }
 
+export async function readApiError(res: Response): Promise<LedgerApiError> {
+  let code = 'unknown'
+  let details: Record<string, unknown> | undefined
+  try {
+    const json = (await res.json()) as Record<string, unknown>
+    if (typeof json.error === 'string') code = json.error
+    details = json
+  } catch {
+    // Not JSON: keep 'unknown'.
+  }
+  return new LedgerApiError(res.status, code, details)
+}
+
 async function call(method: string, path: string, body?: unknown): Promise<unknown> {
   const res = await fetch(path, {
     method,
@@ -78,18 +92,7 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  if (!res.ok) {
-    let code = 'unknown'
-    let details: Record<string, unknown> | undefined
-    try {
-      const json = (await res.json()) as Record<string, unknown>
-      if (typeof json.error === 'string') code = json.error
-      details = json
-    } catch {
-      // Not JSON: keep 'unknown'.
-    }
-    throw new LedgerApiError(res.status, code, details)
-  }
+  if (!res.ok) throw await readApiError(res)
   return res.status === 204 ? null : res.json()
 }
 
@@ -98,15 +101,18 @@ const org = (orgId: string) => `/api/orgs/${encodeURIComponent(orgId)}`
 /** `clientId` makes a retry or a double click create the operation once. */
 export async function createTransaction(orgId: string, draft: TransactionDraft, clientId?: string): Promise<string> {
   const out = (await call('POST', `${org(orgId)}/transactions`, draftToBody(draft, clientId))) as { transaction: { id: string } }
+  notifyLedgerChanged()
   return out.transaction.id
 }
 
 export async function updateTransaction(orgId: string, txId: string, draft: TransactionDraft): Promise<void> {
   await call('PATCH', `${org(orgId)}/transactions/${encodeURIComponent(txId)}`, draftToPatch(draft))
+  notifyLedgerChanged()
 }
 
 export async function deleteTransaction(orgId: string, txId: string): Promise<void> {
   await call('DELETE', `${org(orgId)}/transactions/${encodeURIComponent(txId)}`)
+  notifyLedgerChanged()
 }
 
 const accountBody = (d: Partial<AccountDraft>) => {

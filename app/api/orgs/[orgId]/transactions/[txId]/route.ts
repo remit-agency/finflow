@@ -2,6 +2,7 @@ import { isId } from '@/lib/domain/ledger/guards'
 import { parseTransactionPatch } from '@/lib/domain/ledger/input'
 import { requireOrgRole, requireUser } from '@/lib/server/auth'
 import { errorResponse, HttpError } from '@/lib/server/http-error'
+import { journal } from '@/lib/server/journal'
 import { ledger } from '@/lib/server/ledger'
 import { toHttpError } from '@/lib/server/ledger/http'
 import { readJsonBody } from '@/lib/server/request-body'
@@ -10,6 +11,22 @@ export const runtime = 'nodejs'
 
 const MAX_BODY_BYTES = 32 * 1024
 type Ctx = { params: Promise<{ orgId: string; txId: string }> }
+
+// GET /api/orgs/{orgId}/transactions/{txId}  (owner, accountant, viewer) -> { transaction }
+// The operation as it is now: the journal's rows may be stale, an edit opens from this.
+export async function GET(req: Request, { params }: Ctx) {
+  try {
+    const { uid } = await requireUser(req)
+    const { orgId, txId } = await params
+    await requireOrgRole(uid, orgId, ['owner', 'accountant', 'viewer'])
+    if (!isId(txId)) throw new HttpError(404, 'not_found')
+    const transaction = await journal.readOne(orgId, txId)
+    if (!transaction) throw new HttpError(404, 'not_found')
+    return Response.json({ transaction }, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (e) {
+    return errorResponse(toHttpError(e))
+  }
+}
 
 // PATCH /api/orgs/{orgId}/transactions/{txId}  (owner, accountant)
 export async function PATCH(req: Request, { params }: Ctx) {
