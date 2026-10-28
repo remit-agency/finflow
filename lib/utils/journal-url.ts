@@ -46,11 +46,24 @@ export function viewFromParams(params: URLSearchParams, now: Date): JournalView 
   return { filters: { ...EMPTY_FILTERS, ...rest }, period: DEFAULT_JOURNAL_PERIOD }
 }
 
+/**
+ * The two days of a custom period, earliest first: the period menu hands over `start` and `end` (any time of the
+ * day, in either order), and the address stores days.
+ */
+function customDays(period: PeriodSelection): { from: string; to: string } | null {
+  if (period.preset !== 'custom' || !period.start || !period.end) return null
+  const a = toDay(period.start)
+  const b = toDay(period.end)
+  return a <= b ? { from: a, to: b } : { from: b, to: a }
+}
+
 export function viewToParams(view: JournalView): URLSearchParams {
   const { accountId: _account, from, to, ...rest } = view.filters
   void _account
   const custom = view.period.preset === 'custom'
-  const params = filtersToParams({ ...rest, ...(custom ? { from, to } : {}) })
+  const picked = customDays(view.period)
+  const range = picked ?? { from, to }
+  const params = filtersToParams({ ...rest, ...(custom ? range : {}) })
   if (view.period.preset !== 'allTime') params.set('period', view.period.preset)
   return params
 }
