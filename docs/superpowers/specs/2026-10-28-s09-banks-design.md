@@ -34,7 +34,7 @@ Cron і фонова синхронізація, email-нагадування (S
 
 ### Дані (Firestore, `organizations/{orgId}/…`)
 
-- **`bankConnections/{sessionId}`:** тепер пишеться лише сервером. Поля: `sessionId`, `institutionName`, `connectedAt`, `validUntil` (з відповіді Enable Banking), `status` (`active` або `expired`). Наявний документ без `validUntil` (збережений браузером у S00) отримує `validUntil = connectedAt + 90 днів`: стільки запитував `app/api/enablebanking/session/route.ts`.
+- **`bankConnections/{sessionId}`:** тепер пишеться лише сервером. Поля: `sessionId`, `institutionName`, `institutionCountry`, `psuType` (бізнес чи особистий доступ, потрібні для оновлення підключення до того самого банку), `connectedAt`, `validUntil` (з відповіді Enable Banking), `status` (`active` або `expired`). Наявний документ без `validUntil` (збережений браузером у S00) отримує `validUntil = connectedAt + 90 днів`: стільки запитував `app/api/enablebanking/session/route.ts`.
 - **`bankAccounts/{id}`** (нова, лише сервер): `connectionId`, `ebAccountUid`, `identificationHash` (стабільний між повторними підключеннями), `iban`, `currency`, `accountId` (рахунок FinFlow), `importFrom` (день), `lastSyncAt`, `cursor` (`continuation_key` і дата, від якої йдемо), `syncLock` (термін 60 с), `bankBalance { amountMinor, type, at }`, `firstSyncDone`.
 - **`bankSeen/{key}`** (нова, лише сервер): позначка, що ця банківська операція вже була імпортована. Ключ це `entry_reference` банку, а коли його немає, хеш від (дата проведення, сума, напрям, контрагент, призначення платежу, порядковий номер серед однакових у дні). Документ лишається і після видалення операції.
 - **Операція в журналі:** `source: 'bank'`, блок `bank { accountRef, entryReference, counterpartyName, remittance }`. Id операції детермінований: `bk_` + хеш від ключа. Повторна вставка тому неможлива навіть без `bankSeen`.
@@ -71,7 +71,7 @@ Cron і фонова синхронізація, email-нагадування (S
 
 ### Замкнені поля
 
-Сервер відхиляє зміну `amountMinor`, `paymentDate`, `accountId` операції з `source: 'bank'` кодом `bank_locked` (форма S07, масові зміни S08). У масових змінах рядок отримує причину відмови, як і інші помилки. Форма показує ці поля вимкненими з підказкою «Операція з банку». Видалення дозволене.
+Сервер відхиляє зміну `amountMinor`, `paymentDate`, `accountId`, а також `type` і `status` (зміна знака чи переведення в план псує баланс) операції з `source: 'bank'` кодом `bank_locked` (форма S07, масові зміни S08). У масових змінах рядок отримує причину відмови, як і інші помилки. Форма показує ці поля вимкненими з підказкою «Операція з банку». Видалення дозволене.
 
 ## Сальдо
 
