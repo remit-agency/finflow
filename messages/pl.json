@@ -59,7 +59,16 @@
       "connectInvalid": "Nie udało się połączyć tego banku. Wybierz inny lub spróbuj później.",
       "connectUnavailable": "Bank lub usługa połączeń jest teraz niedostępna. Spróbuj później.",
       "connectNetwork": "Brak połączenia z serwerem. Sprawdź internet i spróbuj ponownie.",
-      "disconnectFailed": "Nie udało się rozłączyć banku"
+      "disconnectFailed": "Nie udało się rozłączyć banku",
+      "consentExpired": "Dostęp do banku wygasł. Odnów połączenie",
+      "rateLimited": "Bank ogranicza częstotliwość zapytań. Spróbuj za kilka minut",
+      "bankUnavailable": "Bank jest chwilowo niedostępny. Spróbuj później",
+      "currencyMismatch": "Waluta rachunku nie zgadza się z walutą rachunku w banku",
+      "currencyUnsupported": "Ta waluta nie jest obsługiwana",
+      "alreadyLinked": "Ten rachunek jest już połączony",
+      "syncFailed": "Nie udało się odświeżyć danych z banku",
+      "linkFailed": "Nie udało się połączyć rachunku",
+      "loadStatus": "Nie udało się wczytać połączeń z bankami"
     }
   },
   "auth": {
@@ -559,6 +568,49 @@
     },
     "banks": {
       "title": "Połączenie z bankiem",
+      "status": {
+        "active": "Aktywne",
+        "expired": "Dostęp wygasł"
+      },
+      "validUntil": "Dostęp do {date}",
+      "renew": "Odnów połączenie",
+      "psuType": {
+        "label": "Rodzaj rachunku w banku",
+        "business": "Firmowy",
+        "personal": "Osobisty"
+      },
+      "connectedNow": "Bank połączony. Teraz połącz jego rachunki",
+      "accounts": {
+        "iban": "Rachunek •••• {tail}",
+        "noIban": "Rachunek bankowy",
+        "linkedTo": "W FinFlow: {name}",
+        "notLinked": "Niepołączony z FinFlow",
+        "lastSync": "Ostatnia synchronizacja: {date}",
+        "neverSynced": "Jeszcze nie synchronizowano",
+        "bankBalance": "Saldo w banku",
+        "difference": "Różnica z bankiem",
+        "matches": "Zgodne z bankiem"
+      },
+      "link": {
+        "open": "Połącz rachunki",
+        "title": "Połącz rachunek bankowy",
+        "create": "Utwórz rachunek w FinFlow",
+        "existing": "Użyj istniejącego",
+        "name": "Nazwa rachunku",
+        "account": "Rachunek w FinFlow",
+        "noMatching": "Brak wolnego rachunku w {currency}",
+        "importFrom": "Pobieraj operacje od",
+        "hint": "Domyślnie 90 dni. Jeśli w FinFlow są już ręczne wpisy tego rachunku, wybierz datę po nich, aby uniknąć duplikatów.",
+        "submit": "Połącz",
+        "allLinked": "Wszystkie rachunki tego banku są już połączone"
+      },
+      "sync": {
+        "refresh": "Odśwież",
+        "running": "Odświeżam…",
+        "imported": "Dodano {count, plural, one {# operację} few {# operacje} many {# operacji} other {# operacji}}",
+        "upToDate": "Brak nowych operacji",
+        "busy": "Synchronizacja już trwa"
+      },
       "description": "Santander, PKO, mBank, ING i inne banki przez Enable Banking",
       "connect": "Połącz bank",
       "redirecting": "Przekierowanie…",

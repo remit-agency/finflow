@@ -59,7 +59,16 @@
       "connectInvalid": "Could not connect this bank. Pick another one or try later.",
       "connectUnavailable": "The bank or the connection service is unavailable right now. Try later.",
       "connectNetwork": "No connection to the server. Check your internet and try again.",
-      "disconnectFailed": "Could not disconnect the bank"
+      "disconnectFailed": "Could not disconnect the bank",
+      "consentExpired": "Bank access has ended. Renew the connection",
+      "rateLimited": "The bank limits how often it can be asked. Try again in a few minutes",
+      "bankUnavailable": "The bank is temporarily unavailable. Try again later",
+      "currencyMismatch": "The account currency does not match the bank account currency",
+      "currencyUnsupported": "This currency is not supported",
+      "alreadyLinked": "This account is already linked",
+      "syncFailed": "Could not refresh from the bank",
+      "linkFailed": "Could not link the account",
+      "loadStatus": "Could not load the bank connections"
     }
   },
   "auth": {
@@ -559,6 +568,49 @@
     },
     "banks": {
       "title": "Bank connection",
+      "status": {
+        "active": "Active",
+        "expired": "Access ended"
+      },
+      "validUntil": "Access until {date}",
+      "renew": "Renew connection",
+      "psuType": {
+        "label": "Bank account type",
+        "business": "Business",
+        "personal": "Personal"
+      },
+      "connectedNow": "Bank connected. Now link its accounts",
+      "accounts": {
+        "iban": "Account •••• {tail}",
+        "noIban": "Bank account",
+        "linkedTo": "In FinFlow: {name}",
+        "notLinked": "Not linked to FinFlow",
+        "lastSync": "Last sync: {date}",
+        "neverSynced": "Not synced yet",
+        "bankBalance": "Bank balance",
+        "difference": "Difference from the bank",
+        "matches": "Matches the bank"
+      },
+      "link": {
+        "open": "Link accounts",
+        "title": "Link a bank account",
+        "create": "Create a FinFlow account",
+        "existing": "Use an existing one",
+        "name": "Account name",
+        "account": "FinFlow account",
+        "noMatching": "No free account in {currency}",
+        "importFrom": "Import transactions from",
+        "hint": "90 days by default. If FinFlow already has manual entries for this account, pick a date after them to avoid duplicates.",
+        "submit": "Link",
+        "allLinked": "All accounts of this bank are already linked"
+      },
+      "sync": {
+        "refresh": "Refresh",
+        "running": "Refreshing…",
+        "imported": "{count, plural, one {# transaction} other {# transactions}} added",
+        "upToDate": "No new transactions",
+        "busy": "A sync is already running"
+      },
       "description": "Santander, PKO, mBank, ING and other banks through Enable Banking",
       "connect": "Connect a bank",
       "redirecting": "Redirecting…",
