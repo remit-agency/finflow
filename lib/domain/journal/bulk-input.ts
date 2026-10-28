@@ -6,6 +6,8 @@ import type { BulkPatch } from './selection'
 /** One request carries at most this many operations; the browser sends a larger selection in several requests. */
 export const MAX_BULK_IDS = 25
 
+export type BulkOutcome = { id: string; ok: true } | { id: string; ok: false; code: string }
+
 export type BulkRequest = { action: 'delete'; ids: string[] } | { action: 'update'; ids: string[]; patch: BulkPatch }
 
 const PATCH_KEYS = ['categoryId', 'counterpartyId', 'description', 'paymentDate', 'accrual'] as const

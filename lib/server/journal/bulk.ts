@@ -1,9 +1,7 @@
-import type { BulkRequest } from '@/lib/domain/journal/bulk-input'
+import type { BulkOutcome, BulkRequest } from '@/lib/domain/journal/bulk-input'
 import type { TransactionPatch } from '@/lib/domain/ledger/input'
 import { HttpError } from '@/lib/server/http-error'
 import { toHttpError } from '@/lib/server/ledger/http'
-
-export type BulkOutcome = { id: string; ok: true } | { id: string; ok: false; code: string }
 
 /** The two ledger calls a bulk change is made of (the production `ledger` object has them). */
 export interface BulkLedger {
