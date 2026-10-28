@@ -12,6 +12,7 @@ import { JournalFiltersBar } from '@/components/transactions/JournalFilters'
 import { SelectionBar, type BulkField } from '@/components/transactions/SelectionBar'
 import { TransactionList } from '@/components/transactions/TransactionList'
 import { bulkChange, bulkDelete, undoBulkChange, undoBulkDelete } from '@/lib/api/journal-actions'
+import { hasActiveFilters } from '@/lib/domain/journal/filter'
 import { selectionSummary, type BulkPatch } from '@/lib/domain/journal/selection'
 import { fromMinor } from '@/lib/domain/ledger/money'
 import { toUiTransaction } from '@/lib/firebase/ledger-map'
@@ -229,6 +230,7 @@ export default function TransactionsPage() {
         counterparties={counterparties}
         orgId={orgId}
         loading={loading}
+        filtered={hasActiveFilters(filters)}
         balances={balances}
         canSelect={canEdit}
         selection={selection}

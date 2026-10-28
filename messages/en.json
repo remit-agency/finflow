@@ -207,11 +207,14 @@
     "loadError": "The journal could not be loaded. Try again.",
     "filters": {
       "searchPlaceholder": "Search accounts, counterparties, comments…",
+      "searchPlaceholderShort": "Search payments…",
       "search": "Search accounts, counterparties and comments",
       "account": "Account",
       "allAccounts": "All accounts",
+      "allAccountsShort": "All accounts",
       "category": "Category",
       "allCategories": "All categories",
+      "allCategoriesShort": "All categories",
       "more": "More filters",
       "clear": "Clear",
       "type": "Type",
@@ -232,6 +235,8 @@
     "list": {
       "emptyTitle": "No transactions yet",
       "emptyBody": "Click “Income”, “Expense” or “Transfer” in the header to add your first transaction",
+      "noMatchTitle": "Nothing found",
+      "noMatchBody": "Change or clear the filters to see transactions",
       "date": "Date",
       "amount": "Amount",
       "account": "Account",

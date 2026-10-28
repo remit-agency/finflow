@@ -35,6 +35,8 @@ interface TransactionListProps {
   counterparties: Counterparty[]
   orgId: string
   loading: boolean
+  /** Any filter, search or period is active: an empty list then means «nothing matches», not «no operations yet». */
+  filtered: boolean
   /** Balance of the account after each operation, in minor units; null for a planned one. */
   balances: Record<string, number | null>
   canSelect: boolean
@@ -54,6 +56,7 @@ export function TransactionList({
   counterparties,
   orgId,
   loading,
+  filtered,
   balances,
   canSelect,
   selection,
@@ -145,8 +148,8 @@ export function TransactionList({
     return (
       <div className="flex flex-col items-center justify-center rounded-panel border border-dashed border-line bg-surface py-16 text-center">
         <ReceiptText className="mb-4 size-12 text-ink-subtle" />
-        <p className="font-medium text-ink">{t('emptyTitle')}</p>
-        <p className="mt-1 max-w-sm text-sm text-ink-muted">{t('emptyBody')}</p>
+        <p className="font-medium text-ink">{filtered ? t('noMatchTitle') : t('emptyTitle')}</p>
+        <p className="mt-1 max-w-sm text-sm text-ink-muted">{filtered ? t('noMatchBody') : t('emptyBody')}</p>
       </div>
     )
   }
@@ -216,6 +219,9 @@ export function TransactionList({
                   const balance = balances[tx.id]
                   const accrual = accrualText(tx)
                   const canFill = canEdit && tx.type !== 'transfer'
+                  const planned = tx.status === 'planned'
+                  // A planned operation has not moved any money: its amount is neutral grey (the sign stays), not green or red.
+                  const amountClass = planned ? 'text-ink-muted' : amount.className
 
                   return (
                     // A click anywhere on the row edits it (mouse). Keyboard and screen readers use
@@ -227,7 +233,7 @@ export function TransactionList({
                       onClick={canEdit ? () => setEditTx(tx) : undefined}
                       className={cn(
                         canEdit ? 'cursor-pointer hover:bg-canvas has-[button:focus-visible]:bg-brand-soft' : 'hover:bg-transparent',
-                        tx.status === 'planned' && 'text-ink-muted',
+                        planned && 'text-ink-muted',
                         selected && 'bg-brand-soft hover:bg-brand-soft-hover',
                       )}
                     >
@@ -251,7 +257,7 @@ export function TransactionList({
                         <span className="block text-xs text-ink-muted">{formatWeekdayShortUtc(tx.date, locale)}</span>
                         {accrual && <span className="block text-xs text-ink-muted">{accrual}</span>}
                       </TableCell>
-                      <TableCell className={cn('hidden py-3.5 text-right font-semibold tabular-nums sm:table-cell', amount.className)}>
+                      <TableCell className={cn('hidden py-3.5 text-right font-semibold tabular-nums sm:table-cell', amountClass)}>
                         {amountLabel(tx)}
                       </TableCell>
                       <TableCell className="py-3.5 pl-4 text-ink sm:pl-6">
@@ -270,16 +276,27 @@ export function TransactionList({
                               event.stopPropagation()
                               setEditTx(tx)
                             }}
-                            className="block max-w-44 truncate rounded-[4px] text-left text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-soft-foreground sm:max-w-56"
+                            className={cn('block max-w-44 truncate rounded-[4px] text-left outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-soft-foreground sm:max-w-56', planned ? 'text-ink-muted' : 'text-ink')}
                           >
                             {accountLabel}
                           </button>
                         ) : (
-                          <span className="block max-w-44 truncate text-ink sm:max-w-56">{accountLabel}</span>
+                          <span className={cn('block max-w-44 truncate sm:max-w-56', planned ? 'text-ink-muted' : 'text-ink')}>{accountLabel}</span>
                         )}
-                        {tx.status === 'planned' && <Badge variant="chip" className="mt-1">{t('planned')}</Badge>}
+                        {planned && <Badge variant="chip" className="mt-1">{t('planned')}</Badge>}
                         {/* Second line: the category below md (its column is hidden there), the account type above. */}
-                        <span className="block max-w-44 truncate text-xs text-ink-muted md:hidden">{categoryName}</span>
+                        {canEdit && !tx.categoryId && tx.type !== 'transfer' ? (
+                          <span className="mt-0.5 block md:hidden">
+                            <FillChip
+                              field="category"
+                              categories={tx.type === 'income' ? incomeCategories : expenseCategories}
+                              counterparties={counterparties}
+                              onSave={(value) => onFill(tx, 'category', value)}
+                            />
+                          </span>
+                        ) : (
+                          <span className="block max-w-44 truncate text-xs text-ink-muted md:hidden">{categoryName}</span>
+                        )}
                         <span className="hidden max-w-56 truncate text-xs text-ink-muted md:block">
                           {account ? tAccountTypes(account.type) : ''}
                         </span>
@@ -324,7 +341,7 @@ export function TransactionList({
                           <span className="block max-w-72 truncate">{tx.description || '—'}</span>
                         )}
                       </TableCell>
-                      <TableCell className={cn('py-3.5 pr-4 text-right font-semibold tabular-nums sm:hidden', amount.className)}>
+                      <TableCell className={cn('py-3.5 pr-4 text-right font-semibold tabular-nums sm:hidden', amountClass)}>
                         {amountLabel(tx)}
                       </TableCell>
                     </TableRow>

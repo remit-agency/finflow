@@ -13,6 +13,7 @@ import type { Counterparty } from '@/lib/domain/counterparties/types'
 import { EMPTY_FILTERS, hasActiveFilters, type JournalFilters } from '@/lib/domain/journal/filter'
 import { toMinor, fromMinor } from '@/lib/domain/ledger/money'
 import type { TxType } from '@/lib/domain/ledger/types'
+import { useIsPhone } from '@/lib/hooks/useIsPhone'
 import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { cn } from '@/lib/utils'
 import { JOURNAL_PERIOD_PRESETS, type JournalView } from '@/lib/utils/journal-url'
@@ -37,6 +38,8 @@ const TYPES: TxType[] = ['income', 'expense', 'transfer']
 export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, expenseCategories, counterparties, accessory }: Props) {
   const t = useTranslations('journal.filters')
   const categoryName = useCategoryName()
+  // The phone has room for about half a row per select: the short «all» labels keep them from clipping.
+  const phone = useIsPhone()
   const [showExtra, setShowExtra] = useState(false)
   const { filters } = view
   const set = (patch: Partial<JournalFilters>) => onChange({ ...view, filters: { ...filters, ...patch } })
@@ -74,7 +77,7 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
           <Input
             value={text}
             onChange={(e) => typeSearch(e.target.value)}
-            placeholder={t('searchPlaceholder')}
+            placeholder={phone ? t('searchPlaceholderShort') : t('searchPlaceholder')}
             aria-label={t('search')}
             className={cn(FIELD_CLASS, 'pl-9')}
           />
@@ -82,31 +85,34 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
 
         <PeriodSelect value={view.period} presets={JOURNAL_PERIOD_PRESETS} onChange={(period) => onChange({ ...view, period })} />
 
-        <NativeSelect
-          value={filters.accountId ?? '_all'}
-          onChange={(e) => set({ accountId: e.target.value === '_all' ? undefined : e.target.value })}
-          aria-label={t('account')}
-          wrapperClassName="min-w-0 flex-1 sm:flex-none"
-          className="border-line sm:min-w-[160px]"
-        >
-          <option value="_all">{t('allAccounts')}</option>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
-          ))}
-        </NativeSelect>
+        {/* Below sm the two selects take a row of their own (after the period, filter and export buttons); from sm up the wrapper vanishes and they sit in the toolbar row. */}
+        <div className="order-last flex w-full gap-2 sm:contents">
+          <NativeSelect
+            value={filters.accountId ?? '_all'}
+            onChange={(e) => set({ accountId: e.target.value === '_all' ? undefined : e.target.value })}
+            aria-label={t('account')}
+            wrapperClassName="min-w-0 flex-1 sm:flex-none"
+            className="border-line sm:min-w-[160px]"
+          >
+            <option value="_all">{phone ? t('allAccountsShort') : t('allAccounts')}</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </NativeSelect>
 
-        <NativeSelect
-          value={selectedCategory}
-          onChange={(e) => set({ categoryIds: e.target.value === '_all' ? [] : [e.target.value] })}
-          aria-label={t('category')}
-          wrapperClassName="min-w-0 flex-1 sm:flex-none"
-          className="border-line sm:min-w-[160px]"
-        >
-          <option value="_all">{t('allCategories')}</option>
-          {allCategories.map((c) => (
-            <option key={c.id} value={c.id}>{categoryName(c)}</option>
-          ))}
-        </NativeSelect>
+          <NativeSelect
+            value={selectedCategory}
+            onChange={(e) => set({ categoryIds: e.target.value === '_all' ? [] : [e.target.value] })}
+            aria-label={t('category')}
+            wrapperClassName="min-w-0 flex-1 sm:flex-none"
+            className="border-line sm:min-w-[160px]"
+          >
+            <option value="_all">{phone ? t('allCategoriesShort') : t('allCategories')}</option>
+            {allCategories.map((c) => (
+              <option key={c.id} value={c.id}>{categoryName(c)}</option>
+            ))}
+          </NativeSelect>
+        </div>
 
         <Button
           variant="outline"

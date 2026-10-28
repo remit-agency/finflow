@@ -207,11 +207,14 @@
     "loadError": "Nie udało się wczytać dziennika operacji. Spróbuj ponownie.",
     "filters": {
       "searchPlaceholder": "Szukaj po kontach, kontrahentach, komentarzach…",
+      "searchPlaceholderShort": "Szukaj w płatnościach…",
       "search": "Szukaj po kontach, kontrahentach i komentarzach",
       "account": "Konto",
       "allAccounts": "Wszystkie konta",
+      "allAccountsShort": "Konta",
       "category": "Kategoria",
       "allCategories": "Wszystkie kategorie",
+      "allCategoriesShort": "Kategorie",
       "more": "Więcej filtrów",
       "clear": "Wyczyść",
       "type": "Typ",
@@ -232,6 +235,8 @@
     "list": {
       "emptyTitle": "Nie ma jeszcze operacji",
       "emptyBody": "Kliknij „Wpływ”, „Wydatek” lub „Przelew” w nagłówku, aby dodać pierwszą operację",
+      "noMatchTitle": "Nic nie znaleziono",
+      "noMatchBody": "Zmień lub wyczyść filtry, aby zobaczyć operacje",
       "date": "Data",
       "amount": "Kwota",
       "account": "Konto",

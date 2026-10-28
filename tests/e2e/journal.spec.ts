@@ -174,6 +174,28 @@ test.describe('journal (emulators)', () => {
     expect(lines[0].split(';').length).toBeGreaterThanOrEqual(16)
   })
 
+  test('a search without a result says nothing matches, not that the journal is empty', async ({ page, request }) => {
+    const user = await setup(page, request, 'jr-nomatch')
+    await seedLedgerOperation(request, user.orgId, 'tx-a', { type: 'expense', accountId: 'acc-main', amount: 20, currency: 'PLN', date: daysAgo(1), description: 'Czynsz' })
+    await page.goto(`/${user.orgId}/transactions?q=zzzznomatch`)
+    await expect(page.getByText('Нічого не знайдено')).toBeVisible()
+    await expect(page.getByText('Операцій ще немає')).toHaveCount(0)
+  })
+
+  test('on a phone the two selects share a row, keep their width and the category chip is there', async ({ page, request }) => {
+    const user = await setup(page, request, 'jr-phone')
+    await seedLedgerOperation(request, user.orgId, 'tx-p', { type: 'expense', accountId: 'acc-main', amount: 25, currency: 'PLN', date: daysAgo(1), description: 'Bez kategorii' })
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(`/${user.orgId}/transactions`)
+    const account = page.getByRole('combobox', { name: 'Рахунок' })
+    const category = page.getByRole('combobox', { name: 'Категорія' })
+    const [a, c] = [await account.boundingBox(), await category.boundingBox()]
+    expect(a && c && a.width > 120 && c.width > 120).toBe(true)
+    expect(a!.y).toBe(c!.y)
+    // The row has no category column on a phone: the chip sits under the account name.
+    await expect(rowsOf(page).first().getByRole('button', { name: 'вкажіть' })).toBeVisible()
+  })
+
   test('an operation made from the header appears without a reload', async ({ page, request }) => {
     await setup(page, request, 'jr-live')
     await expect(rowsOf(page)).toHaveCount(0)
