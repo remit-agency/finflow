@@ -102,10 +102,16 @@ export function TransactionForm({
     return parent ? `${categoryName(parent)} › ${categoryName(category)}` : categoryName(category)
   }
 
-  // Focus the amount when the form opens.
+  // Focus the amount shortly after the form opens, unless the person has already started in another field:
+  // a late focus() would pull the next keystrokes into the amount.
   useEffect(() => {
     if (!open) return
-    const timer = setTimeout(() => amountRef.current?.focus(), 100)
+    const timer = setTimeout(() => {
+      const active = document.activeElement
+      const typing =
+        active instanceof HTMLInputElement || active instanceof HTMLSelectElement || active instanceof HTMLTextAreaElement
+      if (!typing) amountRef.current?.focus()
+    }, 100)
     return () => clearTimeout(timer)
   }, [open])
 
