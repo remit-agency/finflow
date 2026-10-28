@@ -270,7 +270,10 @@
       "field_counterparty": "Zmień kontrahenta",
       "field_comment": "Zmień komentarz",
       "field_paymentDate": "Zmień datę płatności",
-      "field_accrual": "Zmień datę transakcji lub okres"
+      "field_accrual": "Zmień datę transakcji lub okres",
+      "selectAllMatching": "Zaznacz wszystkie wg filtra (do 1000)",
+      "selecting": "Zaznaczanie operacji wg filtra…",
+      "limitReached": "Zaznaczono pierwsze {limit}. Filtr obejmuje więcej operacji."
     },
     "bulk": {
       "title_category": "Zmiana kategorii",
@@ -297,7 +300,7 @@
       "cancel": "Anuluj",
       "apply": "Zastosuj",
       "result": "Zmieniono {ok} z {total}.",
-      "resultFailed": "Nie udało się zmienić: {count}.",
+      "resultFailed": "{count} nie udało się: {reason}.",
       "undo": "Cofnij",
       "undone": "Przywrócono: {count}",
       "undoFailed": "Nie udało się cofnąć wszystkiego",
@@ -310,6 +313,7 @@
         "conflict": "Operację zmienił ktoś inny",
         "ledger_busy": "Księga jest zajęta, spróbuj ponownie",
         "rate_unavailable": "Kurs waluty jest niedostępny",
+        "provider_unavailable": "Kurs NBP jest tymczasowo niedostępny",
         "invalid_input": "Niedozwolone dla tej operacji",
         "unknown": "Coś poszło nie tak"
       }
@@ -320,6 +324,7 @@
       "confirm": "Usuń",
       "cancel": "Anuluj",
       "done": "Usunięto: {count}",
+      "failed": "{count} nie udało się usunąć: {reason}.",
       "undo": "Cofnij",
       "undoFailed": "Nie udało się przywrócić wszystkiego (kontrahent w archiwum blokuje przywrócenie jego operacji)",
       "restored": "Przywrócono: {count}"

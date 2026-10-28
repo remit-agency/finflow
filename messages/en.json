@@ -270,7 +270,10 @@
       "field_counterparty": "Change counterparty",
       "field_comment": "Change comment",
       "field_paymentDate": "Change payment date",
-      "field_accrual": "Change transaction date or period"
+      "field_accrual": "Change transaction date or period",
+      "selectAllMatching": "Select all matching the filter (up to 1000)",
+      "selecting": "Selecting operations…",
+      "limitReached": "The first {limit} are selected. More match the filter."
     },
     "bulk": {
       "title_category": "Change category",
@@ -297,7 +300,7 @@
       "cancel": "Cancel",
       "apply": "Apply",
       "result": "Changed {ok} of {total}.",
-      "resultFailed": "{count} could not be changed.",
+      "resultFailed": "{count} could not be changed: {reason}.",
       "undo": "Undo",
       "undone": "Restored: {count}",
       "undoFailed": "Could not undo everything",
@@ -310,6 +313,7 @@
         "conflict": "The operation was changed by someone else",
         "ledger_busy": "The ledger is busy, try again",
         "rate_unavailable": "The exchange rate is unavailable",
+        "provider_unavailable": "The NBP exchange rate is temporarily unavailable",
         "invalid_input": "Not allowed for this operation",
         "unknown": "Something went wrong"
       }
@@ -320,6 +324,7 @@
       "confirm": "Delete",
       "cancel": "Cancel",
       "done": "Deleted: {count}",
+      "failed": "{count} could not be deleted: {reason}.",
       "undo": "Undo",
       "undoFailed": "Could not restore everything (an archived counterparty blocks restoring its operations)",
       "restored": "Restored: {count}"

@@ -66,3 +66,15 @@ export interface ScopedSelection {
 export function selectionForScope(state: ScopedSelection, scope: string): ScopedSelection {
   return state.scope === scope ? state : { scope, ids: new Set() }
 }
+
+/** The failure code that occurs most often (the first one seen wins a tie); null when nothing failed. */
+export function mostFrequentCode(failed: { code: string }[]): string | null {
+  const counts = new Map<string, number>()
+  let best: string | null = null
+  for (const { code } of failed) {
+    const n = (counts.get(code) ?? 0) + 1
+    counts.set(code, n)
+    if (best === null || n > (counts.get(best) as number)) best = code
+  }
+  return best
+}

@@ -201,6 +201,82 @@ test.describe('journal (emulators)', () => {
     await expect(accountRow(page, 'Konto PLN')).toContainText(balanceText('850', '00'))
   })
 
+  test('select all matching reaches rows that are not loaded and a bulk change applies to them', async ({ page, request }) => {
+    const user = await setup(page, request, 'jr-matching')
+    for (let i = 0; i < 70; i++) {
+      await seedLedgerOperation(request, user.orgId, `tx-${String(i).padStart(3, '0')}`, { type: 'expense', accountId: 'acc-main', amount: 10 + i, currency: 'PLN', date: daysAgo(i % 30), description: `Wiersz ${i}` })
+    }
+    await page.goto(`/${user.orgId}/transactions`)
+    await expect(rowsOf(page)).toHaveCount(50)
+    await page.getByRole('checkbox', { name: 'Вибрати всі рядки' }).check()
+    const bar = page.getByRole('region', { name: 'Вибрані операції' })
+    await expect(bar.getByText('Вибрано: 50')).toBeVisible()
+    await bar.getByRole('button', { name: 'Позначити всі за фільтром (до 1000)' }).click()
+    await expect(bar.getByText('Вибрано: 70')).toBeVisible()
+    await expect(bar.getByRole('button', { name: 'Позначити всі за фільтром (до 1000)' })).toHaveCount(0)
+
+    await bar.getByRole('button', { name: 'Змінити дані' }).click()
+    await page.getByRole('menuitem', { name: 'Змінити коментар' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByLabel('Зміна коментаря').fill('Zbiorczo')
+    await dialog.getByRole('button', { name: 'Застосувати' }).click()
+    await expect(dialog).toBeHidden()
+    await expect
+      .poll(async () => (await txs(request, user)).filter((d) => (d.fields.description as { stringValue?: string } | undefined)?.stringValue === 'Zbiorczo').length)
+      .toBe(70)
+  })
+
+  test('a bulk delete shows its progress and can be stopped', async ({ page, request }) => {
+    const user = await setup(page, request, 'jr-stop')
+    for (let i = 0; i < 60; i++) {
+      await seedLedgerOperation(request, user.orgId, `tx-${String(i).padStart(3, '0')}`, { type: 'expense', accountId: 'acc-main', amount: 10 + i, currency: 'PLN', date: daysAgo(i % 30), description: `Wiersz ${i}` })
+    }
+    await page.goto(`/${user.orgId}/transactions`)
+    await expect(rowsOf(page)).toHaveCount(50)
+    await page.getByRole('checkbox', { name: 'Вибрати всі рядки' }).check()
+    const bar = page.getByRole('region', { name: 'Вибрані операції' })
+    await bar.getByRole('button', { name: 'Позначити всі за фільтром (до 1000)' }).click()
+    await expect(bar.getByText('Вибрано: 60')).toBeVisible()
+
+    // Each chunk (25 operations) takes a moment, so the progress can be seen and the run stopped between chunks.
+    await page.route('**/transactions/bulk', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await route.continue()
+    })
+    await bar.getByRole('button', { name: 'Видалити' }).click()
+    const confirm = page.getByRole('dialog').filter({ hasText: 'Видалити операцій: 60' })
+    await confirm.getByRole('button', { name: 'Видалити', exact: true }).click()
+    await expect(confirm.getByText('Оновлено 25 з 60')).toBeVisible()
+    await confirm.getByRole('button', { name: 'Зупинити' }).click()
+    await expect(confirm).toBeHidden()
+    const left = (await txs(request, user)).length
+    expect(left).toBeGreaterThan(0)
+    expect(left).toBeLessThan(60)
+  })
+
+  test('the result of a bulk change names the most frequent reason of the failures', async ({ page, request }) => {
+    const user = await setup(page, request, 'jr-reason')
+    for (let i = 0; i < 3; i++) {
+      await seedLedgerOperation(request, user.orgId, `tx-${i}`, { type: 'expense', accountId: 'acc-main', amount: 10 + i, currency: 'PLN', date: daysAgo(i), description: `Op ${i}` })
+    }
+    await page.goto(`/${user.orgId}/transactions`)
+    await expect(rowsOf(page)).toHaveCount(3)
+    // The server answers: one done, two refused because the counterparty is archived.
+    await page.route('**/transactions/bulk', async (route) => {
+      const ids = (route.request().postDataJSON() as { ids: string[] }).ids
+      const results = ids.map((id, i) => (i === 0 ? { id, ok: true } : { id, ok: false, code: 'counterparty_archived' }))
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ results }) })
+    })
+    for (let i = 0; i < 3; i++) await rowsOf(page).nth(i).getByRole('checkbox').check()
+    const bar = page.getByRole('region', { name: 'Вибрані операції' })
+    await bar.getByRole('button', { name: 'Змінити дані' }).click()
+    await page.getByRole('menuitem', { name: 'Змінити коментар' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByLabel('Зміна коментаря').fill('Uwaga')
+    await dialog.getByRole('button', { name: 'Застосувати' }).click()
+    await expect(toast(page, 'Змінено 1 з 3. 2 не вдалося: Контрагент в архіві.')).toBeVisible()
+  })
+
   test('a fill chip sets the category in the row', async ({ page, request }) => {
     const user = await setup(page, request, 'jr-chip')
     await seedLedgerOperation(request, user.orgId, 'tx-chip', { type: 'expense', accountId: 'acc-main', amount: 25, currency: 'PLN', date: daysAgo(1), description: 'Bez kategorii' })

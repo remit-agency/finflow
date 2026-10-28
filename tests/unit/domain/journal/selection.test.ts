@@ -1,6 +1,6 @@
 // tests/unit/domain/journal/selection.test.ts
 import { describe, expect, it } from 'vitest'
-import { categoryTypeOf, patchTouches, selectionForScope, selectionSummary, splitByPatch } from '@/lib/domain/journal/selection'
+import { categoryTypeOf, mostFrequentCode, patchTouches, selectionForScope, selectionSummary, splitByPatch } from '@/lib/domain/journal/selection'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
 
 const tx = (id: string, over: Partial<LedgerTransaction> = {}): LedgerTransaction => ({
@@ -78,5 +78,15 @@ describe('selectionForScope', () => {
     expect(other).toEqual({ scope: 'b', ids: new Set() })
     const back = selectionForScope(other, 'a')
     expect(back.ids.size).toBe(0)
+  })
+})
+
+describe('mostFrequentCode', () => {
+  it('is null when nothing failed', () => {
+    expect(mostFrequentCode([])).toBeNull()
+  })
+  it('picks the code seen most often, the first seen on a tie', () => {
+    expect(mostFrequentCode([{ code: 'a' }, { code: 'b' }, { code: 'b' }])).toBe('b')
+    expect(mostFrequentCode([{ code: 'a' }, { code: 'b' }])).toBe('a')
   })
 })

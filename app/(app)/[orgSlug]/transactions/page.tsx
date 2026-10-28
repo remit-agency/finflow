@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
@@ -12,9 +12,11 @@ import { JournalFiltersBar } from '@/components/transactions/JournalFilters'
 import { SelectionBar, type BulkField } from '@/components/transactions/SelectionBar'
 import { TransactionList } from '@/components/transactions/TransactionList'
 import { bulkChange, bulkDelete, undoBulkChange, undoBulkDelete } from '@/lib/api/journal-actions'
+import { collectMatching, SELECT_ALL_LIMIT } from '@/lib/api/journal-matching'
 import { hasActiveFilters } from '@/lib/domain/journal/filter'
-import { selectionSummary, type BulkPatch } from '@/lib/domain/journal/selection'
+import { mostFrequentCode, selectionSummary, type BulkPatch } from '@/lib/domain/journal/selection'
 import { fromMinor } from '@/lib/domain/ledger/money'
+import type { LedgerTransaction } from '@/lib/domain/ledger/types'
 import { toUiTransaction } from '@/lib/firebase/ledger-map'
 import { useCounterparties } from '@/lib/hooks/useCounterparties'
 import { useJournal } from '@/lib/hooks/useJournal'
@@ -51,7 +53,20 @@ export default function TransactionsPage() {
   const view: JournalView = { filters, period: urlView.period }
 
   const { rows, loading, error, hasMore, loadingMore, moreError, loadMore } = useJournal(orgId, filters)
-  const selection = useJournalSelection(`${orgId}|${query}|${selectedAccountId ?? ''}`)
+  const scope = `${orgId}|${query}|${selectedAccountId ?? ''}`
+  const selection = useJournalSelection(scope)
+
+  // «Select all matching the filter»: the rows it took beyond the loaded ones (the page needs the whole operation of
+  // every selected row for a bulk change, delete or undo). They belong to the selection's scope and are dropped with it.
+  const [matching, setMatching] = useState<{
+    scope: string
+    running: boolean
+    done: boolean
+    limitReached: boolean
+    rows: ReadonlyMap<string, LedgerTransaction>
+  } | null>(null)
+  if (matching && matching.scope !== scope) setMatching(null)
+  const matchingNow = matching && matching.scope === scope ? matching : null
 
   const canEdit = can('data.write')
   const baseCurrency = org?.currency ?? 'PLN'
@@ -59,7 +74,12 @@ export default function TransactionsPage() {
   const transactions = useMemo(() => rows.map((r) => toUiTransaction(orgId, r.tx)), [rows, orgId])
   const grouped = useMemo(() => groupTransactionsByDate(transactions), [transactions])
   const balances = useMemo(() => Object.fromEntries(rows.map((r) => [r.tx.id, r.balanceAfterMinor])), [rows])
-  const selectedRows = useMemo(() => [...selection.ids].flatMap((id) => ledgerById.get(id) ?? []), [selection.ids, ledgerById])
+  const extraRows = matchingNow?.rows
+  // The loaded row first (it is the fresher one), then what «select all matching» kept.
+  const selectedRows = useMemo(
+    () => [...selection.ids].flatMap((id) => ledgerById.get(id) ?? extraRows?.get(id) ?? []),
+    [selection.ids, ledgerById, extraRows],
+  )
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? null
 
   const [editField, setEditField] = useState<BulkField | null>(null)
@@ -67,6 +87,39 @@ export default function TransactionsPage() {
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [abort, setAbort] = useState<AbortController | null>(null)
+
+  const matchRun = useRef<AbortController | null>(null)
+  const latest = useRef({ scope, selection })
+  useEffect(() => {
+    latest.current = { scope, selection }
+  })
+  // Another scope (or leaving the page) ends a walk in progress.
+  useEffect(() => () => matchRun.current?.abort(), [scope])
+
+  const clearSelection = () => {
+    matchRun.current?.abort()
+    selection.clear()
+    setMatching(null)
+  }
+
+  const selectMatching = async () => {
+    matchRun.current?.abort()
+    const ac = new AbortController()
+    matchRun.current = ac
+    setMatching({ scope, running: true, done: false, limitReached: false, rows: new Map() })
+    try {
+      const found = await collectMatching(orgId, filters, { signal: ac.signal })
+      if (ac.signal.aborted || latest.current.scope !== scope) return
+      latest.current.selection.add(found.rows.map((r) => r.id))
+      setMatching({ scope, running: false, done: true, limitReached: found.limitReached, rows: new Map(found.rows.map((r) => [r.id, r])) })
+    } catch {
+      if (ac.signal.aborted) return
+      setMatching(null)
+      toast.error(t('loadError'))
+    } finally {
+      if (matchRun.current === ac) matchRun.current = null
+    }
+  }
 
   const setView = (next: JournalView) => {
     // The account is the shell's value: the toolbar select changes it there, not in the address.
@@ -79,6 +132,9 @@ export default function TransactionsPage() {
     const key = `errors.${code}` as 'errors.unknown'
     return tBulk.has(key) ? tBulk(key) : tBulk('errors.unknown')
   }
+
+  // «2 не вдалося: <the most frequent reason>.»
+  const failureReason = (failed: { code: string }[]) => errorText(mostFrequentCode(failed) ?? 'unknown')
 
   const applyChange = async (patch: BulkPatch) => {
     const ac = new AbortController()
@@ -94,7 +150,7 @@ export default function TransactionsPage() {
       })
       const message = [
         tBulk('result', { ok: report.applied.length, total: selectedRows.length }),
-        report.failed.length ? tBulk('resultFailed', { count: report.failed.length }) : '',
+        report.failed.length ? tBulk('resultFailed', { count: report.failed.length, reason: failureReason(report.failed) }) : '',
       ]
         .filter(Boolean)
         .join(' ')
@@ -114,7 +170,7 @@ export default function TransactionsPage() {
       } else {
         toast.warning(message)
       }
-      selection.clear()
+      clearSelection()
       setEditField(null)
     } catch {
       toast.error(tBulk('errors.unknown'))
@@ -126,9 +182,16 @@ export default function TransactionsPage() {
   }
 
   const deleteSelected = async () => {
+    const ac = new AbortController()
+    setAbort(ac)
     setBusy(true)
+    setProgress({ done: 0, total: selectedRows.length })
     try {
-      const report = await bulkDelete(selectedRows, { orgId })
+      const report = await bulkDelete(selectedRows, {
+        orgId,
+        signal: ac.signal,
+        onProgress: (done, total) => setProgress({ done, total }),
+      })
       const count = report.applied.length
       if (count > 0) {
         undoToast({
@@ -144,12 +207,14 @@ export default function TransactionsPage() {
           },
         })
       }
-      if (report.failed.length) toast.warning(tBulk('resultFailed', { count: report.failed.length }))
-      selection.clear()
+      if (report.failed.length) toast.warning(tDelete('failed', { count: report.failed.length, reason: failureReason(report.failed) }))
+      clearSelection()
     } catch {
       toast.error(tBulk('errors.unknown'))
     } finally {
       setBusy(false)
+      setProgress(null)
+      setAbort(null)
       setConfirmDelete(false)
     }
   }
@@ -219,7 +284,20 @@ export default function TransactionsPage() {
       )}
 
       {canEdit && selectedRows.length > 0 && (
-        <SelectionBar rows={selectedRows} baseCurrency={baseCurrency} onEdit={setEditField} onDelete={() => setConfirmDelete(true)} onClear={selection.clear} />
+        <SelectionBar
+          rows={selectedRows}
+          baseCurrency={baseCurrency}
+          onEdit={setEditField}
+          onDelete={() => setConfirmDelete(true)}
+          onClear={clearSelection}
+          matching={{
+            offer: hasMore && !matchingNow?.done,
+            running: !!matchingNow?.running,
+            limitReached: !!matchingNow?.limitReached,
+            limit: SELECT_ALL_LIMIT,
+          }}
+          onSelectMatching={() => void selectMatching()}
+        />
       )}
 
       <TransactionList
@@ -265,6 +343,9 @@ export default function TransactionsPage() {
         cancelLabel={tDelete('cancel')}
         destructive
         busy={busy}
+        progress={progress ? tBulk('progress', { done: progress.done, total: progress.total }) : null}
+        stopLabel={tBulk('stop')}
+        onStop={() => abort?.abort()}
         onConfirm={() => void deleteSelected()}
         onCancel={() => setConfirmDelete(false)}
       />

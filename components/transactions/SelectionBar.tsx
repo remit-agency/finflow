@@ -19,10 +19,13 @@ interface Props {
   onEdit: (field: BulkField) => void
   onDelete: () => void
   onClear: () => void
+  /** «Select all matching the filter»: offered while more rows match than are loaded. */
+  matching: { offer: boolean; running: boolean; limitReached: boolean; limit: number }
+  onSelectMatching: () => void
 }
 
 /** Appears over the journal while rows are checked: how many, their net amount, «change data» and «delete». */
-export function SelectionBar({ rows, baseCurrency, onEdit, onDelete, onClear }: Props) {
+export function SelectionBar({ rows, baseCurrency, onEdit, onDelete, onClear, matching, onSelectMatching }: Props) {
   const t = useTranslations('journal.selection')
   const { money } = useFormatters()
   const { count, totalBaseMinor } = selectionSummary(rows, baseCurrency)
@@ -36,6 +39,23 @@ export function SelectionBar({ rows, baseCurrency, onEdit, onDelete, onClear }: 
     >
       <span className="font-semibold">{t('selected', { count })}</span>
       <span className="tabular-nums">{money(fromMinor(totalBaseMinor), baseCurrency)}</span>
+      {matching.running ? (
+        <span role="status">{t('selecting')}</span>
+      ) : matching.limitReached ? (
+        <span role="status">{t('limitReached', { limit: matching.limit })}</span>
+      ) : (
+        matching.offer && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onSelectMatching}
+            className="px-2 text-primary-foreground underline hover:bg-primary-foreground/10 hover:text-primary-foreground"
+          >
+            {t('selectAllMatching')}
+          </Button>
+        )
+      )}
       <div className="ml-auto flex items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button type="button" variant="secondary" size="sm" />}>{t('change')}</DropdownMenuTrigger>
