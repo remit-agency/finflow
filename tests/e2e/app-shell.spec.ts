@@ -109,6 +109,8 @@ test.describe('app shell (emulators)', () => {
     const user = await registerViaUi(page, 'filter')
     await waitForShell(page, user.companyName)
     await seedJournal(request, user.orgId)
+    // The journal is read page by page from the server, not live: operations seeded from outside show after a reload.
+    await page.reload()
 
     const sidebar = accountsSidebar(page)
     await expect(sidebar.getByRole('listitem').filter({ hasText: 'Euro' })).toBeVisible()
@@ -137,6 +139,8 @@ test.describe('app shell (emulators)', () => {
     const user = await registerViaUi(page, 'sync')
     await waitForShell(page, user.companyName)
     await seedJournal(request, user.orgId)
+    // The journal is read page by page from the server, not live: operations seeded from outside show after a reload.
+    await page.reload()
 
     const sidebar = accountsSidebar(page)
     const select = page.getByRole('combobox', { name: 'Рахунок', exact: true })
@@ -181,6 +185,8 @@ test.describe('app shell (emulators)', () => {
     const user = await registerViaUi(page, 'rowenter')
     await waitForShell(page, user.companyName)
     await seedJournal(request, user.orgId)
+    // The journal is read page by page from the server, not live: operations seeded from outside show after a reload.
+    await page.reload()
 
     const rowAlpha = page.getByRole('row').filter({ hasText: 'Оплата від Alpha' })
     await expect(rowAlpha).toBeVisible()
@@ -454,7 +460,7 @@ test.describe('app shell (emulators)', () => {
     await waitForShell(page, user.companyName)
 
     const tab = page.getByRole('navigation', { name: 'Модулі' }).getByRole('link').first()
-    const search = page.getByPlaceholder('Пошук по опису…')
+    const search = page.getByLabel('Пошук за рахунками, контрагентами і коментарями')
     await expect(search).toBeVisible()
     const tabBox = await tab.boundingBox()
     const searchBox = await search.boundingBox()
