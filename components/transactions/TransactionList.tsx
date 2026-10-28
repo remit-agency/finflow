@@ -45,7 +45,7 @@ export function TransactionList({
   const tAccountTypes = useTranslations('common.accountTypes')
   const { locale, money, date: formatDate } = useFormatters()
   const categoryLabel = useCategoryName()
-  const { can } = useShell()
+  const { can, org } = useShell()
   const canEdit = can('data.write')
   const [editTx, setEditTx] = useState<Transaction | null>(null)
 
@@ -229,6 +229,7 @@ export function TransactionList({
           incomeCategories={incomeCategories}
           expenseCategories={expenseCategories}
           transaction={editTx}
+          defaultCurrency={org?.currency}
           open={!!editTx}
           onClose={() => setEditTx(null)}
         />

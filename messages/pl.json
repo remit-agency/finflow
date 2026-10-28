@@ -277,6 +277,7 @@
       "delete": "Usuń",
       "deleteTitle": "Usunąć operację?",
       "deleteBody": "Operacja zostanie usunięta, a saldo konta się zmieni. Zaraz po usunięciu możesz ją przywrócić przyciskiem „Cofnij”.",
+      "deleteArchivedWarning": "Kontrahent tej operacji jest w archiwum, więc „Cofnij” po usunięciu nie zadziała.",
       "deleteConfirm": "Usuń",
       "deleted": "Operację usunięto",
       "saved": "Zmiany zapisano",

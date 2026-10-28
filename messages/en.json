@@ -277,6 +277,7 @@
       "delete": "Delete",
       "deleteTitle": "Delete the transaction?",
       "deleteBody": "The transaction will be deleted and the account balance will change. Right after deleting you can bring it back with “Undo”.",
+      "deleteArchivedWarning": "This operation's counterparty is archived, so “Undo” will not work after deleting.",
       "deleteConfirm": "Delete",
       "deleted": "Transaction deleted",
       "saved": "Changes saved",

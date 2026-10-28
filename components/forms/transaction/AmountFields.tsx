@@ -36,7 +36,7 @@ interface Props {
 
 export function AmountFields({ state, status, accounts, baseCurrency, currency, toCurrency, errors, amountRef, onChange }: Props) {
   const t = useTranslations('forms.transaction')
-  const { money, number } = useFormatters()
+  const { money, number, date } = useFormatters()
   const isTransfer = state.type === 'transfer'
   const typedAmount = parseAmountInput(state.amount)
 
@@ -115,7 +115,11 @@ export function AmountFields({ state, status, accounts, baseCurrency, currency, 
 
       {preview.state === 'ok' && typedAmount !== null && typedAmount > 0 && (
         <p className="text-xs tabular-nums text-ink-muted">
-          {t('rateHint', { amount: money(convertApprox(typedAmount, preview.rate), baseCurrency), date: preview.rateDate })}
+          {t('rateHint', {
+            amount: money(convertApprox(typedAmount, preview.rate), baseCurrency),
+            // The formatter works in UTC, so the stored day cannot slip to its neighbour.
+            date: date(new Date(`${preview.rateDate}T00:00:00Z`), { day: 'numeric', month: 'long', year: 'numeric' }),
+          })}
         </p>
       )}
       {preview.state === 'unavailable' && <p className="text-xs text-ink-muted">{t('rateUnavailable')}</p>}

@@ -26,6 +26,11 @@ describe('undoToast', () => {
     expect(shown().action.label).toBe('Undo')
   })
 
+  it('forwards the id so a newer toast for the same operation replaces the older one', () => {
+    undoToast({ message: 'Saved', actionLabel: 'Undo', failureMessage: 'Failed', id: 'undo-tx1', undo: async () => undefined })
+    expect(toastMock.mock.calls[0][1]).toMatchObject({ id: 'undo-tx1' })
+  })
+
   it('runs the undo on click and stays quiet when it works', async () => {
     const undo = vi.fn().mockResolvedValue(undefined)
     undoToast({ message: 'Deleted', actionLabel: 'Undo', failureMessage: 'Failed', undo })

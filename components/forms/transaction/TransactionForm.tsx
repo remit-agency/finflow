@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useCounterparties } from '@/lib/hooks/useCounterparties'
 import { LedgerApiError, createTransaction, deleteTransaction, updateTransaction } from '@/lib/api/ledger-client'
 import { buildCreateDraft, buildEditDraft, categoryAfterTypeChange, stateToDraft } from '@/lib/api/transaction-draft'
 import { restoreTransaction, revertTransaction } from '@/lib/api/transaction-undo'
@@ -81,6 +82,9 @@ export function TransactionForm({
   const [confirm, setConfirm] = useState<'delete' | 'discard' | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const amountRef = useRef<HTMLInputElement>(null)
+  // Set synchronously: `busy` only changes on the next render, and two key events can arrive in one tick.
+  const inFlight = useRef(false)
+  const { counterparties } = useCounterparties(orgId)
   // One id per operation being created: a retry or a double click creates it once on the server.
   const clientIdRef = useRef(crypto.randomUUID())
 
@@ -128,6 +132,7 @@ export function TransactionForm({
   }
 
   const submit = async (addSimilar = false) => {
+    if (inFlight.current) return
     const found = validateState(state, { crossCurrency })
     setErrors(found)
     if (Object.keys(found).length > 0) return
@@ -135,6 +140,7 @@ export function TransactionForm({
       onClose()
       return
     }
+    inFlight.current = true
     setBusy('save')
     try {
       const form = stateToDraft(state, { today, crossCurrency })
@@ -144,6 +150,7 @@ export function TransactionForm({
           message: t('saved'),
           actionLabel: t('undo'),
           failureMessage: t('undoFailed'),
+          id: `undo-${transaction.id}`,
           undo: () => revertTransaction(orgId, transaction),
         })
       } else {
@@ -161,12 +168,14 @@ export function TransactionForm({
     } catch (e) {
       toast.error(saveErrorMessage(e))
     } finally {
+      inFlight.current = false
       setBusy(null)
     }
   }
 
   const remove = async () => {
-    if (!transaction) return
+    if (!transaction || inFlight.current) return
+    inFlight.current = true
     setBusy('delete')
     try {
       await deleteTransaction(orgId, transaction.id)
@@ -174,6 +183,7 @@ export function TransactionForm({
         message: t('deleted'),
         actionLabel: t('undo'),
         failureMessage: t('undoFailed'),
+        id: `undo-${transaction.id}`,
         undo: () => restoreTransaction(orgId, transaction),
       })
       onClose()
@@ -181,13 +191,15 @@ export function TransactionForm({
       toast.error(t('errors.delete'))
       setConfirm(null)
     } finally {
+      inFlight.current = false
       setBusy(null)
     }
   }
 
   // Closing a form that holds changes asks first; an untouched form closes at once.
   const requestClose = () => {
-    if (busy) return
+    // A question is open: Esc answers that question only, it must not also close the form behind it.
+    if (busy || confirm) return
     if (dirty) setConfirm('discard')
     else onClose()
   }
@@ -203,7 +215,14 @@ export function TransactionForm({
 
   const markPaid = () => patch({ status: 'actual', paymentDate: paidDay(state.paymentDate, today) })
 
-  const summary = transaction ? money(transaction.amount, transaction.currency) : ''
+  // The delete question names the operation, and warns when «Скасувати» cannot bring it back:
+  // undo re-creates it, and the server refuses an archived counterparty on create.
+  const deleteBody = (() => {
+    if (!transaction) return ''
+    const what = [transaction.description, money(transaction.amount, transaction.currency)].filter(Boolean).join(' · ')
+    const counterparty = transaction.counterpartyId ? counterparties.find((c) => c.id === transaction.counterpartyId) : undefined
+    return [`${what}. ${t('deleteBody')}`, counterparty?.archived ? t('deleteArchivedWarning') : null].filter(Boolean).join(' ')
+  })()
 
   return (
     <>
@@ -260,7 +279,7 @@ export function TransactionForm({
                     </NativeSelect>
                   </div>
 
-                  <CounterpartyField orgId={orgId} value={state.counterpartyId} onChange={(id) => patch({ counterpartyId: id })} />
+                  <CounterpartyField orgId={orgId} counterparties={counterparties} value={state.counterpartyId} onChange={(id) => patch({ counterpartyId: id })} />
                 </>
               )}
 
@@ -341,7 +360,7 @@ export function TransactionForm({
       <ConfirmDialog
         open={confirm === 'delete'}
         title={t('deleteTitle')}
-        body={`${summary}. ${t('deleteBody')}`}
+        body={deleteBody}
         confirmLabel={t('deleteConfirm')}
         cancelLabel={tCommon('cancel')}
         destructive

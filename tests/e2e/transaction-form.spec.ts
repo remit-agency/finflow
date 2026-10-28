@@ -374,6 +374,106 @@ test.describe('transaction form (emulators)', () => {
     await expect(picker).toHaveValue('')
   })
 
+  /** A company with one expense «Z kontrahentem» of 100 that has the counterparty «Alfa»; the journal is open. */
+  async function setupWithCounterpartyExpense(page: Page, request: APIRequestContext, prefix: string): Promise<RegisteredUser> {
+    const user = await setup(page, request, prefix)
+    await page.goto(`/${user.orgId}/settings/counterparties`)
+    await expect(page.getByRole('heading', { name: 'Налаштування' })).toBeVisible()
+    await page.getByRole('button', { name: 'Додати контрагента' }).click()
+    await page.getByLabel('Назва', { exact: true }).fill('Alfa')
+    await page.getByRole('button', { name: 'Зберегти' }).click()
+    await expect(page.getByTestId('counterparty-row').filter({ hasText: 'Alfa' })).toBeVisible()
+
+    await page.goto(`/${user.orgId}/transactions`)
+    await waitForShell(page, user.companyName)
+    await expect(accountRow(page, 'Konto PLN')).toBeVisible()
+    const dialog = await openNewForm(page, 'Витрата')
+    await dialog.locator('#tx-amount').fill('100')
+    await dialog.locator('#tx-desc').fill('Z kontrahentem')
+    await dialog.getByRole('combobox', { name: 'Контрагент', exact: true }).click()
+    await page.getByRole('option', { name: 'Alfa' }).click()
+    await dialog.getByRole('button', { name: 'Додати', exact: true }).click()
+    await expect(dialog).toBeHidden()
+    await expect(page.getByRole('row').filter({ hasText: 'Z kontrahentem' })).toBeVisible()
+    return user
+  }
+
+  test('Enter on a picker reached with Tab keeps the chosen counterparty', async ({ page, request }) => {
+    await setupWithCounterpartyExpense(page, request, 'txf-picker-enter')
+    const dialog = await openRow(page, 'Z kontrahentem')
+    const picker = dialog.getByRole('combobox', { name: 'Контрагент', exact: true })
+
+    await dialog.locator('#tx-category').focus()
+    await page.keyboard.press('Tab')
+    await expect(picker).toBeFocused()
+    await expect(picker).toHaveAttribute('aria-expanded', 'true')
+    await page.keyboard.press('Enter')
+
+    await expect(picker).toHaveAttribute('aria-expanded', 'false')
+    await expect(picker).toHaveValue('Alfa')
+    // Enter chose the highlighted (already chosen) counterparty; it neither cleared it nor submitted the form.
+    await expect(dialog).toBeVisible()
+  })
+
+  test('Escape while the picker list is open closes only the list', async ({ page, request }) => {
+    await setupWithCounterpartyExpense(page, request, 'txf-picker-esc')
+    const dialog = await openRow(page, 'Z kontrahentem')
+    const picker = dialog.getByRole('combobox', { name: 'Контрагент', exact: true })
+
+    await picker.focus()
+    await expect(picker).toHaveAttribute('aria-expanded', 'true')
+    await page.keyboard.press('Escape')
+    await expect(picker).toHaveAttribute('aria-expanded', 'false')
+    // The form is untouched, so had Escape reached the dialog it would have closed at once.
+    await expect(dialog).toBeVisible()
+    await expect(picker).toHaveValue('Alfa')
+
+    // With the list closed, Escape closes the form as usual.
+    await page.keyboard.press('Escape')
+    await expect(page.locator('#tx-amount')).toHaveCount(0)
+  })
+
+  test('Escape on the delete question closes only the question', async ({ page, request }) => {
+    const user = await setup(page, request, 'txf-delete-esc')
+    await createExpense(page, '100', 'Nie usuwać')
+    const dialog = await openRow(page, 'Nie usuwać')
+
+    await dialog.getByRole('button', { name: 'Видалити', exact: true }).click()
+    const ask = confirmDialog(page, 'Видалити операцію?')
+    await expect(ask).toBeVisible()
+    // The question names the operation.
+    await expect(ask).toContainText('Nie usuwać · ')
+    await page.keyboard.press('Escape')
+    await expect(ask).toBeHidden()
+    await expect(dialog).toBeVisible()
+    expect(await transactions(request, user)).toHaveLength(1)
+  })
+
+  test('a second edit of the same operation replaces the first undo toast', async ({ page, request }) => {
+    await setup(page, request, 'txf-toast')
+    await createExpense(page, '100', 'Dwie zmiany')
+    const row = page.getByRole('row').filter({ hasText: 'Dwie zmiany' })
+
+    const first = await openRow(page, 'Dwie zmiany')
+    await first.locator('#tx-amount').fill('40')
+    await first.getByRole('button', { name: 'Зберегти', exact: true }).click()
+    await expect(first).toBeHidden()
+    await expect(row).toContainText(/40,00/)
+    await expect(toast(page, 'Зміни збережено')).toHaveCount(1)
+
+    const second = await openRow(page, 'Dwie zmiany')
+    await second.locator('#tx-amount').fill('30')
+    await second.getByRole('button', { name: 'Зберегти', exact: true }).click()
+    await expect(second).toBeHidden()
+    await expect(row).toContainText(/30,00/)
+
+    // One toast, and it is the newer one: its «undo» goes back to 40, never straight to 100.
+    const saved = toast(page, 'Зміни збережено')
+    await expect(saved).toHaveCount(1)
+    await saved.getByRole('button', { name: 'Скасувати', exact: true }).click()
+    await expect(row).toContainText(/40,00/)
+  })
+
   test('the form renders in Polish and English without raw message keys', async ({ page, request }) => {
     const user = await setup(page, request, 'txf-i18n')
     await page.goto(`/${user.orgId}/settings/language`)

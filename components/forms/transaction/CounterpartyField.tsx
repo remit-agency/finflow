@@ -5,19 +5,19 @@ import { useTranslations } from 'next-intl'
 import { CounterpartyForm } from '@/components/counterparties/CounterpartyForm'
 import { CounterpartyPicker } from '@/components/counterparties/CounterpartyPicker'
 import { Label } from '@/components/ui/label'
-import { useCounterparties } from '@/lib/hooks/useCounterparties'
+import type { Counterparty } from '@/lib/domain/counterparties/types'
 
 interface Props {
   orgId: string
+  /** The company's counterparties; the form owns the subscription because it also reads them for the delete question. */
+  counterparties: Counterparty[]
   /** The chosen counterparty id, or '' for none. */
   value: string
   onChange: (id: string) => void
-  error?: string
 }
 
-export function CounterpartyField({ orgId, value, onChange, error }: Props) {
+export function CounterpartyField({ orgId, counterparties, value, onChange }: Props) {
   const t = useTranslations('forms.transaction')
-  const { counterparties } = useCounterparties(orgId)
   // What was typed in the picker when «add» was chosen; the form opens with it. Null: the form is closed.
   const [creating, setCreating] = useState<string | null>(null)
   const typedNip = creating !== null && /^\d{10}$/.test(creating.replace(/[\s-]/g, '')) ? creating.replace(/[\s-]/g, '') : undefined
@@ -32,7 +32,6 @@ export function CounterpartyField({ orgId, value, onChange, error }: Props) {
         onChange={(id) => onChange(id ?? '')}
         onCreate={(typed) => setCreating(typed)}
       />
-      {error && <p className="text-xs text-expense">{error}</p>}
       {creating !== null && (
         <CounterpartyForm
           orgId={orgId}

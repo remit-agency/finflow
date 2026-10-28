@@ -45,7 +45,12 @@ export function DatesFields({ paymentDate, accrual, showAccrual, errors, onChang
               <Segmented
                 label={t('accrualMode')}
                 value={accrual.mode}
-                onChange={(mode) => setAccrual({ mode })}
+                onChange={(mode) =>
+                  // A period that was never set (or covers one day) follows the payment date instead of the day the form opened.
+                  setAccrual(
+                    mode === 'period' && accrual.from === accrual.to ? { mode, from: paymentDate, to: paymentDate } : { mode },
+                  )
+                }
                 options={[
                   { value: 'date', label: t('accrualModeDate') },
                   { value: 'period', label: t('accrualModePeriod') },

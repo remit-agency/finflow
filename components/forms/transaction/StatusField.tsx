@@ -1,7 +1,6 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Label } from '@/components/ui/label'
 import { Segmented } from '@/components/ui/segmented'
 import type { TxStatus } from '@/lib/domain/ledger/types'
 
@@ -17,7 +16,8 @@ export function StatusField({ status, locked, onChange }: Props) {
   const t = useTranslations('forms.transaction')
   return (
     <div className="space-y-1">
-      <Label>{t('status')}</Label>
+      {/* The group below carries the accessible name; a <label> with nothing to point at would label nothing. */}
+      <span className="block text-sm leading-none font-medium">{t('status')}</span>
       <Segmented
         label={t('status')}
         value={status}

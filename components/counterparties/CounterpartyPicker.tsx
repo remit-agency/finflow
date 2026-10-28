@@ -71,6 +71,8 @@ export function CounterpartyPicker({ counterparties, value, onChange, onCreate, 
       choose(row)
     } else if (e.key === 'Escape' && open) {
       e.preventDefault()
+      // Closing the list must not also close the dialog around it.
+      e.stopPropagation()
       close()
     }
   }
@@ -96,7 +98,12 @@ export function CounterpartyPicker({ counterparties, value, onChange, onCreate, 
           setActive(1)
           setOpen(true)
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          setOpen(true)
+          // Start on the chosen counterparty, so Enter right after Tab keeps it instead of picking «none».
+          const chosen = rows.findIndex((r) => r.kind === 'item' && r.counterparty.id === value)
+          setActive(Math.max(chosen, 0))
+        }}
         onBlur={close}
         onKeyDown={onKeyDown}
       />

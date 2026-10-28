@@ -148,6 +148,38 @@ describe('stateToDraft', () => {
   })
 })
 
+describe('an unchanged edit', () => {
+  // Saving the form without touching anything must send exactly what undo would restore: the form-owned fields go
+  // through the state and back, the rest (project, tags, files) is carried from the stored operation on both sides.
+  const options = { today: '2026-10-28', crossCurrency: false }
+  const unchanged = (tx: Transaction) =>
+    buildEditDraft(
+      tx,
+      stateToDraft(
+        initialFormState({ transaction: tx, defaultType: 'expense', defaultAccountId: 'a1', today: options.today, formatAmount: String }),
+        options,
+      ),
+    )
+
+  it('an expense with counterparty, period accrual, category and description round-trips', () => {
+    const tx = stored({
+      categoryId: 'c1',
+      counterpartyId: 'cp1',
+      description: 'Czynsz',
+      projectId: 'p1',
+      tags: ['q4'],
+      fileUrls: ['https://x/f.pdf'],
+      accrual: { mode: 'period', from: '2026-10-01', to: '2026-12-31' },
+    })
+    expect(unchanged(tx)).toEqual(transactionToDraft(tx))
+  })
+
+  it('a planned expense round-trips', () => {
+    const tx = stored({ status: 'planned', date: new Date('2026-11-15T00:00:00.000Z'), accrual: { mode: 'date', date: '2026-11-15' } })
+    expect(unchanged(tx)).toEqual(transactionToDraft(tx))
+  })
+})
+
 describe('transactionToDraft', () => {
   it('reproduces a stored expense in full, so that a create or a full replace restores it', () => {
     const tx = stored({
