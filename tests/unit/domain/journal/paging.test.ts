@@ -28,6 +28,16 @@ describe('pagingReducer', () => {
     const s = initialPaging('new')
     expect(pagingReducer(s, { type: 'first', key: 'old', page: { rows: [row('x')], next: null } })).toBe(s)
   })
+  it('a new key starts a fresh load and then accepts its own answers', () => {
+    let s = pagingReducer(initialPaging('old'), { type: 'first', key: 'old', page: { rows: [row('x')], next: 'c' } })
+    s = pagingReducer(s, { type: 'begin', key: 'new' })
+    expect(s).toMatchObject({ key: 'new', phase: 'loading', next: null })
+    expect(s.rows).toHaveLength(0)
+    expect(pagingReducer(s, { type: 'first', key: 'old', page: { rows: [row('x')], next: null } })).toBe(s)
+    s = pagingReducer(s, { type: 'first', key: 'new', page: { rows: [row('y')], next: null } })
+    expect(s.rows.map((r) => r.tx.id)).toEqual(['y'])
+    expect(pagingReducer(s, { type: 'begin', key: 'new' })).toBe(s)
+  })
   it('replace swaps the rows in place (a reload after a change)', () => {
     let s = pagingReducer(initialPaging('k'), { type: 'first', key: 'k', page: { rows: [row('a'), row('b')], next: 'c' } })
     s = pagingReducer(s, { type: 'replace', key: 'k', rows: [row('b')], next: null })

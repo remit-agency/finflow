@@ -27,6 +27,9 @@ export interface UseJournalResult {
 export function useJournal(orgId: string | null, filters: JournalFilters): UseJournalResult {
   const key = `${orgId ?? ''}|${filtersToParams(filters).toString()}`
   const [state, dispatch] = useReducer(pagingReducer, key, initialPaging)
+  // Other filters or another company: start over for the new key (set during render, the documented way to reset
+  // state on a changed input). Without it the reducer would ignore every answer for the new key.
+  if (state.key !== key) dispatch({ type: 'begin', key })
   const latest = useRef({ state, key })
   useEffect(() => {
     latest.current = { state, key }

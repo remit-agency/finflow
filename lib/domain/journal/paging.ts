@@ -10,6 +10,7 @@ export interface PagingState {
 }
 
 export type PagingAction =
+  | { type: 'begin'; key: string }
   | { type: 'first'; key: string; page: JournalPage }
   | { type: 'moreStart'; key: string }
   | { type: 'more'; key: string; page: JournalPage }
@@ -19,6 +20,9 @@ export type PagingAction =
 export const initialPaging = (key: string): PagingState => ({ key, rows: [], next: null, phase: 'loading', moreLoading: false })
 
 export function pagingReducer(state: PagingState, action: PagingAction): PagingState {
+  // A new key (other filters or company) starts a fresh load; every other answer for a key that is not the
+  // current one is stale and ignored.
+  if (action.type === 'begin') return action.key === state.key ? state : initialPaging(action.key)
   if (action.key !== state.key) return state
   switch (action.type) {
     case 'first':
