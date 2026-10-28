@@ -225,8 +225,6 @@
       "basis": "Filtruj według daty",
       "basisPayment": "Data płatności",
       "basisAccrual": "Data transakcji",
-      "dateFrom": "Data od",
-      "dateTo": "do",
       "amountFrom": "Kwota od",
       "amountTo": "do",
       "counterparties": "Kontrahenci"

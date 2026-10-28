@@ -26,6 +26,11 @@ describe('undoToast', () => {
     expect(shown().action.label).toBe('Undo')
   })
 
+  it('uses the given duration instead of the default', () => {
+    undoToast({ message: 'm', actionLabel: 'a', failureMessage: 'f', undo: async () => undefined, duration: 15_000 })
+    expect(shown().duration).toBe(15_000)
+  })
+
   it('forwards the id so a newer toast for the same operation replaces the older one', () => {
     undoToast({ message: 'Saved', actionLabel: 'Undo', failureMessage: 'Failed', id: 'undo-tx1', undo: async () => undefined })
     expect(toastMock.mock.calls[0][1]).toMatchObject({ id: 'undo-tx1' })

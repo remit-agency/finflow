@@ -225,8 +225,6 @@
       "basis": "Date to filter by",
       "basisPayment": "Payment date",
       "basisAccrual": "Transaction date",
-      "dateFrom": "Date from",
-      "dateTo": "to",
       "amountFrom": "Amount from",
       "amountTo": "to",
       "counterparties": "Counterparties"

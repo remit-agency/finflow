@@ -225,8 +225,6 @@
       "basis": "Фільтрувати за датою",
       "basisPayment": "Дата платежу",
       "basisAccrual": "Дата транзакції",
-      "dateFrom": "Дата від",
-      "dateTo": "до",
       "amountFrom": "Сума від",
       "amountTo": "до",
       "counterparties": "Контрагенти"
