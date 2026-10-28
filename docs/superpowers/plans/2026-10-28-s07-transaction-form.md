@@ -2570,6 +2570,81 @@ git commit -m "style(account-form): design tokens instead of hex colors"
 
 ---
 
+### Task 12a: Планові операції в журналі
+
+Знахідка e2e: `toTransactions` у `lib/firebase/transactions.ts` залишає лише `actual`, тож планова операція, створена формою, ніде не видна, а «Позначити сплаченою» недосяжне. Рішення власника (2026-10-28): журнал показує планові з міткою «План»; звіти, баланси й календар лишаються як є (їх читання не змінюється). Сума дня планові не враховує.
+
+**Files:**
+- Modify: `lib/firebase/transactions.ts`, `lib/utils/journal.ts`, `tests/unit/utils/journal.test.ts`, `app/(app)/[orgSlug]/transactions/page.tsx`, `components/transactions/TransactionList.tsx`, `messages/{uk,pl,en}.json`
+- Create: нічого
+
+- [ ] **Step 1: Failing tests** у `tests/unit/utils/journal.test.ts`
+
+Прочитати файл. Хелпер `tx(...)` у ньому будує операції для `summarizeDay`; додати до нього поле `status: 'actual'` за замовчуванням і параметр для зміни статусу (адаптувати наявні виклики мінімально). Додати тести в `describe('summarizeDay', …)`:
+
+```ts
+it('does not count planned operations in the sum of the day', () => {
+  expect(summarizeDay([tx('income', 1000), { ...tx('expense', 400), status: 'planned' }])).toEqual({ total: 1000, currency: 'UAH' })
+})
+
+it('has no sum for a day that holds only planned operations', () => {
+  expect(summarizeDay([{ ...tx('expense', 400), status: 'planned' }])).toBeNull()
+})
+```
+
+Додати також тест для нової чистої функції `isListed` (імпорт з `@/lib/utils/journal`):
+
+```ts
+describe('isListed', () => {
+  it('actual operations are always listed', () => {
+    expect(isListed({ status: 'actual' }, false)).toBe(true)
+  })
+  it('planned ones only when the journal asks for them', () => {
+    expect(isListed({ status: 'planned' }, false)).toBe(false)
+    expect(isListed({ status: 'planned' }, true)).toBe(true)
+  })
+})
+```
+
+Run: `npx vitest run tests/unit/utils/journal.test.ts` → FAIL.
+
+- [ ] **Step 2: Implement** у `lib/utils/journal.ts`
+
+Змінити тип параметра `summarizeDay` на `ReadonlyArray<Pick<Transaction, 'type' | 'amount' | 'currency' | 'status'>>`; на початку функції: `const actual = txs.filter((t) => t.status === 'actual')`, `if (actual.length === 0) return null`, і далі весь код працює з `actual` замість `txs` (включно з `currency = counted[0]?.currency ?? actual[0].currency`). Оновити коментар над функцією: планові не входять у суму дня. Додати:
+
+```ts
+/** Whether the journal lists an operation: planned ones only when it asks for them (reports and the calendar never do). */
+export function isListed(tx: Pick<Transaction, 'status'>, includePlanned: boolean): boolean {
+  return tx.status === 'actual' || includePlanned
+}
+```
+
+- [ ] **Step 3: Reading** у `lib/firebase/transactions.ts`
+
+Додати в `TransactionFilters` поле `includePlanned?: boolean` з коментарем (`The journal lists planned operations too; everything else reads actual ones only`). `toTransactions(orgId, docs, includePlanned)`: замість `else if (tx.status === 'actual')` використати `else if (isListed(tx, includePlanned))` (імпорт `isListed` з `@/lib/utils/journal`), оновити коментар над функцією (прибрати твердження, що UI не створює планові). У `getTransactions` передати `filters.includePlanned ?? false`. Хук `useTransactions` не змінюється: `includePlanned` їде в ключі фільтра.
+
+- [ ] **Step 4: Journal page** `app/(app)/[orgSlug]/transactions/page.tsx`
+
+`useTransactions(orgId, { ...effectiveFilters, includePlanned: true })`. У `TransactionFiltersBar` і в стан `filters` прапорець **не** потрапляє (інакше він порахувався б активним фільтром і з'явилась би кнопка «Очистити»).
+
+- [ ] **Step 5: Marker** у `components/transactions/TransactionList.tsx`
+
+Для `tx.status === 'planned'`: рядок отримує додатковий клас `text-ink-muted` (приглушений вигляд, збережи наявні класи hover/cursor) і `data-status="planned"`; в комірці рахунку, перед рядком категорії/типу рахунку, додати `<Badge variant="chip" className="mt-1">{t('planned')}</Badge>` (видно на всіх ширинах). Мітка не змінює `aria-label` кнопки редагування. Ключ `journal.list.planned`: uk «План», pl «Plan», en «Planned» (додати в усі три файли поруч з `transfer`).
+
+- [ ] **Step 6: Verify**
+
+Run: `npx vitest run tests/unit/utils/journal.test.ts tests/unit/i18n && npx tsc --noEmit && npm run lint && npx vitest run tests/unit`
+Expected: усе зелене, нових lint-попереджень немає.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add -A
+git commit -m "feat(journal): list planned operations with a marker, outside the day sums"
+```
+
+---
+
 ### Task 12: E2E
 
 Спочатку **запустити наявні e2e, що торкаються форми**, і виправити їх селектори, якщо вони зламалися через нову розмітку (мітки полів лишились, але `Дата` тепер «Дата платежу», є нові елементи): `ledger.spec.ts`, `smoke.spec.ts`, `app-shell.spec.ts`, `i18n.spec.ts`. Тести не послаблювати: міняти лише локатор на рівноцінний.
