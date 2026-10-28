@@ -51,3 +51,18 @@ export function selectionSummary(rows: LedgerTransaction[], baseCurrency: string
   }
   return { count: rows.length, totalBaseMinor: total }
 }
+
+/** The checked ids and the scope (the filters) they were checked in. */
+export interface ScopedSelection {
+  scope: string
+  ids: ReadonlySet<string>
+}
+
+/**
+ * The selection for `scope`: the same object while the scope is the same, an empty one for the new scope otherwise.
+ * The old scope's ids are dropped for good, so going back to an earlier scope (search, then clear the search) does
+ * not bring them back.
+ */
+export function selectionForScope(state: ScopedSelection, scope: string): ScopedSelection {
+  return state.scope === scope ? state : { scope, ids: new Set() }
+}

@@ -1,6 +1,6 @@
 // tests/unit/domain/journal/selection.test.ts
 import { describe, expect, it } from 'vitest'
-import { categoryTypeOf, patchTouches, selectionSummary, splitByPatch } from '@/lib/domain/journal/selection'
+import { categoryTypeOf, patchTouches, selectionForScope, selectionSummary, splitByPatch } from '@/lib/domain/journal/selection'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
 
 const tx = (id: string, over: Partial<LedgerTransaction> = {}): LedgerTransaction => ({
@@ -64,5 +64,19 @@ describe('selectionSummary', () => {
       tx('d', { status: 'planned', amountMinor: 999 }),
     ]
     expect(selectionSummary(rows, 'PLN')).toEqual({ count: 4, totalBaseMinor: 2000 })
+  })
+})
+
+describe('selectionForScope', () => {
+  it('keeps the selection while the scope is the same', () => {
+    const state = { scope: 'a', ids: new Set(['1', '2']) }
+    expect(selectionForScope(state, 'a')).toBe(state)
+  })
+  it('empties it for another scope, and the old ids do not come back when the old scope returns', () => {
+    const state = { scope: 'a', ids: new Set(['1', '2']) }
+    const other = selectionForScope(state, 'b')
+    expect(other).toEqual({ scope: 'b', ids: new Set() })
+    const back = selectionForScope(other, 'a')
+    expect(back.ids.size).toBe(0)
   })
 })
