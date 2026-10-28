@@ -2,8 +2,8 @@
 import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import { registerViaUi, waitForShell, type RegisteredUser } from './helpers/app-ui'
-import { listDocs, readDoc, seedDoc } from './helpers/emulator-firestore'
-import { seedLedgerAccount, seedLedgerOperation, utcDay } from './helpers/ledger-seed'
+import { deleteDoc, listDocs, readDoc, seedDoc } from './helpers/emulator-firestore'
+import { replaceLedgerOperation, seedLedgerAccount, seedLedgerOperation, utcDay } from './helpers/ledger-seed'
 import { todayDay } from '../../lib/utils/today'
 
 const NEEDS_EMULATORS =
@@ -216,6 +216,35 @@ test.describe('journal (emulators)', () => {
     await expect(page.getByText('Шукаємо серед старіших операцій…')).toHaveCount(0)
     await expect(page.getByText('Нічого не знайдено')).toHaveCount(0)
     expect(followed).toBeGreaterThanOrEqual(1)
+  })
+
+  test('a row opens the form with the operation as it is now, not as the list last saw it', async ({ page, request }) => {
+    const user = await setup(page, request, 'jr-fresh')
+    const op = { type: 'expense', accountId: 'acc-main', amount: 20, currency: 'PLN', date: daysAgo(1) } as const
+    await seedLedgerOperation(request, user.orgId, 'tx-fresh', { ...op, description: 'Stary opis' })
+    await page.goto(`/${user.orgId}/transactions`)
+    const row = page.getByRole('row').filter({ hasText: 'Stary opis' })
+    await expect(row).toBeVisible()
+
+    // Changed behind the app's back: the list still shows the old text.
+    await replaceLedgerOperation(request, user.orgId, 'tx-fresh', { ...op, description: 'Nowy opis' })
+    await row.click()
+    await expect(formDialog(page).locator('#tx-desc')).toHaveValue('Nowy opis')
+  })
+
+  test('a row whose operation is already gone says so and the list drops it', async ({ page, request }) => {
+    const user = await setup(page, request, 'jr-gone')
+    await seedLedgerOperation(request, user.orgId, 'tx-gone', { type: 'expense', accountId: 'acc-main', amount: 20, currency: 'PLN', date: daysAgo(1), description: 'Znikająca' })
+    await seedLedgerOperation(request, user.orgId, 'tx-stay', { type: 'expense', accountId: 'acc-main', amount: 30, currency: 'PLN', date: daysAgo(2), description: 'Zostaje' })
+    await page.goto(`/${user.orgId}/transactions`)
+    await expect(rowsOf(page)).toHaveCount(2)
+
+    await deleteDoc(request, `organizations/${user.orgId}/transactions/tx-gone`)
+    await page.getByRole('row').filter({ hasText: 'Znikająca' }).click()
+    await expect(toast(page, 'Операції вже немає')).toBeVisible()
+    await expect(formDialog(page)).toHaveCount(0)
+    await expect(rowsOf(page)).toHaveCount(1)
+    await expect(page.getByRole('row').filter({ hasText: 'Zostaje' })).toBeVisible()
   })
 
   test('on a phone the two selects share a row, keep their width and the category chip is there', async ({ page, request }) => {

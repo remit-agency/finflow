@@ -3,13 +3,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { ReceiptText } from 'lucide-react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { LazyTransactionForm } from '@/components/forms/lazy'
 import { FillChip } from '@/components/transactions/FillChip'
+import { fetchTransaction } from '@/lib/api/journal-client'
+import { notifyLedgerChanged } from '@/lib/api/ledger-events'
+import { LedgerApiError } from '@/lib/api/ledger-client'
 import type { Counterparty } from '@/lib/domain/counterparties/types'
 import { fromMinor } from '@/lib/domain/ledger/money'
+import { toUiTransaction } from '@/lib/firebase/ledger-map'
 import { useShell } from '@/lib/hooks/useShell'
 import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { useFormatters } from '@/lib/i18n/useFormatters'
@@ -77,6 +82,36 @@ export function TransactionList({
   const canEdit = can('data.write')
   const [editTx, setEditTx] = useState<Transaction | null>(null)
   const hasRows = Object.keys(grouped).length > 0
+
+  // A row can be older than the operation (another tab, a bank import, a bulk run): the form opens with the
+  // operation as it is now. While the read is in flight further clicks are ignored; if the operation is gone the
+  // list reloads, and any other failure opens the form with the row as shown.
+  const opening = useRef<AbortController | null>(null)
+  useEffect(
+    () => () => {
+      opening.current?.abort()
+    },
+    [],
+  )
+  const openEdit = async (tx: Transaction) => {
+    if (opening.current) return
+    const ac = new AbortController()
+    opening.current = ac
+    try {
+      const fresh = await fetchTransaction(orgId, tx.id, ac.signal)
+      if (!ac.signal.aborted) setEditTx(toUiTransaction(orgId, fresh))
+    } catch (e) {
+      if (ac.signal.aborted) return
+      if (e instanceof LedgerApiError && e.status === 404) {
+        toast.error(t('gone'))
+        notifyLedgerChanged()
+      } else {
+        setEditTx(tx)
+      }
+    } finally {
+      if (opening.current === ac) opening.current = null
+    }
+  }
 
   // The next page loads when the sentinel under the table scrolls near the viewport. `loadingMore` is a
   // dependency so the observer is armed again after a page arrives: a short page that leaves the sentinel
@@ -263,7 +298,7 @@ export function TransactionList({
                       key={tx.id}
                       data-status={tx.status === 'planned' ? 'planned' : undefined}
                       data-selected={selected || undefined}
-                      onClick={canEdit ? () => setEditTx(tx) : undefined}
+                      onClick={canEdit ? () => void openEdit(tx) : undefined}
                       className={cn(
                         canEdit ? 'cursor-pointer hover:bg-canvas has-[button:focus-visible]:bg-brand-soft' : 'hover:bg-transparent',
                         planned && 'text-ink-muted',
@@ -307,7 +342,7 @@ export function TransactionList({
                             })}
                             onClick={(event) => {
                               event.stopPropagation()
-                              setEditTx(tx)
+                              void openEdit(tx)
                             }}
                             className={cn('block max-w-44 truncate rounded-[4px] text-left outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-soft-foreground sm:max-w-56', planned ? 'text-ink-muted' : 'text-ink')}
                           >

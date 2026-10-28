@@ -257,7 +257,8 @@
       "selectRow": "Zaznacz {account}: {amount}, {date}",
       "loadingMore": "Wczytywanie kolejnych…",
       "searching": "Szukamy wśród starszych operacji…",
-      "loadMoreRetry": "Nie udało się wczytać, ponów"
+      "loadMoreRetry": "Nie udało się wczytać, ponów",
+      "gone": "Tej operacji już nie ma"
     },
     "selection": {
       "region": "Zaznaczone operacje",

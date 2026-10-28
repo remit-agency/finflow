@@ -257,7 +257,8 @@
       "selectRow": "Select {account}: {amount}, {date}",
       "loadingMore": "Loading more…",
       "searching": "Searching older operations…",
-      "loadMoreRetry": "Could not load more, retry"
+      "loadMoreRetry": "Could not load more, retry",
+      "gone": "The operation no longer exists"
     },
     "selection": {
       "region": "Selected operations",

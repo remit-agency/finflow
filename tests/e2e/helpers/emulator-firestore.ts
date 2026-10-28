@@ -56,6 +56,20 @@ export async function seedDoc(
   if (!res.ok()) throw new Error(`seed ${collectionPath}/${docId} failed: ${res.status()} ${await res.text()}`)
 }
 
+/** Replaces a whole document as admin (created if missing): a change made behind the app's back. */
+export async function replaceDoc(request: APIRequestContext, path: string, data: SeedFields): Promise<void> {
+  const url = `http://${firestoreHost()}/v1/projects/${PROJECT}/databases/(default)/documents/${path}`
+  const res = await request.patch(url, { headers: { Authorization: 'Bearer owner' }, data: { fields: toFields(data) } })
+  if (!res.ok()) throw new Error(`replace ${path} failed: ${res.status()} ${await res.text()}`)
+}
+
+/** Deletes a document as admin (no error when it is already gone). */
+export async function deleteDoc(request: APIRequestContext, path: string): Promise<void> {
+  const url = `http://${firestoreHost()}/v1/projects/${PROJECT}/databases/(default)/documents/${path}`
+  const res = await request.delete(url, { headers: { Authorization: 'Bearer owner' } })
+  if (!res.ok()) throw new Error(`delete ${path} failed: ${res.status()} ${await res.text()}`)
+}
+
 /** Reads a document as admin. Returns its raw Firestore `fields`, or null when it does not exist. */
 export async function readDoc(
   request: APIRequestContext,
