@@ -33,7 +33,9 @@ const DAY = 24 * 60 * 60 * 1000
 // Written by the server only (S05): clients may read accounts, transactions and rollups, the owner reads audit.
 const SERVER_WRITTEN_SUBS = ['accounts', 'transactions', 'rollups', 'audit', 'counterparties'] as const
 const MEMBER_READ_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'counterparties'] as const
-const ALL_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'audit', 'bankConnections', 'counterparties'] as const
+const ALL_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'counterparties'] as const
+// S09: the bank collections written by the server only. bankAccounts and bankSeen are closed to every client role.
+const BANK_SERVER_ONLY_SUBS = ['bankAccounts', 'bankSeen'] as const
 
 let testEnv: RulesTestEnvironment
 
@@ -266,7 +268,7 @@ describe('collection group query on members (the "my companies" query)', () => {
   })
 
   it('does not open other collection groups', async () => {
-    for (const group of ['accounts', 'transactions', 'categories', 'rollups', 'audit', 'bankConnections', 'ledger', 'counterparties', 'counterpartyKeys']) {
+    for (const group of ['accounts', 'transactions', 'categories', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'ledger', 'counterparties', 'counterpartyKeys']) {
       await assertFails(getDocs(collectionGroup(as('alice'), group)))
     }
   })
@@ -306,12 +308,20 @@ describe('data subcollections by role', () => {
       await expectOutcome(categoryWrite, deleteDoc(doc(as(uid), 'organizations/orgA/categories/seed')))
     })
 
-    it('bankConnections: owner only (read and write)', async () => {
+    it('bankConnections: the owner reads, nobody writes from a client (the server saves the session)', async () => {
       await expectOutcome(bank, getDoc(doc(as(uid), 'organizations/orgA/bankConnections/seed')))
       await expectOutcome(bank, getDocs(collection(as(uid), 'organizations/orgA/bankConnections')))
-      await expectOutcome(bank, setDoc(doc(as(uid), 'organizations/orgA/bankConnections/new1'), { orgId: 'orgA' }))
-      await expectOutcome(bank, updateDoc(doc(as(uid), 'organizations/orgA/bankConnections/seed'), { name: 'x' }))
-      await expectOutcome(bank, deleteDoc(doc(as(uid), 'organizations/orgA/bankConnections/seed')))
+      await assertFails(setDoc(doc(as(uid), 'organizations/orgA/bankConnections/new1'), { orgId: 'orgA' }))
+      await assertFails(updateDoc(doc(as(uid), 'organizations/orgA/bankConnections/seed'), { name: 'x' }))
+      await assertFails(deleteDoc(doc(as(uid), 'organizations/orgA/bankConnections/seed')))
+    })
+
+    it.each(BANK_SERVER_ONLY_SUBS)('%s: closed to every role, for reads and writes', async (sub) => {
+      await assertFails(getDoc(doc(as(uid), `organizations/orgA/${sub}/seed`)))
+      await assertFails(getDocs(collection(as(uid), `organizations/orgA/${sub}`)))
+      await assertFails(setDoc(doc(as(uid), `organizations/orgA/${sub}/new1`), { orgId: 'orgA' }))
+      await assertFails(updateDoc(doc(as(uid), `organizations/orgA/${sub}/seed`), { name: 'x' }))
+      await assertFails(deleteDoc(doc(as(uid), `organizations/orgA/${sub}/seed`)))
     })
   })
 

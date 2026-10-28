@@ -11,9 +11,10 @@ rules_version = '2';
 //
 // Data shape:
 //   organizations/{orgId} { name, currency, ownerId, plan, trialEndsAt, createdAt }
-//   organizations/{orgId}/{accounts|categories|transactions|rollups|audit|bankConnections|ledger|counterparties|counterpartyKeys}/{docId}
-// Accounts, transactions, rollups, audit, ledger and counterparties are written by the server only (S05, S06); counterpartyKeys
-// (uniqueness keys) and the root rateLimits are not readable or writable by clients at all.
+//   organizations/{orgId}/{accounts|categories|transactions|rollups|audit|bankConnections|bankAccounts|bankSeen|ledger|counterparties|counterpartyKeys}/{docId}
+// Accounts, transactions, rollups, audit, ledger, counterparties and the bank collections (bankConnections, bankAccounts,
+// bankSeen: S09) are written by the server only (S05, S06, S09). counterpartyKeys (uniqueness keys), bankAccounts and bankSeen
+// (bank sync state) and the root rateLimits are not readable or writable by clients at all.
 //
 // The name `members` is reserved for memberships: the collection-group rule below applies to
 // every collection called `members`. New subcollections must be added to the lists below.
@@ -54,21 +55,19 @@ service cloud.firestore {
       }
 
       match /{subcollection}/{docId} {
+        // bankAccounts and bankSeen match no rule below: closed to clients for reads and writes (deny by default).
         allow read: if (subcollection in ['accounts', 'categories', 'transactions', 'rollups', 'counterparties']
             && hasRole(orgId, ['owner', 'accountant', 'viewer']))
           || (subcollection in ['bankConnections', 'audit'] && hasRole(orgId, ['owner']));
 
-        // The browser writes categories and bank connections only. Accounts, transactions, rollups and the
-        // audit log are written by the server (S05, lib/server/ledger); `ledger/lock` is server-only too.
-        allow create, update: if (subcollection == 'categories'
+        // The browser writes categories only. Accounts, transactions, rollups, the audit log and the bank
+        // collections (bankConnections, bankAccounts, bankSeen: S09) are written by the server (lib/server/ledger,
+        // lib/server/banking); `ledger/lock` is server-only too.
+        allow create, update: if subcollection == 'categories'
             && hasRole(orgId, ['owner', 'accountant'])
-            && orgIdMatchesPath(orgId))
-          || (subcollection == 'bankConnections'
-            && hasRole(orgId, ['owner'])
-            && orgIdMatchesPath(orgId));
+            && orgIdMatchesPath(orgId);
 
-        allow delete: if (subcollection == 'categories' && hasRole(orgId, ['owner', 'accountant']))
-          || (subcollection == 'bankConnections' && hasRole(orgId, ['owner']));
+        allow delete: if subcollection == 'categories' && hasRole(orgId, ['owner', 'accountant']);
       }
     }
 
