@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { notifyLedgerChanged, onLedgerChanged } from '@/lib/api/ledger-events'
 import { bulkChange, bulkDelete, undoBulkChange, undoBulkDelete } from '@/lib/api/journal-actions'
 import type { BulkOutcome } from '@/lib/domain/journal/bulk-input'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
@@ -54,5 +55,22 @@ describe('undo', () => {
   it('undoBulkDelete creates every row again and counts failures', async () => {
     const restore = vi.fn(async () => undefined)
     expect(await undoBulkDelete([tx('a'), tx('b')], { restore })).toEqual({ done: 2, failed: 0 })
+  })
+  it('an undo of many rows tells the journal once, after the last row', async () => {
+    vi.stubGlobal('window', new EventTarget())
+    const seen = vi.fn()
+    const off = onLedgerChanged(seen)
+    const revert = vi.fn(async () => {
+      notifyLedgerChanged()
+      expect(seen).not.toHaveBeenCalled()
+    })
+    await undoBulkChange([tx('a'), tx('b'), tx('c')], { revert })
+    expect(revert).toHaveBeenCalledTimes(3)
+    expect(seen).toHaveBeenCalledTimes(1)
+    const restore = vi.fn(async () => notifyLedgerChanged())
+    await undoBulkDelete([tx('a'), tx('b')], { restore })
+    expect(seen).toHaveBeenCalledTimes(2)
+    off()
+    vi.unstubAllGlobals()
   })
 })

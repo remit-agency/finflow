@@ -1,3 +1,4 @@
+import { withoutNotifications } from '@/lib/api/ledger-events'
 import { revertTransaction, restoreTransaction } from '@/lib/api/transaction-undo'
 import { toUiTransaction } from '@/lib/firebase/ledger-map'
 import type { BulkOutcome } from '@/lib/domain/journal/bulk-input'
@@ -77,7 +78,8 @@ export function undoBulkChange(
   o: { orgId?: string; revert?: (row: LedgerTransaction) => Promise<unknown> } = {},
 ): Promise<UndoResult> {
   const revert = o.revert ?? ((row: LedgerTransaction) => revertTransaction(o.orgId as string, toUiTransaction(o.orgId as string, row)))
-  return each(before, revert)
+  // The single-row undo helpers each notify the journal; one reload at the end is enough.
+  return withoutNotifications(() => each(before, revert))
 }
 
 /** Creates deleted rows again under their own ids. */
@@ -86,5 +88,5 @@ export function undoBulkDelete(
   o: { orgId?: string; restore?: (row: LedgerTransaction) => Promise<unknown> } = {},
 ): Promise<UndoResult> {
   const restore = o.restore ?? ((row: LedgerTransaction) => restoreTransaction(o.orgId as string, toUiTransaction(o.orgId as string, row)))
-  return each(rows, restore)
+  return withoutNotifications(() => each(rows, restore))
 }
