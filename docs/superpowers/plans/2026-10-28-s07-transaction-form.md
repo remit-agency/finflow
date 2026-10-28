@@ -16,6 +16,7 @@
 - Рядок у кінці кожного коміту: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 - Команди з кореня `F:\AI\finflow`. Unit: `npx vitest run <файл>`. Типи: `npx tsc --noEmit`. Lint: `npm run lint` (базова лінія: 13 попереджень, нових бути не має). Інтеграційні: `npx firebase emulators:exec --only firestore --project demo-finflow "npx vitest run --config vitest.integration.config.ts <файл>"`. E2E: `npx firebase emulators:exec --only auth,firestore --project demo-finflow "npx playwright test <файл>"`.
 - Ніколи не вбивати процеси `node` за іменем образа.
+- Емулятори потребують Java: перед командами з `emulators:exec` додати в PATH `C:/Users/Admin/.jre/temurin-21/bin` (лише для оболонки, без змін конфігурації).
 - Тести в `tests/unit/**` запускаються в середовищі node (без DOM): логіку компонентів виносимо в чисті функції.
 - Дати в стані форми й API: рядки `YYYY-MM-DD`; «сьогодні» = Варшава (`todayDay()`), як на сервері.
 
@@ -1127,9 +1128,21 @@ const deps = makeDeps(db)
 const asCreate = (tx: Transaction) => parseTransactionInput(JSON.parse(JSON.stringify(draftToBody(transactionToDraft(tx), tx.id))))
 const asReplace = (tx: Transaction) => parseTransactionPatch(JSON.parse(JSON.stringify(draftToPatch(transactionToDraft(tx)))))
 
+/** Rollup documents as stored, without leaves that hold 0: an edit that moves an amount away from a bucket leaves that bucket at 0, which says the same as no bucket. */
+function withoutZeros(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value
+  const entries = Object.entries(value).flatMap(([key, child]): [string, unknown][] => {
+    const pruned = withoutZeros(child)
+    if (pruned === 0) return []
+    if (typeof pruned === 'object' && pruned !== null && Object.keys(pruned).length === 0) return []
+    return [[key, pruned]]
+  })
+  return Object.fromEntries(entries)
+}
+
 async function rollups(): Promise<Record<string, unknown>> {
   const snap = await db.collection(`organizations/${ORG}/rollups`).get()
-  return Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]))
+  return withoutZeros(Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]))) as Record<string, unknown>
 }
 
 const VOLATILE = ['createdAt', 'updatedAt', 'createdBy', 'updatedBy']
