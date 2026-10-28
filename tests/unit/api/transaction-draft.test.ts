@@ -4,118 +4,80 @@ import {
   buildCreateDraft,
   buildEditDraft,
   categoryAfterTypeChange,
+  stateToDraft,
+  transactionToDraft,
   type FormOwnedDraft,
 } from '@/lib/api/transaction-draft'
+import { initialFormState, type FormState } from '@/lib/domain/transaction-form/state'
 import type { Transaction } from '@/types'
 
-const stored: Transaction = {
+const stored = (over: Partial<Transaction> = {}): Transaction => ({
   id: 'tx1',
   orgId: 'org1',
-  accountId: 'acc1',
-  type: 'income',
+  accountId: 'a1',
+  type: 'expense',
   status: 'actual',
-  amount: 100,
+  amount: 120.5,
   currency: 'PLN',
-  categoryId: 'cat-sales',
-  counterpartyId: 'cp1',
-  date: new Date('2026-10-05T00:00:00.000Z'),
-  accrual: { mode: 'period', from: '2026-10-01', to: '2026-12-31' },
-  description: 'Subscription',
+  date: new Date('2026-10-20T00:00:00.000Z'),
+  accrual: { mode: 'date', date: '2026-10-20' },
   isRecurring: false,
-  projectId: 'proj1',
-  tags: ['q4', 'retainer'],
-  fileUrls: ['https://files.example/invoice.pdf'],
-}
+  tags: [],
+  fileUrls: [],
+  ...over,
+})
 
-/** What the form reports when the user changed only the amount. */
-const onlyAmountChanged: FormOwnedDraft = {
-  type: 'income',
-  accountId: 'acc1',
-  amount: 250,
-  paymentDate: '2026-10-05',
+/** What the form reports; every field it can carry is optional here. */
+const form = (over: Partial<FormOwnedDraft> = {}): FormOwnedDraft => ({
+  type: 'expense',
+  accountId: 'a1',
+  amount: 120.5,
+  paymentDate: '2026-10-20',
   isRecurring: false,
-  categoryId: 'cat-sales',
-  description: 'Subscription',
-}
+  ...over,
+})
 
 describe('buildEditDraft', () => {
-  it('keeps the fields the form does not own when only the amount changes', () => {
-    const draft = buildEditDraft(stored, onlyAmountChanged)
-    expect(draft.amount).toBe(250)
-    expect(draft.categoryId).toBe('cat-sales')
-    expect(draft.counterpartyId).toBe('cp1')
-    expect(draft.projectId).toBe('proj1')
-    expect(draft.tags).toEqual(['q4', 'retainer'])
-    expect(draft.fileUrls).toEqual(['https://files.example/invoice.pdf'])
-    expect(draft.accrual).toEqual({ mode: 'period', from: '2026-10-01', to: '2026-12-31' })
-  })
-
-  it('clears nothing but the amount in the PATCH that is sent', () => {
-    const patch = draftToPatch(buildEditDraft(stored, onlyAmountChanged))
-    expect(patch).toMatchObject({
-      amountMinor: 25000,
-      categoryId: 'cat-sales',
-      counterpartyId: 'cp1',
-      projectId: 'proj1',
-      tags: ['q4', 'retainer'],
-      fileUrls: ['https://files.example/invoice.pdf'],
-      accrual: { mode: 'period', from: '2026-10-01', to: '2026-12-31' },
-    })
-    // Only the fields the form owns may be null (cleared), and they are all set here.
-    expect(Object.entries(patch).filter(([, v]) => v === null).map(([k]) => k).sort()).toEqual([
-      'toAccountId',
-      'toAmountMinor',
-    ])
-  })
-
-  it('drops an accrual that only followed the payment date, so it follows the new date', () => {
-    const followed: Transaction = { ...stored, accrual: { mode: 'date', date: '2026-10-05' } }
-    const draft = buildEditDraft(followed, { ...onlyAmountChanged, paymentDate: '2026-10-09' })
-    expect(draft.accrual).toBeUndefined()
-    expect(draftToPatch(draft).accrual).toBeNull()
-  })
-
-  it('keeps a single-date accrual that differs from the payment date', () => {
-    const own: Transaction = { ...stored, accrual: { mode: 'date', date: '2026-09-30' } }
-    expect(buildEditDraft(own, onlyAmountChanged).accrual).toEqual({ mode: 'date', date: '2026-09-30' })
-  })
-
-  it('lets the form clear what it owns (category, description)', () => {
-    const cleared: FormOwnedDraft = { ...onlyAmountChanged, categoryId: undefined, description: undefined }
-    const draft = buildEditDraft(stored, cleared)
-    expect(draft.categoryId).toBeUndefined()
-    const patch = draftToPatch(draft)
-    expect(patch.categoryId).toBeNull()
-    expect(patch.description).toBeNull()
-  })
-
-  it('does not carry a counterparty or an accrual into a transfer, which the server refuses', () => {
-    const transfer: FormOwnedDraft = {
-      type: 'transfer',
-      accountId: 'acc1',
-      toAccountId: 'acc2',
-      amount: 250,
-      paymentDate: '2026-10-05',
-      isRecurring: false,
-    }
-    const draft = buildEditDraft(stored, transfer)
+  it('carries only what the form does not show: project, tags and files', () => {
+    const tx = stored({ projectId: 'p1', tags: ['q4'], fileUrls: ['https://x/f.pdf'], counterpartyId: 'c-old' })
+    const draft = buildEditDraft(tx, form({ amount: 99 }))
+    expect(draft).toMatchObject({ amount: 99, projectId: 'p1', tags: ['q4'], fileUrls: ['https://x/f.pdf'] })
+    // the counterparty and accrual now come from the form, never from the stored operation
     expect(draft.counterpartyId).toBeUndefined()
     expect(draft.accrual).toBeUndefined()
-    expect(draft.categoryId).toBeUndefined()
-    expect(draft.projectId).toBe('proj1')
-    expect(draft.tags).toEqual(['q4', 'retainer'])
+  })
+
+  it('sends the counterparty, accrual and status the form holds', () => {
+    const draft = buildEditDraft(
+      stored(),
+      form({ counterpartyId: 'c1', accrual: { mode: 'period', from: '2026-10-01', to: '2026-12-31' }, status: 'planned' }),
+    )
+    expect(draft).toMatchObject({
+      counterpartyId: 'c1',
+      accrual: { mode: 'period', from: '2026-10-01', to: '2026-12-31' },
+      status: 'planned',
+    })
+  })
+
+  it('lets the form clear what it owns (category, description, counterparty)', () => {
+    const tx = stored({ categoryId: 'c1', description: 'x', counterpartyId: 'cp1' })
+    const patch = draftToPatch(buildEditDraft(tx, form({})))
+    expect(patch).toMatchObject({ categoryId: null, description: null, counterpartyId: null })
   })
 
   it('does not mutate the stored operation through the carried arrays', () => {
-    const draft = buildEditDraft(stored, onlyAmountChanged)
-    draft.tags.push('x')
-    expect(stored.tags).toEqual(['q4', 'retainer'])
+    const tx = stored({ tags: ['a'], fileUrls: ['u'] })
+    const draft = buildEditDraft(tx, form({}))
+    draft.tags.push('b')
+    draft.fileUrls.push('v')
+    expect(tx.tags).toEqual(['a'])
+    expect(tx.fileUrls).toEqual(['u'])
   })
 })
 
 describe('buildCreateDraft', () => {
   it('starts a new operation with no tags or files', () => {
-    expect(buildCreateDraft(onlyAmountChanged)).toMatchObject({ amount: 250, tags: [], fileUrls: [] })
+    expect(buildCreateDraft(form({ amount: 250 }))).toMatchObject({ amount: 250, tags: [], fileUrls: [] })
   })
 })
 
@@ -126,5 +88,111 @@ describe('categoryAfterTypeChange', () => {
 
   it('keeps the category when the type is the same (and on mount, where nothing changed)', () => {
     expect(categoryAfterTypeChange('cat-sales', 'income', 'income')).toBe('cat-sales')
+  })
+})
+
+describe('stateToDraft', () => {
+  const state = (over: Partial<FormState> = {}): FormState => ({
+    ...initialFormState({ defaultType: 'expense', defaultAccountId: 'a1', today: '2026-10-28', formatAmount: String }),
+    amount: '1 234,50',
+    ...over,
+  })
+
+  it('an expense: parsed amount, category, counterparty, trimmed description', () => {
+    expect(
+      stateToDraft(state({ categoryId: 'c1', counterpartyId: 'cp1', description: '  Czynsz ' }), {
+        today: '2026-10-28',
+        crossCurrency: false,
+      }),
+    ).toEqual({
+      type: 'expense',
+      status: 'actual',
+      accountId: 'a1',
+      amount: 1234.5,
+      paymentDate: '2026-10-28',
+      isRecurring: false,
+      categoryId: 'c1',
+      counterpartyId: 'cp1',
+      description: 'Czynsz',
+    })
+  })
+
+  it('a future payment date is sent as planned, whatever was chosen', () => {
+    const draft = stateToDraft(state({ paymentDate: '2026-11-15' }), { today: '2026-10-28', crossCurrency: false })
+    expect(draft.status).toBe('planned')
+  })
+
+  it('an own accrual is sent only when the switch is on', () => {
+    const on = { on: true, mode: 'period' as const, date: null, from: '2026-10-01', to: '2026-12-31' }
+    expect(stateToDraft(state({ accrual: on }), { today: '2026-10-28', crossCurrency: false }).accrual).toEqual({
+      mode: 'period',
+      from: '2026-10-01',
+      to: '2026-12-31',
+    })
+    expect(stateToDraft(state(), { today: '2026-10-28', crossCurrency: false }).accrual).toBeUndefined()
+  })
+
+  it('a transfer sends the target account, the second amount only across currencies, and no category, counterparty or accrual', () => {
+    const base = state({
+      type: 'transfer',
+      toAccountId: 'a2',
+      toAmount: '100',
+      categoryId: 'c1',
+      counterpartyId: 'cp1',
+      accrual: { on: true, mode: 'date', date: '2026-10-01', from: '', to: '' },
+    })
+    const same = stateToDraft(base, { today: '2026-10-28', crossCurrency: false })
+    expect(same).toMatchObject({ type: 'transfer', toAccountId: 'a2' })
+    for (const key of ['toAmount', 'categoryId', 'counterpartyId', 'accrual']) expect(key in same).toBe(false)
+    expect(stateToDraft(base, { today: '2026-10-28', crossCurrency: true }).toAmount).toBe(100)
+  })
+})
+
+describe('transactionToDraft', () => {
+  it('reproduces a stored expense in full, so that a create or a full replace restores it', () => {
+    const tx = stored({
+      categoryId: 'c1',
+      counterpartyId: 'cp1',
+      description: 'Czynsz',
+      projectId: 'p1',
+      tags: ['q4'],
+      fileUrls: ['https://x/f.pdf'],
+      accrual: { mode: 'period', from: '2026-10-01', to: '2026-12-31' },
+    })
+    expect(transactionToDraft(tx)).toEqual({
+      type: 'expense',
+      status: 'actual',
+      accountId: 'a1',
+      amount: 120.5,
+      paymentDate: '2026-10-20',
+      isRecurring: false,
+      categoryId: 'c1',
+      counterpartyId: 'cp1',
+      description: 'Czynsz',
+      projectId: 'p1',
+      tags: ['q4'],
+      fileUrls: ['https://x/f.pdf'],
+      accrual: { mode: 'period', from: '2026-10-01', to: '2026-12-31' },
+    })
+  })
+
+  it('leaves out an accrual that only followed the payment date, so it follows again', () => {
+    expect(transactionToDraft(stored()).accrual).toBeUndefined()
+  })
+
+  it('a transfer carries its target, the second amount only across currencies, and no accrual or counterparty', () => {
+    const cross = transactionToDraft(
+      stored({ type: 'transfer', toAccountId: 'a2', toAmount: 28, toCurrency: 'EUR', accrual: { mode: 'date', date: '2026-10-01' } }),
+    )
+    expect(cross).toMatchObject({ toAccountId: 'a2', toAmount: 28 })
+    expect('accrual' in cross).toBe(false)
+    const same = transactionToDraft(stored({ type: 'transfer', toAccountId: 'a2', toAmount: 120.5, toCurrency: 'PLN' }))
+    expect('toAmount' in same).toBe(false)
+  })
+
+  it('does not share the arrays with the stored operation', () => {
+    const tx = stored({ tags: ['a'] })
+    transactionToDraft(tx).tags.push('b')
+    expect(tx.tags).toEqual(['a'])
   })
 })
