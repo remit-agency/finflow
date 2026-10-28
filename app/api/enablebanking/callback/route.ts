@@ -25,7 +25,8 @@ function redirectTo(req: Request, path: string): Response {
 // then the session must belong to the same user as the state, then membership is checked.
 // All of that happens BEFORE the code is exchanged.
 // Bank connections are owner-only. On success the session is saved on the server (S09) and the
-// redirect carries `?eb_connected=1` only: the session id never reaches the browser.
+// redirect carries `?eb_connected=1` only. The session id does reach the members of the company, as the
+// connection id in `GET /api/orgs/{orgId}/bank`: a non-secret handle; using it needs the app's private key.
 export async function GET(req: Request) {
   const params = new URL(req.url).searchParams
   const code = params.get('code')
@@ -79,7 +80,7 @@ export async function GET(req: Request) {
 
     const data = await res.json()
     if (typeof data.session_id !== 'string') throw new Error('no session_id')
-    // S09: the server reads the session (accounts, validUntil) and keeps it; the browser never handles the session id.
+    // S09: the server reads the session (accounts, validUntil) and keeps it; the redirect does not carry the session id.
     const deps = bankDeps(req)
     const session = await deps.eb.getSession(data.session_id)
     await banking.saveSession(deps, orgId, verified.uid, session)
