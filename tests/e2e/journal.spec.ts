@@ -182,6 +182,42 @@ test.describe('journal (emulators)', () => {
     await expect(page.getByText('Операцій ще немає')).toHaveCount(0)
   })
 
+  test('an empty page with a cursor keeps searching instead of saying nothing matches', async ({ page, request }) => {
+    const user = await setup(page, request, 'jr-cap')
+    await seedLedgerOperation(request, user.orgId, 'tx-old', { type: 'expense', accountId: 'acc-main', amount: 20, currency: 'PLN', date: daysAgo(3), description: 'Dawna operacja' })
+    await page.goto(`/${user.orgId}/transactions`)
+    await expect(rowsOf(page)).toHaveCount(1)
+
+    // The server stops a scan at its cap and answers no rows with a cursor. Requests without a cursor get that
+    // answer (the dev build may send the first one twice); the one that follows the cursor is held until the test
+    // lets it through, and then asks the real server for the first page.
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    let capped = true
+    let followed = 0
+    await page.route('**/api/orgs/*/journal?*', async (route) => {
+      const url = new URL(route.request().url())
+      if (capped && !url.searchParams.has('cursor')) {
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ rows: [], next: 'x' }) })
+        return
+      }
+      followed++
+      await gate
+      capped = false
+      url.searchParams.delete('cursor')
+      await route.continue({ url: url.toString() })
+    })
+    await page.reload()
+    await expect(page.getByText('Шукаємо серед старіших операцій…')).toBeVisible()
+    await expect(page.getByText('Нічого не знайдено')).toHaveCount(0)
+    await expect(page.getByText('Операцій ще немає')).toHaveCount(0)
+    release()
+    await expect(rowsOf(page)).toHaveCount(1)
+    await expect(page.getByText('Шукаємо серед старіших операцій…')).toHaveCount(0)
+    await expect(page.getByText('Нічого не знайдено')).toHaveCount(0)
+    expect(followed).toBeGreaterThanOrEqual(1)
+  })
+
   test('on a phone the two selects share a row, keep their width and the category chip is there', async ({ page, request }) => {
     const user = await setup(page, request, 'jr-phone')
     await seedLedgerOperation(request, user.orgId, 'tx-p', { type: 'expense', accountId: 'acc-main', amount: 25, currency: 'PLN', date: daysAgo(1), description: 'Bez kategorii' })

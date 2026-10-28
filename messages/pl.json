@@ -255,7 +255,9 @@
       "fillSave": "Zapisz",
       "selectAll": "Zaznacz wszystkie wiersze",
       "selectRow": "Zaznacz {account}: {amount}, {date}",
-      "loadingMore": "Wczytywanie kolejnych…"
+      "loadingMore": "Wczytywanie kolejnych…",
+      "searching": "Szukamy wśród starszych operacji…",
+      "loadMoreRetry": "Nie udało się wczytać, ponów"
     },
     "selection": {
       "region": "Zaznaczone operacje",

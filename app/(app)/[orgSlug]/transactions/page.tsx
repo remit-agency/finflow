@@ -50,7 +50,7 @@ export default function TransactionsPage() {
   const filters = useMemo(() => ({ ...urlView.filters, accountId: selectedAccountId ?? undefined }), [urlView, selectedAccountId])
   const view: JournalView = { filters, period: urlView.period }
 
-  const { rows, loading, error, hasMore, loadingMore, loadMore } = useJournal(orgId, filters)
+  const { rows, loading, error, hasMore, loadingMore, moreError, loadMore } = useJournal(orgId, filters)
   const selection = useJournalSelection(`${orgId}|${query}|${selectedAccountId ?? ''}`)
 
   const canEdit = can('data.write')
@@ -236,6 +236,7 @@ export default function TransactionsPage() {
         selection={selection}
         hasMore={hasMore}
         loadingMore={loadingMore}
+        moreError={moreError}
         onLoadMore={loadMore}
         onFill={fill}
       />

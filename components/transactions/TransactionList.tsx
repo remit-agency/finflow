@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { ReceiptText } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { LazyTransactionForm } from '@/components/forms/lazy'
 import { FillChip } from '@/components/transactions/FillChip'
@@ -43,6 +44,8 @@ interface TransactionListProps {
   selection: { has: (id: string) => boolean; toggle: (id: string) => void; add: (ids: string[]) => void; remove: (ids: string[]) => void }
   hasMore: boolean
   loadingMore: boolean
+  /** The last «load more» failed: the sentinel stops asking by itself and a button asks again. */
+  moreError: boolean
   onLoadMore: () => void
   /** Sets one category or counterparty from a «вкажіть» chip; rejects when the server refused. */
   onFill: (tx: Transaction, field: 'category' | 'counterparty', value: string) => Promise<void>
@@ -62,6 +65,7 @@ export function TransactionList({
   selection,
   hasMore,
   loadingMore,
+  moreError,
   onLoadMore,
   onFill,
 }: TransactionListProps) {
@@ -80,7 +84,8 @@ export function TransactionList({
   const sentinel = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = sentinel.current
-    if (!el || !hasMore) return
+    // After a failed page the observer stays off (it would re-ask at once and loop); the retry button asks again.
+    if (!el || !hasMore || moreError) return
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) onLoadMore()
@@ -89,7 +94,7 @@ export function TransactionList({
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [hasMore, onLoadMore, loadingMore, loading, hasRows])
+  }, [hasMore, onLoadMore, loadingMore, moreError, loading, hasRows])
 
   // The amount cell exists twice (a column from `sm`, a trailing cell below it) and both read from here.
   // A transfer between currencies shows what left and what arrived.
@@ -144,7 +149,35 @@ export function TransactionList({
   const keys = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
   const allIds = keys.flatMap((k) => grouped[k].map((tx) => tx.id))
 
+  // Under the table (or under the «searching» message): the sentinel that pages on, the loading hint, the retry.
+  const footer = (
+    <>
+      <div ref={sentinel} aria-hidden className="h-4" />
+      {loadingMore && <p className="py-3 text-center text-sm text-ink-muted">{t('loadingMore')}</p>}
+      {moreError && !loadingMore && (
+        <div className="flex justify-center py-3">
+          <Button type="button" variant="outline" size="sm" onClick={onLoadMore}>
+            {t('loadMoreRetry')}
+          </Button>
+        </div>
+      )}
+    </>
+  )
+
   if (keys.length === 0) {
+    // The server stops a scan at its cap and answers no rows with a cursor: older operations may still match, so
+    // this is not «nothing found» yet. The sentinel keeps paging until rows appear or the cursor runs out.
+    if (hasMore) {
+      return (
+        <>
+          <div role="status" className="flex flex-col items-center justify-center rounded-panel border border-dashed border-line bg-surface py-16 text-center">
+            <ReceiptText className="mb-4 size-12 text-ink-subtle" />
+            <p className="font-medium text-ink">{t('searching')}</p>
+          </div>
+          {footer}
+        </>
+      )
+    }
     return (
       <div className="flex flex-col items-center justify-center rounded-panel border border-dashed border-line bg-surface py-16 text-center">
         <ReceiptText className="mb-4 size-12 text-ink-subtle" />
@@ -352,8 +385,7 @@ export function TransactionList({
           })}
         </Table>
       </div>
-      <div ref={sentinel} aria-hidden className="h-4" />
-      {loadingMore && <p className="py-3 text-center text-sm text-ink-muted">{t('loadingMore')}</p>}
+      {footer}
 
       {canEdit && editTx && (
         <LazyTransactionForm

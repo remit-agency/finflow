@@ -255,7 +255,9 @@
       "fillSave": "Зберегти",
       "selectAll": "Вибрати всі рядки",
       "selectRow": "Вибрати {account}: {amount}, {date}",
-      "loadingMore": "Завантажуємо ще…"
+      "loadingMore": "Завантажуємо ще…",
+      "searching": "Шукаємо серед старіших операцій…",
+      "loadMoreRetry": "Не вдалося підвантажити, повторити"
     },
     "selection": {
       "region": "Вибрані операції",

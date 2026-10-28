@@ -255,7 +255,9 @@
       "fillSave": "Save",
       "selectAll": "Select all rows",
       "selectRow": "Select {account}: {amount}, {date}",
-      "loadingMore": "Loading more…"
+      "loadingMore": "Loading more…",
+      "searching": "Searching older operations…",
+      "loadMoreRetry": "Could not load more, retry"
     },
     "selection": {
       "region": "Selected operations",
