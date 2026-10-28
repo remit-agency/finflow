@@ -62,6 +62,16 @@ describe('toUiTransaction', () => {
     }
   })
 
+  it('carries the bank block to the UI transaction and leaves a manual one without it', () => {
+    const { toAccountId, toAmountMinor, toCurrency, ...expense } = base
+    void toAccountId
+    void toAmountMinor
+    void toCurrency
+    const bank = { accountRef: 'ba1', counterpartyName: 'ACME' }
+    expect(toUiTransaction('org1', { ...expense, type: 'expense', bank }).bank).toEqual(bank)
+    expect('bank' in toUiTransaction('org1', { ...expense, type: 'expense' })).toBe(false)
+  })
+
   it('does not add destination fields to an income', () => {
     const { toAccountId, toAmountMinor, toCurrency, ...rest } = base
     void toAccountId

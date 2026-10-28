@@ -75,6 +75,7 @@ export function TransactionList({
   onFill,
 }: TransactionListProps) {
   const t = useTranslations('journal.list')
+  const tJournal = useTranslations('journal')
   const tAccountTypes = useTranslations('common.accountTypes')
   const { locale, money, date: formatDate } = useFormatters()
   const categoryLabel = useCategoryName()
@@ -287,6 +288,11 @@ export function TransactionList({
                   const balance = balances[tx.id]
                   const accrual = accrualText(tx)
                   const canFill = canEdit && tx.type !== 'transfer'
+                  const showFill = !counterparty && canFill
+                  // The bank's name for the other party is only a hint: shown muted until a real counterparty is set.
+                  const bankName = !counterparty && tx.bank?.counterpartyName ? tx.bank.counterpartyName : null
+                  // The counterparty cell has a line when there is a counterparty, a fill chip or a bank operation (its mark).
+                  const counterpartyLine = !!counterparty || showFill || !!tx.bank
                   const planned = tx.status === 'planned'
                   // A planned operation has not moved any money: its amount is neutral grey (the sign stays), not green or red.
                   const amountClass = planned ? 'text-ink-muted' : amount.className
@@ -394,18 +400,29 @@ export function TransactionList({
                         )}
                       </TableCell>
                       <TableCell className="hidden pr-2 text-ink-muted md:table-cell">
-                        {counterparty ? (
-                          <span className="block max-w-72 truncate text-ink">{counterparty.name}</span>
-                        ) : canFill ? (
-                          <FillChip
-                            field="counterparty"
-                            categories={[]}
-                            counterparties={counterparties}
-                            onSave={(value) => onFill(tx, 'counterparty', value)}
-                          />
-                        ) : null}
+                        {/* One line: the bank mark, then the counterparty (or the bank's name for it, muted), then the «вкажіть» chip. */}
+                        {counterpartyLine && (
+                          <span className="flex max-w-72 items-center gap-2">
+                            {tx.bank && <Badge variant="chip" className="shrink-0">{tJournal('fromBank')}</Badge>}
+                            {counterparty ? (
+                              <span className="min-w-0 truncate text-ink">{counterparty.name}</span>
+                            ) : bankName ? (
+                              <span className="min-w-0 truncate text-ink-muted" title={bankName}>
+                                {bankName}
+                              </span>
+                            ) : null}
+                            {showFill && (
+                              <FillChip
+                                field="counterparty"
+                                categories={[]}
+                                counterparties={counterparties}
+                                onSave={(value) => onFill(tx, 'counterparty', value)}
+                              />
+                            )}
+                          </span>
+                        )}
                         {/* A dash only when nothing else fills the cell. */}
-                        {(tx.description || (!counterparty && !canFill)) && (
+                        {(tx.description || !counterpartyLine) && (
                           <span className="block max-w-72 truncate">{tx.description || '—'}</span>
                         )}
                       </TableCell>

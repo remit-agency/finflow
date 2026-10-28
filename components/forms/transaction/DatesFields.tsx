@@ -13,10 +13,12 @@ interface Props {
   /** False for a transfer: it has no accrual. */
   showAccrual: boolean
   errors: FormErrors
+  /** The payment date of a bank operation cannot change. */
+  paymentLocked?: boolean
   onChange: (patch: Partial<FormState>) => void
 }
 
-export function DatesFields({ paymentDate, accrual, showAccrual, errors, onChange }: Props) {
+export function DatesFields({ paymentDate, accrual, showAccrual, errors, paymentLocked = false, onChange }: Props) {
   const t = useTranslations('forms.transaction')
   const dateProps = { placeholder: t('datePlaceholder'), calendarLabel: t('openCalendar') }
   const setAccrual = (patch: Partial<AccrualState>) => onChange({ accrual: { ...accrual, ...patch } })
@@ -25,7 +27,13 @@ export function DatesFields({ paymentDate, accrual, showAccrual, errors, onChang
     <div className="space-y-3">
       <div className="space-y-1">
         <Label htmlFor="tx-date">{t('date')}</Label>
-        <DateField id="tx-date" value={paymentDate} onChange={(paymentDate) => onChange({ paymentDate })} {...dateProps} />
+        <DateField
+          id="tx-date"
+          value={paymentDate}
+          onChange={(paymentDate) => onChange({ paymentDate })}
+          disabled={paymentLocked}
+          {...dateProps}
+        />
         {errors.paymentDate && <p className="text-xs text-expense">{t(`errors.${errors.paymentDate}`)}</p>}
       </div>
 

@@ -223,6 +223,7 @@
     }
   },
   "journal": {
+    "fromBank": "z banku",
     "title": "Płatności",
     "showAllAccounts": "Pokaż wszystkie konta",
     "loadError": "Nie udało się wczytać dziennika operacji. Spróbuj ponownie.",
@@ -326,6 +327,7 @@
       "undone": "Przywrócono: {count}",
       "undoFailed": "Nie udało się cofnąć wszystkiego",
       "errors": {
+        "bank_locked": "Operacja z banku: ta zmiana jest zabroniona",
         "counterparty_archived": "Kontrahent jest w archiwum",
         "counterparty_not_found": "Nie znaleziono kontrahenta",
         "category_not_found": "Kategoria nie pasuje do tej operacji",
@@ -381,6 +383,7 @@
   },
   "forms": {
     "transaction": {
+      "bankLockedHint": "Operacja z banku: nie można zmienić kwoty, daty płatności, rachunku ani typu.",
       "titleNew": "Nowa operacja",
       "titleEdit": "Edytuj operację",
       "income": "Wpływ",
@@ -448,6 +451,7 @@
         "accrualFrom": "Podaj początek okresu",
         "accrualTo": "Podaj koniec okresu",
         "accrualOrder": "Początek okresu nie może być późniejszy niż jego koniec",
+        "bankLocked": "Ta operacja pochodzi z banku: nie można zmienić kwoty, daty płatności ani rachunku",
         "counterpartyArchived": "Kontrahent jest w archiwum. Wybierz innego",
         "counterpartyMissing": "Nie znaleziono kontrahenta",
         "delete": "Nie udało się usunąć operacji. Spróbuj ponownie."

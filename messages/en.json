@@ -223,6 +223,7 @@
     }
   },
   "journal": {
+    "fromBank": "from bank",
     "title": "Payments",
     "showAllAccounts": "Show all accounts",
     "loadError": "The journal could not be loaded. Try again.",
@@ -326,6 +327,7 @@
       "undone": "Restored: {count}",
       "undoFailed": "Could not undo everything",
       "errors": {
+        "bank_locked": "Bank transaction: this change is not allowed",
         "counterparty_archived": "The counterparty is archived",
         "counterparty_not_found": "The counterparty was not found",
         "category_not_found": "The category does not fit this operation",
@@ -381,6 +383,7 @@
   },
   "forms": {
     "transaction": {
+      "bankLockedHint": "Bank transaction: the amount, payment date, account and type cannot be changed.",
       "titleNew": "New transaction",
       "titleEdit": "Edit transaction",
       "income": "Income",
@@ -448,6 +451,7 @@
         "accrualFrom": "Enter the start of the period",
         "accrualTo": "Enter the end of the period",
         "accrualOrder": "The period cannot end before it starts",
+        "bankLocked": "This transaction was imported from the bank: the amount, payment date and account cannot be changed",
         "counterpartyArchived": "The counterparty is archived. Choose another one",
         "counterpartyMissing": "The counterparty was not found",
         "delete": "Could not delete the transaction. Try again."

@@ -38,5 +38,6 @@ export function toUiTransaction(orgId: string, tx: LedgerTransaction): Transacti
   if (tx.counterpartyId !== undefined) ui.counterpartyId = tx.counterpartyId
   if (tx.description !== undefined) ui.description = tx.description
   if (tx.projectId !== undefined) ui.projectId = tx.projectId
+  if (tx.bank !== undefined) ui.bank = tx.bank
   return ui
 }
