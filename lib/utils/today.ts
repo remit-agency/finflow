@@ -16,3 +16,8 @@ export function todayUtcDay(now: Date = new Date()): Date {
   const part = (type: 'year' | 'month' | 'day') => Number(parts.find((p) => p.type === type)?.value)
   return new Date(Date.UTC(part('year'), part('month') - 1, part('day')))
 }
+
+/** `todayUtcDay` as the `YYYY-MM-DD` string the ledger API and the forms use. */
+export function todayDay(now: Date = new Date()): string {
+  return todayUtcDay(now).toISOString().slice(0, 10)
+}
