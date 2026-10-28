@@ -39,7 +39,8 @@ export async function linkBankAccount(orgId: string, body: LinkRequest): Promise
     body: JSON.stringify(body),
   })
   if (!res.ok) throw await readApiError(res)
-  notifyBankChanged()
+  // Not announced here: the status refresh it would trigger races the first sync the link dialog starts next, and the
+  // auto-sync would win the lock. syncBankAccount announces when it ends.
   return (await res.json()) as { bankAccountId: string; accountId: string }
 }
 

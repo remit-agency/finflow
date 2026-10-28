@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { createEmulatorUser, verifyEmailInEmulator } from './helpers/emulator-auth'
+import { listDocs } from './helpers/emulator-firestore'
 
 const ORIGIN = 'http://localhost:3000'
 const PASSWORD = 'session-pass-123'
@@ -208,28 +209,25 @@ test.describe('server session (emulators)', () => {
     expect(await alive.json()).toEqual({ error: 'email_not_verified' })
   })
 
-  test('settings ignores an eb_auth link that this tab did not start', async ({ page }) => {
+  test('a legacy eb_auth link saves nothing: the browser flow is gone, the server saves the session', async ({ page, request }) => {
     const { orgId } = await registerViaUi(page)
     const planted = Buffer.from(JSON.stringify({ sessionId: 'attacker-session' })).toString('base64url')
 
     await page.goto(`/${orgId}/settings/banks?eb_auth=${planted}`)
 
-    await expect(page.getByText('Підключення не підтверджено')).toBeVisible()
-    expect(new URL(page.url()).searchParams.has('eb_auth')).toBe(false)
-    // Nothing was saved: no connection row (it would be named "Банк" without a pending entry).
-    await expect(page.getByText('Банк', { exact: true })).toHaveCount(0)
-    await expect(page.getByText(/підключено$/)).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Підключити банк' })).toBeVisible()
+    await expect(page.getByTestId('bank-status')).toHaveCount(0)
+    expect(await listDocs(request, `organizations/${orgId}/bankConnections`)).toHaveLength(0)
   })
 
   test('the old settings URL sends a bank return value to the Banks section', async ({ page }) => {
     const { orgId } = await registerViaUi(page)
-    const planted = Buffer.from(JSON.stringify({ sessionId: 'attacker-session' })).toString('base64url')
 
-    await page.goto(`/${orgId}/settings?eb_auth=${planted}`)
+    await page.goto(`/${orgId}/settings?eb_error=1`)
 
     await page.waitForURL(new RegExp(`/${orgId}/settings/banks`))
-    await expect(page.getByText('Підключення не підтверджено')).toBeVisible()
-    expect(new URL(page.url()).searchParams.has('eb_auth')).toBe(false)
+    await expect(page.getByText('Помилка підключення банку')).toBeVisible()
+    expect(new URL(page.url()).searchParams.has('eb_error')).toBe(false)
   })
 
   test('login ignores an off-site ?redirect= and honours the app return path after re-login', async ({ page }) => {

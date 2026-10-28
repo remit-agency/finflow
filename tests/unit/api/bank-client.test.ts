@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const notify = vi.fn()
 vi.mock('@/lib/api/ledger-events', () => ({ notifyLedgerChanged: () => notify() }))
 
-import { syncBankAccount } from '@/lib/api/bank-client'
+import { linkBankAccount, syncBankAccount } from '@/lib/api/bank-client'
 
 function step(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -39,5 +39,17 @@ describe('syncBankAccount', () => {
     expect(await syncBankAccount('org1', 'ba1')).toMatchObject({ busy: true, imported: 0 })
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(step({ error: 'consent_expired' }, 409)))
     await expect(syncBankAccount('org1', 'ba1')).rejects.toMatchObject({ code: 'consent_expired', status: 409 })
+  })
+})
+
+describe('linkBankAccount', () => {
+  it('does not announce the change before its first sync: the sync that follows does, so the auto-sync cannot race it', async () => {
+    const target = new EventTarget()
+    vi.stubGlobal('window', target)
+    const announced = vi.fn()
+    target.addEventListener('finflow:bank-changed', announced)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(step({ bankAccountId: 'ba1', accountId: 'a1' }, 201)))
+    await linkBankAccount('org1', { connectionId: 'c1', ebAccountUid: 'u1', mode: 'create', name: 'Konto', importFrom: '2026-01-01' })
+    expect(announced).not.toHaveBeenCalled()
   })
 })
