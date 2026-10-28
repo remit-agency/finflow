@@ -269,6 +269,8 @@
       "accrualDate": "Data transakcji",
       "accrualFrom": "Okres od",
       "accrualTo": "Okres do",
+      "datePlaceholder": "DD.MM.RRRR",
+      "openCalendar": "Otwórz kalendarz",
       "accrualHint": "Operacja będzie liczona w P&L w podanym okresie",
       "counterparty": "Kontrahent",
       "rateHint": "≈ {amount} według kursu NBP z {date}",

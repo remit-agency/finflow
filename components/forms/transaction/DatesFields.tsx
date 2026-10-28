@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Input } from '@/components/ui/input'
+import { DateField } from '@/components/ui/date-field'
 import { Label } from '@/components/ui/label'
 import { Segmented } from '@/components/ui/segmented'
 import type { AccrualState } from '@/lib/domain/transaction-form/accrual'
@@ -18,13 +18,14 @@ interface Props {
 
 export function DatesFields({ paymentDate, accrual, showAccrual, errors, onChange }: Props) {
   const t = useTranslations('forms.transaction')
+  const dateProps = { placeholder: t('datePlaceholder'), calendarLabel: t('openCalendar') }
   const setAccrual = (patch: Partial<AccrualState>) => onChange({ accrual: { ...accrual, ...patch } })
 
   return (
     <div className="space-y-3">
       <div className="space-y-1">
         <Label htmlFor="tx-date">{t('date')}</Label>
-        <Input id="tx-date" type="date" value={paymentDate} onChange={(e) => onChange({ paymentDate: e.target.value })} />
+        <DateField id="tx-date" value={paymentDate} onChange={(paymentDate) => onChange({ paymentDate })} {...dateProps} />
         {errors.paymentDate && <p className="text-xs text-expense">{t(`errors.${errors.paymentDate}`)}</p>}
       </div>
 
@@ -59,31 +60,31 @@ export function DatesFields({ paymentDate, accrual, showAccrual, errors, onChang
               {accrual.mode === 'date' ? (
                 <div className="space-y-1">
                   <Label htmlFor="tx-accrual-date">{t('accrualDate')}</Label>
-                  <Input
+                  <DateField
                     id="tx-accrual-date"
-                    type="date"
                     value={accrual.date ?? paymentDate}
-                    onChange={(e) => setAccrual({ date: e.target.value })}
+                    onChange={(date) => setAccrual({ date })}
+                    {...dateProps}
                   />
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label htmlFor="tx-accrual-from">{t('accrualFrom')}</Label>
-                    <Input
+                    <DateField
                       id="tx-accrual-from"
-                      type="date"
                       value={accrual.from}
-                      onChange={(e) => setAccrual({ from: e.target.value })}
+                      onChange={(from) => setAccrual({ from })}
+                      {...dateProps}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="tx-accrual-to">{t('accrualTo')}</Label>
-                    <Input
+                    <DateField
                       id="tx-accrual-to"
-                      type="date"
                       value={accrual.to}
-                      onChange={(e) => setAccrual({ to: e.target.value })}
+                      onChange={(to) => setAccrual({ to })}
+                      {...dateProps}
                     />
                   </div>
                 </div>

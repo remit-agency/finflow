@@ -100,6 +100,31 @@ async function openRow(page: Page, description: string): Promise<Locator> {
 test.describe('transaction form (emulators)', () => {
   test.skip(!process.env.FIREBASE_AUTH_EMULATOR_HOST || !process.env.FIRESTORE_EMULATOR_HOST, NEEDS_EMULATORS)
 
+  test('dates can be typed by hand as DD.MM.YYYY', async ({ page, request }) => {
+    const user = await setup(page, request, 'txf-typed-dates')
+    const dialog = await openNewForm(page, 'Витрата')
+
+    await dialog.locator('#tx-amount').fill('50')
+    await dialog.getByRole('checkbox', { name: 'Дата транзакції інша' }).check()
+    // Digits only: the dots appear by themselves, and a click selects the prefilled date so typing replaces it.
+    const accrual = dialog.locator('#tx-accrual-date')
+    await accrual.click()
+    await accrual.pressSequentially('01102026')
+    await expect(accrual).toHaveValue('01.10.2026')
+    // A date that does not exist is refused instead of being guessed.
+    await accrual.fill('')
+    await accrual.pressSequentially('31022026')
+    await dialog.getByRole('button', { name: 'Додати', exact: true }).click()
+    await expect(dialog).toBeVisible()
+    expect(await transactions(request, user)).toHaveLength(0)
+
+    await accrual.fill('')
+    await accrual.pressSequentially('01102026')
+    await dialog.getByRole('button', { name: 'Додати', exact: true }).click()
+    await expect(dialog).toBeHidden()
+    await expect.poll(async () => (await transactions(request, user)).length).toBe(1)
+  })
+
   test('an expense with a period and a new counterparty', async ({ page, request }) => {
     const user = await setup(page, request, 'txf-period')
     const dialog = await openNewForm(page, 'Витрата')
@@ -187,7 +212,7 @@ test.describe('transaction form (emulators)', () => {
       'true',
     )
     const today = todayDay()
-    await expect(dialog.locator('#tx-date')).toHaveValue(today)
+    await expect(dialog.locator('#tx-date')).toHaveValue(today.split('-').reverse().join('.'))
     await dialog.getByRole('button', { name: 'Зберегти', exact: true }).click()
     await expect(dialog).toBeHidden()
 
