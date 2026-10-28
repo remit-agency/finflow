@@ -34,6 +34,16 @@ export interface Base {
   accrual: number
 }
 
+/** Where an operation imported from a bank came from (S09). Absent on a manual operation. */
+export interface BankInfo {
+  /** Id of the `bankAccounts` document the operation was imported through. */
+  accountRef: string
+  entryReference?: string
+  /** The other party as the bank names it (not a FinFlow counterparty). */
+  counterpartyName?: string
+  remittance?: string
+}
+
 export interface LedgerTransaction {
   id: string
   type: TxType
@@ -58,6 +68,7 @@ export interface LedgerTransaction {
   /** Only actual income/expense in a currency other than the company's. */
   fx?: Fx
   base?: Base
+  bank?: BankInfo
 }
 
 export interface LedgerAccount {

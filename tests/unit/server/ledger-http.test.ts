@@ -17,6 +17,7 @@ const LEDGER: Record<LedgerErrorCode, number> = {
   currency_locked: 409,
   ledger_busy: 409,
   conflict: 409,
+  bank_locked: 422,
 }
 
 const FX: Record<FxErrorCode, [number, string]> = {

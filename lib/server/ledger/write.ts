@@ -1,11 +1,12 @@
 import { FieldValue, Timestamp, type DocumentSnapshot } from 'firebase-admin/firestore'
 import { attachFx, buildTransaction, fxPlan } from '@/lib/domain/ledger/build'
+import { assertBankUnlocked } from '@/lib/domain/ledger/bank-lock'
 import { changeSet } from '@/lib/domain/ledger/change'
 import { parseAccount, parseTransaction, transactionToDoc } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import { applyPatch, toRawInput, type TransactionInput, type TransactionPatch } from '@/lib/domain/ledger/input'
 import { nest } from '@/lib/domain/ledger/rollups'
-import type { LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
+import type { BankInfo, LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
 import type { RateSnapshot } from '@/lib/server/fx/types'
 import { auditData, type AuditAction } from './audit'
 import type { LedgerDeps } from './deps'
@@ -175,9 +176,16 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
   })
 }
 
-export async function createTransaction(deps: LedgerDeps, orgId: string, uid: string, input: TransactionInput): Promise<WriteResult> {
+export async function createTransaction(
+  deps: LedgerDeps,
+  orgId: string,
+  uid: string,
+  input: TransactionInput,
+  bank?: BankInfo,
+): Promise<WriteResult> {
   const txId = input.clientId ?? transactionsCol(deps.db, orgId).doc().id
   const next = await prepare(deps, orgId, txId, input)
+  if (bank !== undefined) next.tx = { ...next.tx, bank }
   return commit(deps, orgId, uid, { action: 'tx.create', txId, prior: null, next })
 }
 
@@ -198,6 +206,11 @@ export async function updateTransaction(
 ): Promise<WriteResult> {
   const prior = await loadPrior(deps, orgId, txId)
   const next = await prepare(deps, orgId, txId, applyPatch(toRawInput(prior.tx), patch))
+  if (prior.tx.bank !== undefined) {
+    assertBankUnlocked(prior.tx, next.tx)
+    // toRawInput never carries `bank`, so an edit keeps the provenance from the prior document.
+    next.tx = { ...next.tx, bank: prior.tx.bank }
+  }
   return commit(deps, orgId, uid, { action: 'tx.update', txId, prior, next })
 }
 
