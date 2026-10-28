@@ -283,6 +283,7 @@
       "noCategory": "Bez kategorii",
       "categoryMixed": "Zaznacz operacje jednego typu (tylko wpływy albo tylko wydatki), aby zmienić kategorię.",
       "commentPlaceholder": "Zostaw puste, aby usunąć komentarz",
+      "commentClearsHint": "Pusty komentarz usunie komentarz z zaznaczonych operacji",
       "accrualMode": "Rodzaj daty transakcji",
       "accrualDate": "Data",
       "accrualPeriod": "Okres",

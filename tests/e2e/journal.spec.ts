@@ -162,6 +162,27 @@ test.describe('journal (emulators)', () => {
     await expect.poll(async () => (await txs(request, user)).filter((d) => 'categoryId' in d.fields).length).toBe(0)
   })
 
+  test('the bulk counterparty dialog applies nothing until a choice is made; an empty comment says it clears', async ({ page, request }) => {
+    const user = await setup(page, request, 'jr-explicit')
+    await seedLedgerOperation(request, user.orgId, 'tx-1', { type: 'expense', accountId: 'acc-main', amount: 10, currency: 'PLN', date: daysAgo(1), description: 'Jeden' })
+    await page.goto(`/${user.orgId}/transactions`)
+    await rowsOf(page).first().getByRole('checkbox').check()
+    const bar = page.getByRole('region', { name: 'Вибрані операції' })
+    await bar.getByRole('button', { name: 'Змінити дані' }).click()
+    await page.getByRole('menuitem', { name: 'Змінити контрагента' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('button', { name: 'Застосувати' })).toBeDisabled()
+    // The picker opens its list on focus and the list covers the footer: leave the field first.
+    await dialog.getByText('Зміна контрагента').click()
+    await dialog.getByRole('button', { name: 'Скасувати' }).click()
+
+    await bar.getByRole('button', { name: 'Змінити дані' }).click()
+    await page.getByRole('menuitem', { name: 'Змінити коментар' }).click()
+    await expect(dialog.getByText('Порожній коментар очистить коментар у вибраних операціях')).toBeVisible()
+    await dialog.getByLabel('Зміна коментаря').fill('Nowy')
+    await expect(dialog.getByText('Порожній коментар очистить коментар у вибраних операціях')).toHaveCount(0)
+  })
+
   test('a bulk delete asks first and can be undone', async ({ page, request }) => {
     const user = await setup(page, request, 'jr-delete')
     await createExpense(page, '100', 'Do usunięcia A')

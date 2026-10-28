@@ -38,6 +38,8 @@ export function BulkEditDialog({ field, rows, today, incomeCategories, expenseCa
   const categoryName = useCategoryName()
   const [category, setCategory] = useState('')
   const [counterparty, setCounterparty] = useState<string | null>(null)
+  // Nothing is applied until the person picks (the picker's «none» is the explicit «clear»).
+  const [counterpartyChosen, setCounterpartyChosen] = useState(false)
   const [comment, setComment] = useState('')
   const [day, setDay] = useState(today)
   const [mode, setMode] = useState<'date' | 'period'>('date')
@@ -53,7 +55,7 @@ export function BulkEditDialog({ field, rows, today, incomeCategories, expenseCa
         if (!type || category === '') return null
         return { categoryId: category === '_none' ? null : category }
       case 'counterparty':
-        return { counterpartyId: counterparty }
+        return counterpartyChosen ? { counterpartyId: counterparty } : null
       case 'comment':
         return { description: comment.trim() === '' ? null : comment.trim() }
       case 'paymentDate':
@@ -93,11 +95,21 @@ export function BulkEditDialog({ field, rows, today, incomeCategories, expenseCa
           ))}
 
         {field === 'counterparty' && (
-          <CounterpartyPicker counterparties={counterparties.filter((c) => !c.archived)} value={counterparty} onChange={setCounterparty} />
+          <CounterpartyPicker
+            counterparties={counterparties.filter((c) => !c.archived)}
+            value={counterparty}
+            onChange={(id) => {
+              setCounterparty(id)
+              setCounterpartyChosen(true)
+            }}
+          />
         )}
 
         {field === 'comment' && (
-          <Input value={comment} onChange={(e) => setComment(e.target.value)} aria-label={t('title_comment')} placeholder={t('commentPlaceholder')} />
+          <div className="space-y-1.5">
+            <Input value={comment} onChange={(e) => setComment(e.target.value)} aria-label={t('title_comment')} placeholder={t('commentPlaceholder')} />
+            {comment.trim() === '' && <p className="text-sm text-ink-muted">{t('commentClearsHint')}</p>}
+          </div>
         )}
 
         {field === 'paymentDate' && (

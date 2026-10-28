@@ -283,6 +283,7 @@
       "noCategory": "No category",
       "categoryMixed": "Select operations of one type (only income or only expenses) to change the category.",
       "commentPlaceholder": "Leave empty to clear the comment",
+      "commentClearsHint": "An empty comment clears the comment on the selected operations",
       "accrualMode": "Transaction date type",
       "accrualDate": "Date",
       "accrualPeriod": "Period",
