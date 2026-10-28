@@ -7,7 +7,7 @@ import { parseAccount, parseTransaction } from '@/lib/domain/ledger/doc'
 import { balanceEffects } from '@/lib/domain/ledger/effects'
 import { parseTransactionInput } from '@/lib/domain/ledger/input'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
-import { readJournalPage } from '@/lib/server/journal/read'
+import { readJournalPage, readOneTransaction } from '@/lib/server/journal/read'
 import { createTransaction } from '@/lib/server/ledger/write'
 import { ORG, UID, clearFirestore, makeDeps, seedAccount, seedCategory, seedCounterparty, seedOrg, testDb } from './helpers'
 
@@ -163,5 +163,30 @@ describe('readJournalPage', () => {
     const expected = (await readAll(filters)).map((r) => r.tx.id)
     expect(found).toEqual(expected)
     expect(pages).toBeGreaterThan(1)
+  })
+})
+
+describe('readOneTransaction', () => {
+  beforeEach(async () => {
+    await clearFirestore()
+    await seedOrg(db)
+    await seedAccount(db, ORG, 'a1', 'PLN', 0)
+  })
+
+  it('returns the operation as it is stored now', async () => {
+    const { transaction } = await createTransaction(deps, ORG, UID, parseTransactionInput({ type: 'income', accountId: 'a1', amountMinor: 4_200, paymentDate: '2026-10-20', description: 'Zaliczka' }))
+    const one = await readOneTransaction(deps, ORG, transaction.id)
+    expect(one).toMatchObject({ id: transaction.id, type: 'income', amountMinor: 4_200, description: 'Zaliczka' })
+    await db.doc(`organizations/${ORG}/transactions/${transaction.id}`).update({ description: 'Zmienione' })
+    expect((await readOneTransaction(deps, ORG, transaction.id))?.description).toBe('Zmienione')
+  })
+
+  it('returns null for a missing document', async () => {
+    expect(await readOneTransaction(deps, ORG, 'nope')).toBeNull()
+  })
+
+  it('returns null for a document that is not a ledger v2 operation', async () => {
+    await db.doc(`organizations/${ORG}/transactions/legacy1`).set({ amount: 12.5, note: 'old shape' })
+    expect(await readOneTransaction(deps, ORG, 'legacy1')).toBeNull()
   })
 })

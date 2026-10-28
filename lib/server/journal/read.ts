@@ -7,7 +7,7 @@ import type { JournalPage, JournalRow } from '@/lib/domain/journal/types'
 import { parseAccount, parseTransaction } from '@/lib/domain/ledger/doc'
 import { balanceEffects } from '@/lib/domain/ledger/effects'
 import { cashDocId } from '@/lib/domain/ledger/rollups'
-import type { LedgerAccount } from '@/lib/domain/ledger/types'
+import type { LedgerAccount, LedgerTransaction } from '@/lib/domain/ledger/types'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import { accountsCol, counterpartiesCol, rollupsCol, transactionsCol } from '@/lib/server/ledger/paths'
 
@@ -64,6 +64,16 @@ function baseQuery(deps: LedgerDeps, orgId: string, f: JournalFilters): Query {
 
 function after(q: Query, key: JournalKey): Query {
   return q.startAfter(key.paymentDate, new Timestamp(key.createdAtS, key.createdAtN), key.id)
+}
+
+/**
+ * One operation as it is now: the journal's rows can be minutes old (no live listener), and an edit must start from
+ * fresh data. `null` when the document is missing or is not a ledger v2 operation.
+ */
+export async function readOneTransaction(deps: LedgerDeps, orgId: string, txId: string): Promise<LedgerTransaction | null> {
+  const snap = await transactionsCol(deps.db, orgId).doc(txId).get()
+  if (!snap.exists) return null
+  return parseTransaction(snap.id, snap.data() ?? {})
 }
 
 export async function readJournalPage(deps: LedgerDeps, orgId: string, opts: ReadOptions): Promise<ReadResult> {

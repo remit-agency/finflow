@@ -1,5 +1,6 @@
 import { filtersToParams, type JournalFilters } from '@/lib/domain/journal/filter'
 import type { JournalPage } from '@/lib/domain/journal/types'
+import type { LedgerTransaction } from '@/lib/domain/ledger/types'
 import { readApiError } from './ledger-client'
 
 export const PAGE_SIZE = 50
@@ -17,4 +18,11 @@ export async function fetchJournalPage(
   const res = await fetch(`/api/orgs/${encodeURIComponent(orgId)}/journal?${params}`, { credentials: 'same-origin', signal: opts.signal })
   if (!res.ok) throw await readApiError(res)
   return (await res.json()) as JournalPage
+}
+
+/** One operation as it is now (the journal's rows can be stale). Throws `LedgerApiError`; status 404 when it is gone. */
+export async function fetchTransaction(orgId: string, txId: string, signal?: AbortSignal): Promise<LedgerTransaction> {
+  const res = await fetch(`/api/orgs/${encodeURIComponent(orgId)}/transactions/${encodeURIComponent(txId)}`, { credentials: 'same-origin', signal })
+  if (!res.ok) throw await readApiError(res)
+  return ((await res.json()) as { transaction: LedgerTransaction }).transaction
 }

@@ -7,7 +7,7 @@ import { ledger } from '@/lib/server/ledger'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import { todayUtcDay } from '@/lib/utils/today'
 import { runBulk } from './bulk'
-import { readJournalPage, type ReadOptions } from './read'
+import { readJournalPage, readOneTransaction, type ReadOptions } from './read'
 
 function deps(): LedgerDeps {
   return { db: getAdmin().db, resolveRate, now: () => new Date(), today: () => toDay(todayUtcDay()) }
@@ -19,5 +19,6 @@ export const journal = {
     const { rows, next } = await readJournalPage(deps(), orgId, opts)
     return { rows, next }
   },
+  readOne: (orgId: string, txId: string) => readOneTransaction(deps(), orgId, txId),
   bulk: (orgId: string, uid: string, req: BulkRequest) => runBulk(ledger, orgId, uid, req),
 }
