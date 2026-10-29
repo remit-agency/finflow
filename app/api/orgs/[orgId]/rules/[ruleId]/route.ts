@@ -4,11 +4,10 @@ import { requireOrgRole, requireUser } from '@/lib/server/auth'
 import { errorResponse, HttpError } from '@/lib/server/http-error'
 import { readJsonBody } from '@/lib/server/request-body'
 import { rules } from '@/lib/server/rules'
-import { toRuleHttpError } from '@/lib/server/rules/http'
+import { RULE_BODY_MAX_BYTES, toRuleHttpError } from '@/lib/server/rules/http'
 
 export const runtime = 'nodejs'
 
-const MAX_BODY_BYTES = 32 * 1024
 type Ctx = { params: Promise<{ orgId: string; ruleId: string }> }
 
 // PATCH /api/orgs/{orgId}/rules/{ruleId}  (owner, accountant) -> { rule }; also switches `active`
@@ -18,7 +17,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     const { orgId, ruleId } = await params
     await requireOrgRole(uid, orgId, ['owner', 'accountant'])
     if (!isId(ruleId)) throw new HttpError(404, 'not_found')
-    const patch = parseRulePatch(await readJsonBody(req, MAX_BODY_BYTES))
+    const patch = parseRulePatch(await readJsonBody(req, RULE_BODY_MAX_BYTES))
     const rule = await rules.update(orgId, uid, ruleId, patch)
     return Response.json({ rule }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (e) {

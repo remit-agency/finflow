@@ -3,6 +3,12 @@ import { RuleError, type RuleErrorCode } from '@/lib/domain/rules/errors'
 import { HttpError } from '@/lib/server/http-error'
 import { toHttpError } from '@/lib/server/ledger/http'
 
+/**
+ * The largest JSON body of a rule request (create, edit, preview). Limits are in characters and a Cyrillic rule takes two
+ * bytes a character: 10 conditions of 20 words of 80 characters are about 33 KB, so 64 KB leaves room for the JSON.
+ */
+export const RULE_BODY_MAX_BYTES = 64 * 1024
+
 const STATUS: Record<RuleErrorCode, number> = {
   invalid_input: 400,
   not_found: 404,
