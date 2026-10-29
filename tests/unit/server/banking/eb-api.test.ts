@@ -87,6 +87,26 @@ describe('failures', () => {
   })
 })
 
+describe('an answer that cannot be read is an error, not an empty page', () => {
+  function apiWith(res: Response) {
+    const fetchImpl = vi.fn(async () => res) as unknown as typeof fetch
+    return createEbApi({ base: 'https://eb.test', token: async () => 'tok', fetchImpl })
+  }
+
+  it('a body cut off while it is read (the timeout fires mid-body) is bank_unavailable', async () => {
+    const body = new ReadableStream({
+      start(controller) {
+        controller.error(new DOMException('The operation was aborted due to timeout', 'TimeoutError'))
+      },
+    })
+    await expect(apiWith(new Response(body, { status: 200 })).getTransactions('u1', { dateFrom: '2026-10-01' })).rejects.toMatchObject({ code: 'bank_unavailable' })
+  })
+
+  it.each([['not json'], ['']])('a 200 answer whose body is %j is bank_error', async (text) => {
+    await expect(apiWith(new Response(text, { status: 200 })).getTransactions('u1', { dateFrom: '2026-10-01' })).rejects.toMatchObject({ code: 'bank_error' })
+  })
+})
+
 describe('background fetching', () => {
   it('sends no psu-* header when no person is given, and sends them when one is', async () => {
     const background = api([{ json: { balances: [] } }])

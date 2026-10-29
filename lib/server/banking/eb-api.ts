@@ -130,7 +130,19 @@ export function createEbApi(opts: EbApiOptions): EbApi {
       console.error('Enable Banking call failed:', res.status, sanitize(text))
       throw new BankError(classifyEbFailure(res.status, text))
     }
-    return res.json().catch(() => null)
+    // A body that cannot be read in full (the timeout fires mid-body) or is not JSON is an error, never an empty page:
+    // `syncStep` would take an empty page for "nothing more" and move `syncedThrough` past operations it never saw.
+    let text: string
+    try {
+      text = await res.text()
+    } catch {
+      throw new BankError('bank_unavailable')
+    }
+    try {
+      return JSON.parse(text)
+    } catch {
+      throw new BankError('bank_error')
+    }
   }
 
   return {
