@@ -38,6 +38,22 @@ test.describe('API guards', () => {
     }
   })
 
+  // S10: the rules routes refuse a request without a session cookie, before they read any data.
+  test('rules endpoints require a session cookie (401)', async ({ request }) => {
+    const origin = { Origin: 'http://localhost:3000' }
+    const calls: { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; path: string; data?: object }[] = [
+      { method: 'GET', path: '/api/orgs/x/rules' },
+      { method: 'POST', path: '/api/orgs/x/rules', data: {} },
+      { method: 'PATCH', path: '/api/orgs/x/rules/r1', data: {} },
+      { method: 'DELETE', path: '/api/orgs/x/rules/r1' },
+      { method: 'POST', path: '/api/orgs/x/rules/order', data: { ids: ['r1'] } },
+    ]
+    for (const { method, path, data } of calls) {
+      const res = await request.fetch(path, { method, headers: origin, data })
+      expect(res.status(), `${method} ${path}`).toBe(401)
+    }
+  })
+
   test('Enable Banking callback rejects a forged state before exchanging the code (400)', async ({ request }) => {
     // The pre-S00 format: unsigned base64url JSON with just an orgId.
     const forged = Buffer.from(JSON.stringify({ orgId: 'victim-org' })).toString('base64url')
