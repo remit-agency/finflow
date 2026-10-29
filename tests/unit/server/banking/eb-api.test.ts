@@ -3,9 +3,9 @@ import { BankError } from '@/lib/server/banking/errors'
 import { classifyEbFailure, createEbApi } from '@/lib/server/banking/eb-api'
 
 function api(responses: Array<{ status?: number; json?: unknown; text?: string } | Error>, psu?: { ip?: string; userAgent?: string }) {
-  const calls: Array<{ url: string; headers: Record<string, string> }> = []
+  const calls: Array<{ url: string; headers: Record<string, string>; signal: AbortSignal | null | undefined }> = []
   const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
-    calls.push({ url, headers: Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>)) })
+    calls.push({ url, headers: Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>)), signal: init?.signal })
     const next = responses.shift()
     if (next === undefined) throw new Error('no more responses')
     if (next instanceof Error) throw next
@@ -78,5 +78,43 @@ describe('failures', () => {
     const { eb } = api([{ status: 429, text: '{}' }, new TypeError('fetch failed')])
     await expect(eb.getBalances('u1')).rejects.toMatchObject({ code: 'rate_limited' })
     await expect(eb.getBalances('u1')).rejects.toBeInstanceOf(BankError)
+  })
+  it('every bank request carries a timeout signal, and a timed-out request is bank_unavailable', async () => {
+    const { eb, calls } = api([{ json: { balances: [] } }, new DOMException('The operation was aborted due to timeout', 'TimeoutError')])
+    await eb.getBalances('u1')
+    expect(calls[0].signal).toBeInstanceOf(AbortSignal)
+    await expect(eb.getBalances('u1')).rejects.toMatchObject({ code: 'bank_unavailable' })
+  })
+})
+
+describe('an answer that cannot be read is an error, not an empty page', () => {
+  function apiWith(res: Response) {
+    const fetchImpl = vi.fn(async () => res) as unknown as typeof fetch
+    return createEbApi({ base: 'https://eb.test', token: async () => 'tok', fetchImpl })
+  }
+
+  it('a body cut off while it is read (the timeout fires mid-body) is bank_unavailable', async () => {
+    const body = new ReadableStream({
+      start(controller) {
+        controller.error(new DOMException('The operation was aborted due to timeout', 'TimeoutError'))
+      },
+    })
+    await expect(apiWith(new Response(body, { status: 200 })).getTransactions('u1', { dateFrom: '2026-10-01' })).rejects.toMatchObject({ code: 'bank_unavailable' })
+  })
+
+  it.each([['not json'], ['']])('a 200 answer whose body is %j is bank_error', async (text) => {
+    await expect(apiWith(new Response(text, { status: 200 })).getTransactions('u1', { dateFrom: '2026-10-01' })).rejects.toMatchObject({ code: 'bank_error' })
+  })
+})
+
+describe('background fetching', () => {
+  it('sends no psu-* header when no person is given, and sends them when one is', async () => {
+    const background = api([{ json: { balances: [] } }])
+    await background.eb.getBalances('u1')
+    expect(Object.keys(background.calls[0].headers).filter((h) => h.toLowerCase().startsWith('psu-'))).toEqual([])
+
+    const online = api([{ json: { balances: [] } }], { ip: '203.0.113.7', userAgent: 'Mozilla/5.0' })
+    await online.eb.getBalances('u1')
+    expect(online.calls[0].headers).toMatchObject({ 'psu-ip-address': '203.0.113.7', 'psu-user-agent': 'Mozilla/5.0' })
   })
 })

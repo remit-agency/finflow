@@ -36,6 +36,10 @@ export interface BankAccount {
   syncLock: { until: number; token: string } | null
   bankBalance: { amountMinor: number; type: string; at: string } | null
   firstSyncDone: boolean
+  /** The background refresh slot (`YYYY-MM-DD#HH`, see `backgroundSlot`) in which this account was last tried. */
+  bgSlot: string | null
+  /** ISO instant before which background runs leave this account alone (the bank said its limit was reached). */
+  backoffUntil: string | null
 }
 
 const NINETY_DAYS_MS = 90 * 86_400_000
@@ -95,5 +99,7 @@ export function parseBankAccount(data: unknown): BankAccount | null {
       ? { amountMinor: balance.amountMinor, type: balance.type, at: balance.at }
       : null,
     firstSyncDone: d.firstSyncDone === true,
+    bgSlot: str(d.bgSlot),
+    backoffUntil: str(d.backoffUntil),
   }
 }

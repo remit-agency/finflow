@@ -1,0 +1,46 @@
+name: Bank sync
+
+# Calls the production route that refreshes the linked bank accounts in the slots 08:00, 13:00 and 17:00 Warsaw.
+# It runs every hour on purpose: the schedule is UTC, a run can be late or lost, and the server decides which slot
+# an hour belongs to and does the work once per slot (see docs/superpowers/specs/2026-10-29-s09b-bank-cron-design.md).
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: bank-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Refresh the bank accounts
+        env:
+          BASE_URL: ${{ secrets.FINFLOW_BASE_URL }}
+          SECRET: ${{ secrets.BANK_CRON_SECRET }}
+        run: |
+          if [ -z "$BASE_URL" ] || [ -z "$SECRET" ]; then
+            echo "FINFLOW_BASE_URL and BANK_CRON_SECRET must be set as repository secrets" >&2
+            exit 1
+          fi
+          # The body (counts only) goes to a file: the log shows the status line, never the body, and the job turns red
+          # only when an account failed. A missing or wrong secret or a server error prints just the status.
+          if ! curl --fail-with-body -sS -X POST --max-time 90 \
+            -H "Authorization: Bearer ${SECRET}" \
+            -o "$RUNNER_TEMP/out.json" \
+            -w 'HTTP %{http_code}\n' \
+            "${BASE_URL%/}/api/cron/bank-sync"; then
+            echo "bank-sync: the request failed (status above)" >&2
+            exit 1
+          fi
+          failed=$(jq -r '.failed' "$RUNNER_TEMP/out.json") || { echo "bank-sync: the response is not JSON" >&2; exit 1; }
+          case "$failed" in
+            0) echo "bank-sync ok" ;;
+            ''|*[!0-9]*) echo "bank-sync: the response has no failed count" >&2; exit 1 ;;
+            *) echo "bank-sync: ${failed} account(s) failed"; exit 1 ;;
+          esac

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { todayDay, todayUtcDay } from '@/lib/utils/today'
+import { todayDay, todayUtcDay, warsawHour } from '@/lib/utils/today'
 
 const iso = (d: Date) => d.toISOString()
 
@@ -37,5 +37,24 @@ describe('todayDay', () => {
   it('moves to the next day once Warsaw is past midnight while UTC is not', () => {
     // 2026-10-28 23:30 UTC is 00:30 on the 29th in Warsaw (CET, UTC+1).
     expect(todayDay(new Date('2026-10-28T23:30:00Z'))).toBe('2026-10-29')
+  })
+})
+
+describe('warsawHour', () => {
+  it('is the hour on a Warsaw clock, summer time (UTC+2)', () => {
+    expect(warsawHour(new Date('2026-10-24T06:30:00Z'))).toBe(8)
+    expect(warsawHour(new Date('2026-07-01T21:59:00Z'))).toBe(23)
+    expect(warsawHour(new Date('2026-07-01T22:00:00Z'))).toBe(0)
+  })
+
+  it('is the hour on a Warsaw clock, winter time (UTC+1)', () => {
+    expect(warsawHour(new Date('2026-10-27T10:00:00Z'))).toBe(11)
+    expect(warsawHour(new Date('2026-12-01T23:30:00Z'))).toBe(0)
+  })
+
+  it('follows the clock change (2026-10-25 back to winter, 2026-03-29 forward to summer)', () => {
+    expect(warsawHour(new Date('2026-10-25T06:30:00Z'))).toBe(7)
+    expect(warsawHour(new Date('2026-03-29T05:30:00Z'))).toBe(7)
+    expect(warsawHour(new Date('2026-03-29T06:30:00Z'))).toBe(8)
   })
 })

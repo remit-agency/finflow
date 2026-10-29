@@ -5,6 +5,12 @@ const WARSAW_DAY = new Intl.DateTimeFormat('en-US', {
   day: '2-digit',
 })
 
+const WARSAW_HOUR = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Europe/Warsaw',
+  hour: '2-digit',
+  hourCycle: 'h23',
+})
+
 /**
  * "Today" for the app: the calendar date in Warsaw at this moment, as a Date at 00:00 UTC (the
  * app's calendar-day convention, see lib/utils/date.ts). Near midnight UTC and Warsaw disagree
@@ -20,4 +26,9 @@ export function todayUtcDay(now: Date = new Date()): Date {
 /** `todayUtcDay` as the `YYYY-MM-DD` string the ledger API and the forms use. */
 export function todayDay(now: Date = new Date()): string {
   return todayUtcDay(now).toISOString().slice(0, 10)
+}
+
+/** The hour (0-23) on a Warsaw clock at this moment; follows the summer/winter time change. */
+export function warsawHour(now: Date = new Date()): number {
+  return Number(WARSAW_HOUR.formatToParts(now).find((p) => p.type === 'hour')?.value)
 }
