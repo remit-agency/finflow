@@ -30,10 +30,10 @@ const PROJECT_ID = 'demo-finflow'
 // FIRESTORE_RULES_FILE lets the "red" check run this suite against a deliberately open ruleset.
 const RULES_FILE = process.env.FIRESTORE_RULES_FILE ?? resolve(process.cwd(), 'firestore.rules')
 const DAY = 24 * 60 * 60 * 1000
-// Written by the server only (S05): clients may read accounts, transactions and rollups, the owner reads audit.
-const SERVER_WRITTEN_SUBS = ['accounts', 'transactions', 'rollups', 'audit', 'counterparties'] as const
-const MEMBER_READ_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'counterparties'] as const
-const ALL_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'counterparties'] as const
+// Written by the server only (S05, S06, S10): clients may read accounts, transactions, rollups, counterparties and rules, the owner reads audit.
+const SERVER_WRITTEN_SUBS = ['accounts', 'transactions', 'rollups', 'audit', 'counterparties', 'rules'] as const
+const MEMBER_READ_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'counterparties', 'rules'] as const
+const ALL_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'counterparties', 'rules'] as const
 // S09: the bank collections written by the server only. bankAccounts and bankSeen are closed to every client role.
 const BANK_SERVER_ONLY_SUBS = ['bankAccounts', 'bankSeen'] as const
 
@@ -268,7 +268,7 @@ describe('collection group query on members (the "my companies" query)', () => {
   })
 
   it('does not open other collection groups', async () => {
-    for (const group of ['accounts', 'transactions', 'categories', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'ledger', 'counterparties', 'counterpartyKeys']) {
+    for (const group of ['accounts', 'transactions', 'categories', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'ledger', 'counterparties', 'counterpartyKeys', 'rules']) {
       await assertFails(getDocs(collectionGroup(as('alice'), group)))
     }
   })

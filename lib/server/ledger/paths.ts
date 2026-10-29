@@ -9,5 +9,7 @@ export const auditCol = (db: Firestore, orgId: string) => orgRef(db, orgId).coll
 export const counterpartiesCol = (db: Firestore, orgId: string) => orgRef(db, orgId).collection('counterparties')
 /** Uniqueness keys of the counterparties (NIP and name): closed to clients (firestore.rules). */
 export const counterpartyKeysCol = (db: Firestore, orgId: string) => orgRef(db, orgId).collection('counterpartyKeys')
+/** The auto-rules (S10): written by the server, readable by members (firestore.rules). */
+export const rulesCol = (db: Firestore, orgId: string) => orgRef(db, orgId).collection('rules')
 /** organizations/{org}/ledger/lock: closed to clients (firestore.rules). */
 export const lockRef = (db: Firestore, orgId: string) => orgRef(db, orgId).collection('ledger').doc('lock')
