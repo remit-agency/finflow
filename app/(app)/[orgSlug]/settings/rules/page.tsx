@@ -21,12 +21,14 @@ export default function RulesSettingsPage() {
   const t = useTranslations('settings.rules')
   const { orgId, org, can, accounts, incomeCategories, expenseCategories } = useShell()
   const canEdit = can('data.write')
-  const { rules, loading, error, reload } = useRules(orgId)
+  const { rules, loading, error, refreshing, reload } = useRules(orgId)
   const { counterparties } = useCounterparties(orgId)
   // 'new': the editor of a new rule; a rule: its editor.
   const [editing, setEditing] = useState<ListedRule | 'new' | null>(null)
   const [applying, setApplying] = useState(false)
   const [busy, setBusy] = useState(false)
+  // Still busy while the list is read again: a click then would send an order computed from the list before the last change.
+  const locked = busy || refreshing
   const categories = [...incomeCategories, ...expenseCategories]
 
   /** A change made from the list (order, the active switch): one at a time, then the list is read again. */
@@ -99,17 +101,17 @@ export default function RulesSettingsPage() {
                       className="mr-1 accent-brand"
                       aria-label={t('active', { name: rule.name })}
                       checked={rule.active}
-                      disabled={busy}
+                      disabled={locked}
                       onChange={() => void run(() => updateRule(orgId, rule.id, { active: !rule.active }))}
                     />
-                    <Button variant="ghost" size="icon" aria-label={t('moveUp', { name: rule.name })} disabled={busy || index === 0} onClick={() => move(index, -1)}>
+                    <Button variant="ghost" size="icon" aria-label={t('moveUp', { name: rule.name })} disabled={locked || index === 0} onClick={() => move(index, -1)}>
                       <ArrowUp />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       aria-label={t('moveDown', { name: rule.name })}
-                      disabled={busy || index === rules.length - 1}
+                      disabled={locked || index === rules.length - 1}
                       onClick={() => move(index, 1)}
                     >
                       <ArrowDown />
@@ -139,7 +141,8 @@ export default function RulesSettingsPage() {
           onSaved={reload}
         />
       )}
-      {applying && <ApplyRulesDialog orgId={orgId} onClose={() => setApplying(false)} />}
+      {/* Keyed by company: a company switch restarts the count for the new one (an apply of the old one was aborted). */}
+      {applying && <ApplyRulesDialog key={orgId} orgId={orgId} onClose={() => setApplying(false)} />}
     </Card>
   )
 }
