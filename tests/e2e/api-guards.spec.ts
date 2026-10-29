@@ -47,6 +47,8 @@ test.describe('API guards', () => {
       { method: 'PATCH', path: '/api/orgs/x/rules/r1', data: {} },
       { method: 'DELETE', path: '/api/orgs/x/rules/r1' },
       { method: 'POST', path: '/api/orgs/x/rules/order', data: { ids: ['r1'] } },
+      { method: 'POST', path: '/api/orgs/x/rules/preview', data: { rule: {} } },
+      { method: 'POST', path: '/api/orgs/x/rules/apply', data: { mode: 'check' } },
     ]
     for (const { method, path, data } of calls) {
       const res = await request.fetch(path, { method, headers: origin, data })
