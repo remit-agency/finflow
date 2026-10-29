@@ -1,6 +1,7 @@
 import 'server-only'
 import { createJwt } from '@/lib/enablebanking/jwt'
 import { ledgerDeps } from '@/lib/server/ledger'
+import { runBackgroundSync } from './background'
 import type { BankDeps } from './deps'
 import { createEbApi, type Psu } from './eb-api'
 import { disconnect, linkAccount, listConnectionAccounts, saveSession } from './link'
@@ -18,4 +19,10 @@ export function bankDeps(req: Request): BankDeps {
   return { db: ledger.db, ledger, now: ledger.now, today: ledger.today, eb: createEbApi({ token: createJwt, psu: psuFromRequest(req) }) }
 }
 
-export const banking = { saveSession, linkAccount, listConnectionAccounts, disconnect, syncStep, readStatus: readBankStatus }
+/** Dependencies for a run with no person present: no `psu-*` headers, so the bank counts the calls as background fetching. */
+export function backgroundBankDeps(): BankDeps {
+  const ledger = ledgerDeps()
+  return { db: ledger.db, ledger, now: ledger.now, today: ledger.today, eb: createEbApi({ token: createJwt }) }
+}
+
+export const banking = { saveSession, linkAccount, listConnectionAccounts, disconnect, syncStep, readStatus: readBankStatus, runBackgroundSync }

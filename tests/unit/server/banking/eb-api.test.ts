@@ -80,3 +80,15 @@ describe('failures', () => {
     await expect(eb.getBalances('u1')).rejects.toBeInstanceOf(BankError)
   })
 })
+
+describe('background fetching', () => {
+  it('sends no psu-* header when no person is given, and sends them when one is', async () => {
+    const background = api([{ json: { balances: [] } }])
+    await background.eb.getBalances('u1')
+    expect(Object.keys(background.calls[0].headers).filter((h) => h.toLowerCase().startsWith('psu-'))).toEqual([])
+
+    const online = api([{ json: { balances: [] } }], { ip: '203.0.113.7', userAgent: 'Mozilla/5.0' })
+    await online.eb.getBalances('u1')
+    expect(online.calls[0].headers).toMatchObject({ 'psu-ip-address': '203.0.113.7', 'psu-user-agent': 'Mozilla/5.0' })
+  })
+})
