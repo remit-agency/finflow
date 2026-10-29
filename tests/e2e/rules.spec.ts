@@ -55,6 +55,10 @@ test.describe('auto-rules (emulators + fake bank)', () => {
     const fuel = rowsOf(page).filter({ hasText: 'Orlen' })
     await expect(fuel.getByTestId('rule-chip')).toHaveText('за правилом: Паливо Orlen')
     await expect(page.getByTestId('rule-chip')).toHaveCount(1)
+
+    // Below md the category column (and the chip in it) is hidden: a phone gets the same note as a plain line.
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expect(rowsOf(page).filter({ hasText: 'Orlen' }).getByTestId('rule-note')).toHaveText('за правилом: Паливо Orlen')
   })
 
   test('«Застосувати до наявних» shows how many operations change, then fills them', async ({ page, request }) => {
