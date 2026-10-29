@@ -409,39 +409,6 @@ CashFlowChart (Recharts), PLTable, CalendarView, BalanceSheet, all 4 analytics p
 - Баланси сторінки читаються в різні моменти: запис між читаннями може дати розбіжність до наступного перезавантаження списку.
 - Відфільтровані сторінки читають усі операції своїх днів плюс rollups по всьому проміжку.
 
-## 2026-10-29 — S09b: фонове оновлення банку
-
-Спека: `docs/superpowers/specs/2026-10-29-s09b-bank-cron-design.md`. План: `docs/superpowers/plans/2026-10-29-s09b-bank-cron.md`.
-
-**Статус:** реалізовано в гілці `s09b-bank-cron`, чекає огляду й мерджа. На production нічого не розгорнуто. **Є новий індекс:** `bankAccounts.status` (`COLLECTION_GROUP`) у `firestore.indexes.json`; деплоїти його окремим кроком. Секрет `BANK_CRON_SECRET` ще не створено ні у Vercel, ні в GitHub.
-
-### Зроблено
-- **Слоти:** `backgroundSlot` (`lib/domain/banking/slot.ts`): 08:00, 13:00 і 17:00 за Варшавою; 17:00-07:59 це слот `#17`. Рахунок, чий `bgSlot` дорівнює поточному слоту, пропускається.
-- **GitHub Actions:** `.github/workflows/bank-sync.yml` щогодини на 7-й хвилині (UTC) і вручну (`workflow_dispatch`). Сервер сам визначає слот, тож запуск із запізненням не губить оновлення.
-- **Маршрут** `POST /api/cron/bank-sync`: `Authorization: Bearer` з `BANK_CRON_SECRET`, порівняння через `timingSafeEqual` (`lib/server/cron-auth.ts`). Секрет відсутній або коротший за 32 символи дає 503, хибний токен 401.
-- **`runBackgroundSync`** (`lib/server/banking/background.ts`): до 4 `syncStep` на рахунок, бюджет часу 45 с, клієнт банку без заголовків `psu-*`. `rate_limited` ставить `backoffUntil` = +6 год; `already_running` і вичерпаний бюджет слот не витрачають.
-- **Guard-тест:** `tests/unit/server/route-auth-coverage.test.ts` потребував запису в allow-list для cron-маршруту, бо той маршрут сам перевіряє секрет і читає заголовок `Authorization` навмисно. Інші маршрути перевіряються як раніше.
-- **Документація:** `.env.example` (`BANK_CRON_SECRET`), `CLAUDE.md` (рядок таблиці змінних і абзац S09b у блоці «Banks (S09)»).
-
-### Підсумок перевірок (2026-10-29, реально виміряно)
-- `npm run typecheck` (`tsc --noEmit`): чисто.
-- `npm run lint`: 0 errors / 10 warnings (стільки ж, як після S09).
-- `npm run check:server-imports`: ok, усі 4 модулі завантажуються.
-- unit: 1917 тестів, 132 файли (було 1879 і 128 після S09).
-- rules: 123 тести, 2 файли (без змін).
-- integration (емулятор Firestore): 202 тести, 19 файлів (було 170 і 17).
-- e2e не запускали (за планом; змін в інтерфейсі немає).
-
-### Не перевірено
-- Реальний запуск GitHub Actions і cron на production (секрет і деплой ще не зроблено).
-- Ліміт PSD2 для фонових запитів на реальному банку і поведінка `rate_limited` на production.
-- Відповіді 503 і 401 на production.
-
-### Known follow-ups (S09b)
-- Помилки фонового запуску бачить лише власник репозиторію як червоний запуск GitHub (листи і push про збої це S18).
-- Слот витрачається будь-якою спробою, тож збій банку ранком не повторюється до 13:00.
-- Точний ліміт Millennium невідомий (перевіряється спостереженням перших днів).
-
 ## 2026-10-28 — S09: банки
 
 Спека: `docs/superpowers/specs/2026-10-28-s09-banks-design.md`. План: `docs/superpowers/plans/2026-10-28-s09-banks.md`.
@@ -506,3 +473,37 @@ CashFlowChart (Recharts), PLTable, CalendarView, BalanceSheet, all 4 analytics p
 - «Відключити» без підтвердження й не відкликає сесію в банку (лише прибирає підключення в FinFlow).
 - `importFrom` після прив'язки не можна змінити.
 - Ключ `settings.banks.notConfirmed` у `messages/*.json` більше ніде не використовується; прибрати в окремому кроці (ключі трьох мов мають збігатися).
+
+## 2026-10-29 — S09b: фонове оновлення банку
+
+Спека: `docs/superpowers/specs/2026-10-29-s09b-bank-cron-design.md`. План: `docs/superpowers/plans/2026-10-29-s09b-bank-cron.md`.
+
+**Статус:** реалізовано в гілці `s09b-bank-cron`, чекає огляду й мерджа. На production нічого не розгорнуто. **Є новий індекс:** `bankAccounts.status` (`COLLECTION_GROUP`) у `firestore.indexes.json`; деплоїти його окремим кроком. Секрет `BANK_CRON_SECRET` ще не створено ні у Vercel, ні в GitHub.
+
+### Зроблено
+- **Слоти:** `backgroundSlot` (`lib/domain/banking/slot.ts`): 08:00, 13:00 і 17:00 за Варшавою; 17:00-07:59 це слот `#17`. Рахунок, чий `bgSlot` дорівнює поточному слоту, пропускається.
+- **GitHub Actions:** `.github/workflows/bank-sync.yml` щогодини на 7-й хвилині (UTC) і вручну (`workflow_dispatch`). Сервер сам визначає слот, тож запуск із запізненням не губить оновлення.
+- **Маршрут** `POST /api/cron/bank-sync`: `Authorization: Bearer` з `BANK_CRON_SECRET`, порівняння через `timingSafeEqual` (`lib/server/cron-auth.ts`). Секрет відсутній або коротший за 32 символи дає 503, хибний токен 401.
+- **`runBackgroundSync`** (`lib/server/banking/background.ts`): до 4 `syncStep` на рахунок, бюджет часу 45 с, клієнт банку без заголовків `psu-*`. `rate_limited` ставить `backoffUntil` = +6 год; `already_running` і вичерпаний бюджет слот не витрачають.
+- **Guard-тест:** `tests/unit/server/route-auth-coverage.test.ts` потребував запису в allow-list для cron-маршруту, бо той маршрут сам перевіряє секрет і читає заголовок `Authorization` навмисно. Інші маршрути перевіряються як раніше.
+- **Документація:** `.env.example` (`BANK_CRON_SECRET`), `CLAUDE.md` (рядок таблиці змінних і абзац S09b у блоці «Banks (S09)»).
+
+### Підсумок перевірок (2026-10-29, реально виміряно)
+- `npm run typecheck` (`tsc --noEmit`): чисто.
+- `npm run lint`: 0 errors / 10 warnings (стільки ж, як після S09).
+- `npm run check:server-imports`: ok, усі 4 модулі завантажуються.
+- unit: 1917 тестів, 132 файли (було 1879 і 128 після S09).
+- rules: 123 тести, 2 файли (без змін).
+- integration (емулятор Firestore): 202 тести, 19 файлів (було 170 і 17).
+- e2e не запускали (за планом; змін в інтерфейсі немає).
+
+### Не перевірено
+- Реальний запуск GitHub Actions і cron на production (секрет і деплой ще не зроблено).
+- Ліміт PSD2 для фонових запитів на реальному банку і поведінка `rate_limited` на production.
+- Відповіді 503 і 401 на production.
+
+### Known follow-ups (S09b)
+- Помилки фонового запуску бачить лише власник репозиторію як червоний запуск GitHub (листи і push про збої це S18).
+- Слот витрачається будь-якою спробою, тож збій банку ранком не повторюється до 13:00.
+- Точний ліміт Millennium невідомий (перевіряється спостереженням перших днів).
+
