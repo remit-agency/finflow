@@ -1,3 +1,5 @@
+import type { LedgerTransaction } from '@/lib/domain/ledger/types'
+
 /** What the `excluded` flag of an operation needs to know about one tag (S10t). */
 export interface TagFlags {
   excludeFromAnalytics: boolean
@@ -20,4 +22,11 @@ export function tagFlagsOf(docs: readonly TagFlagSource[]): Map<string, TagFlags
   const out = new Map<string, TagFlags>()
   for (const d of docs) if (d.exists) out.set(d.id, { excludeFromAnalytics: d.get('excludeFromAnalytics') === true })
   return out
+}
+
+/** The operation with `excluded` set (true) or without the key (false): the ledger stores the flag only when it is on. */
+export function withExcluded(tx: LedgerTransaction, excluded: boolean): LedgerTransaction {
+  const { excluded: _old, ...rest } = tx
+  void _old
+  return excluded ? { ...rest, excluded: true } : rest
 }

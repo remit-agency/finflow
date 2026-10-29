@@ -19,6 +19,8 @@ const LEDGER: Record<LedgerErrorCode, number> = {
   ledger_busy: 409,
   conflict: 409,
   bank_locked: 422,
+  tag_not_found: 422,
+  tag_archived: 422,
 }
 
 const FX: Record<FxErrorCode, [number, string]> = {

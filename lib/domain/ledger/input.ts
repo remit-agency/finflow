@@ -2,6 +2,8 @@ import { asRecord, bad, isId, onlyKeys } from './guards'
 import { isDay, monthsBetween } from './days'
 import { MAX_MINOR, isMinor } from './money'
 import { TX_STATUSES, TX_TYPES, type Accrual, type LedgerTransaction, type TxStatus, type TxType } from './types'
+import { tagIdsOf } from '@/lib/domain/tags/assign'
+import { MAX_TX_TAGS } from '@/lib/domain/tags/types'
 
 export const MAX_PERIOD_MONTHS = 36
 export const MIN_DAY = '2000-01-01'
@@ -82,6 +84,14 @@ function stringList(v: unknown, field: string, maxItems: number, maxLength: numb
   })
 }
 
+/** The tag ids of an operation (S10t): at most 10 safe document ids, none twice; `[]` when absent. */
+function tagList(v: unknown): string[] {
+  if (v === undefined) return []
+  const ids = tagIdsOf(v, MAX_TX_TAGS)
+  if (ids === null) bad('tags')
+  return ids
+}
+
 /**
  * Options of a create. `internal` is for server code only, never for a value taken from a request body as it is:
  * - the bank sync passes it (its operations carry `bk_` ids);
@@ -116,7 +126,7 @@ export function parseTransactionInput(body: unknown, opts?: ParseOptions): Trans
     paymentDate,
     accrual: { mode: 'date', date: paymentDate },
     isRecurring: false,
-    tags: stringList(r.tags, 'tags', 20, 50),
+    tags: tagList(r.tags),
     fileUrls: stringList(r.fileUrls, 'fileUrls', 10, 2048),
   }
   if (r.clientId !== undefined) out.clientId = r.clientId as string

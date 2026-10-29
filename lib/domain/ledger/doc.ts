@@ -89,6 +89,7 @@ export function transactionToDoc(tx: LedgerTransaction): Record<string, unknown>
     doc.bank = bank
   }
   if (tx.autoRules !== undefined && tx.autoRules.length > 0) doc.autoRules = tx.autoRules.map((r) => ({ id: r.id, name: r.name }))
+  if (tx.excluded === true) doc.excluded = true
   return doc
 }
 
@@ -162,6 +163,8 @@ export function parseTransaction(id: string, data: unknown): LedgerTransaction |
   }
   const autoRules = parseAutoRules(data.autoRules)
   if (autoRules !== undefined) tx.autoRules = autoRules
+  if (data.excluded !== undefined && typeof data.excluded !== 'boolean') return null
+  if (data.excluded === true) tx.excluded = true
   return tx
 }
 

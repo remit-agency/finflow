@@ -61,6 +61,11 @@ describe('parseTransactionInput', () => {
     expect(out).toMatchObject({ type: 'transfer', toAccountId: 'b', toAmountMinor: 7, accrual: { mode: 'date', date: '2026-10-20' } })
   })
 
+  it('accepts up to ten tag ids (S10t)', () => {
+    const tags = Array.from({ length: 10 }, (_, i) => `tag${i}`)
+    expect(parseTransactionInput({ ...BASE, tags }).tags).toEqual(tags)
+  })
+
   it.each([
     ['a non-object body', 'x', 'invalid_input:body'],
     ['an unknown key', { ...BASE, nope: 1 }, 'invalid_input:nope'],
@@ -80,6 +85,10 @@ describe('parseTransactionInput', () => {
     ['an extra accrual key', { ...BASE, accrual: { mode: 'date', date: '2026-10-20', x: 1 } }, 'invalid_input:accrual.x'],
     ['a long description', { ...BASE, description: 'x'.repeat(501) }, 'invalid_input:description'],
     ['too many tags', { ...BASE, tags: Array.from({ length: 21 }, (_, i) => `t${i}`) }, 'invalid_input:tags'],
+    ['eleven tags', { ...BASE, tags: Array.from({ length: 11 }, (_, i) => `t${i}`) }, 'invalid_input:tags'],
+    ['a tag twice', { ...BASE, tags: ['vat', 'vat'] }, 'invalid_input:tags'],
+    ['a tag that is not a document id', { ...BASE, tags: ['ПДВ 2026'] }, 'invalid_input:tags'],
+    ['the server-only excluded flag', { ...BASE, excluded: true }, 'invalid_input:excluded'],
     ['a short clientId', { ...BASE, clientId: 'abc' }, 'invalid_input:clientId'],
     ['a transfer without a target', { type: 'transfer', accountId: 'a', amountMinor: 5, paymentDate: '2026-10-20' }, 'invalid_input:toAccountId'],
     ['a transfer with a category', { type: 'transfer', accountId: 'a', toAccountId: 'b', amountMinor: 5, paymentDate: '2026-10-20', categoryId: 'c' }, 'invalid_input:categoryId'],
