@@ -49,6 +49,14 @@ describe('rules calls', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/api/orgs/org1/rules/preview')
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ rule: RULE })
   })
+
+  it('passes the signal to the preview so a stale check can be stopped', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => json({ matched: 0, scanned: 0, capped: false }))
+    vi.stubGlobal('fetch', fetchMock)
+    const controller = new AbortController()
+    await previewRule('org1', RULE, controller.signal)
+    expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal)
+  })
 })
 
 describe('checkExisting', () => {

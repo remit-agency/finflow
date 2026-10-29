@@ -32,8 +32,16 @@ export async function orderRules(orgId: string, ids: string[]): Promise<void> {
 }
 
 /** «Перевірити»: how many operations without a category or counterparty the draft rule would fill (nothing is saved). */
-export async function previewRule(orgId: string, rule: RuleInput): Promise<PreviewResult> {
-  return (await apiCall('POST', `${base(orgId)}/preview`, { rule })) as PreviewResult
+export async function previewRule(orgId: string, rule: RuleInput, signal?: AbortSignal): Promise<PreviewResult> {
+  const res = await fetch(`${base(orgId)}/preview`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rule }),
+    signal,
+  })
+  if (!res.ok) throw await readApiError(res)
+  return (await res.json()) as PreviewResult
 }
 
 async function step<T>(orgId: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<T> {

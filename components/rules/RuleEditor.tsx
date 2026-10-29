@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Plus, Trash2 } from 'lucide-react'
@@ -46,15 +46,22 @@ export function RuleEditor({ orgId, rule, accounts, incomeCategories, expenseCat
   const categoryName = useCategoryName()
   const [draft, setDraft] = useState<RuleDraft>(() => (rule ? draftFromRule(rule, locale) : emptyDraft()))
   const [busy, setBusy] = useState<Busy>(null)
-  // The answer of «Перевірити»; any change of the draft makes it stale, so it is cleared.
-  const [check, setCheck] = useState<PreviewResult | null>(null)
+  // The answer of «Перевірити», tagged with the draft it was computed for (`key`): it is shown only while that draft is still the one.
+  const [check, setCheck] = useState<{ key: string; result: PreviewResult } | null>(null)
+  // The newest «Перевірити» request; a new check, an edit or the unmount aborts it.
+  const checkRequest = useRef<AbortController | null>(null)
 
   const input = draftToInput(draft)
+  const draftKey = input === null ? null : JSON.stringify(input)
+  const checkResult = check !== null && check.key === draftKey ? check.result : null
   const categories = draft.type === 'income' ? incomeCategories : expenseCategories
   const missingCategory = draft.categoryId !== '' && !categories.some((c) => c.id === draft.categoryId)
 
+  useEffect(() => () => checkRequest.current?.abort(), [])
+
   const change = (next: Partial<RuleDraft>) => {
     setDraft((d) => ({ ...d, ...next }))
+    checkRequest.current?.abort()
     setCheck(null)
   }
   const changeCondition = (index: number, next: DraftCondition) => change({ conditions: draft.conditions.map((c, i) => (i === index ? next : c)) })
@@ -88,13 +95,22 @@ export function RuleEditor({ orgId, rule, accounts, incomeCategories, expenseCat
 
   const runCheck = async () => {
     if (input === null) return
+    checkRequest.current?.abort()
+    const request = new AbortController()
+    checkRequest.current = request
+    const key = JSON.stringify(input)
     setBusy('check')
     try {
-      setCheck(await previewRule(orgId, input))
+      const result = await previewRule(orgId, input, request.signal)
+      if (!request.signal.aborted) setCheck({ key, result })
     } catch {
-      toast.error(t('errors.check'))
+      if (!request.signal.aborted) toast.error(t('errors.check'))
     } finally {
-      setBusy(null)
+      // Only the newest request releases «busy»: an aborted one must not clear the next check's.
+      if (checkRequest.current === request) {
+        checkRequest.current = null
+        setBusy(null)
+      }
     }
   }
 
@@ -201,10 +217,10 @@ export function RuleEditor({ orgId, rule, accounts, incomeCategories, expenseCat
             <Button type="button" variant="soft" onClick={() => void runCheck()} disabled={input === null || busy !== null}>
               {busy === 'check' ? t('editor.checking') : t('editor.check')}
             </Button>
-            {check && (
+            {checkResult && (
               <p data-testid="rule-check-result" className="text-sm text-ink" aria-live="polite">
-                {t('editor.checkResult', { scanned: check.scanned, matched: check.matched })}
-                {check.capped && <span className="block text-xs text-ink-muted">{t('editor.checkCapped')}</span>}
+                {t('editor.checkResult', { scanned: checkResult.scanned, matched: checkResult.matched })}
+                {checkResult.capped && <span className="block text-xs text-ink-muted">{t('editor.checkCapped')}</span>}
               </p>
             )}
           </div>
