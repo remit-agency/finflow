@@ -83,10 +83,14 @@ describe('settingsIndexRedirect', () => {
   })
 
   it.each([
-    [{ eb_auth: 'abc' }, '/org1/settings/banks?eb_auth=abc'],
+    [{ eb_connected: '1' }, '/org1/settings/banks?eb_connected=1'],
     [{ eb_error: '1' }, '/org1/settings/banks?eb_error=1'],
   ])('sends a bank return value to Banks: %o', (query, expected) => {
     expect(settingsIndexRedirect('org1', query)).toBe(expected)
+  })
+
+  it('no longer treats the retired eb_auth value as a bank return', () => {
+    expect(settingsIndexRedirect('org1', { eb_auth: 'abc' })).toBe('/org1/settings/company?eb_auth=abc')
   })
 
   it('encodes the org id', () => {

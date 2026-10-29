@@ -39,8 +39,8 @@ type Query = Record<string, string | string[] | undefined>
 
 /**
  * Where the old single settings page (`/<org>/settings`) sends a visitor. A bank return value
- * (`eb_auth`, `eb_error`) belongs to the Banks section; there only `eb_auth` is consumed
- * (EnableBankingConnect does not read `eb_error` yet); everything else goes to Company. The query string is kept as is.
+ * (`eb_connected` or `eb_error`, set by the Enable Banking callback) belongs to the Banks section; everything else
+ * goes to Company. The query string is kept as is.
  */
 export function settingsIndexRedirect(orgId: string, query: Query): string {
   const params = new URLSearchParams()
@@ -48,7 +48,7 @@ export function settingsIndexRedirect(orgId: string, query: Query): string {
     if (value === undefined) continue
     for (const item of Array.isArray(value) ? value : [value]) params.append(key, item)
   }
-  const section: SettingsSection = params.has('eb_auth') || params.has('eb_error') ? 'banks' : 'company'
+  const section: SettingsSection = params.has('eb_connected') || params.has('eb_error') ? 'banks' : 'company'
   const qs = params.toString()
   return qs ? `${settingsPath(orgId, section)}?${qs}` : settingsPath(orgId, section)
 }

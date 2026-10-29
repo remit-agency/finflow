@@ -148,10 +148,25 @@ describe('POST /api/enablebanking/session', () => {
     const sent = JSON.parse(String(init.body))
     expect(sent.aspsp).toEqual({ name: 'Mock ASPSP', country: 'FI' })
     expect(sent.redirect_url).toBe(`${TEST_APP_URL}/api/enablebanking/callback`)
-    expect(sent.psu_type).toBe('personal')
+    expect(sent.psu_type).toBe('business')
     expect(sent.access.balances).toBe(true)
     expect(sent.access.transactions).toBe(true)
     expect(verifyEbState(sent.state, TEST_EB_STATE_SECRET)).toEqual({ orgId: 'org-acme', uid: 'user-alice' })
+  })
+
+  it('sends the psuType the owner chose (personal) as psu_type', async () => {
+    fetchMock.mockResolvedValueOnce(upstreamJson({ url: 'https://x.test', authorization_id: 'a1' }))
+    const res = await POST(sessionRequest({ ...VALID_BODY, psuType: 'personal' }, 'token-alice'))
+    expect(res.status).toBe(200)
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(init.body)).psu_type).toBe('personal')
+  })
+
+  it('answers 400 "Missing params" for a psuType that is neither business nor personal', async () => {
+    const res = await POST(sessionRequest({ ...VALID_BODY, psuType: 'government' }, 'token-alice'))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'Missing params' })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('defaults aspspCountry to PL', async () => {

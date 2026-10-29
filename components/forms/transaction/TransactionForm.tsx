@@ -64,6 +64,8 @@ export function TransactionForm({
   const { locale, money } = useFormatters()
   const categoryName = useCategoryName()
   const isEdit = !!transaction
+  // An operation imported from a bank keeps its amount, payment date, account and type (the server refuses to change them too).
+  const bankLocked = transaction?.bank !== undefined
   const today = todayDay()
 
   // What the form is compared with to know whether anything was typed: the stored operation, or an empty form.
@@ -127,6 +129,7 @@ export function TransactionForm({
     if (e instanceof LedgerApiError) {
       if (e.code === 'counterparty_archived') return t('errors.counterpartyArchived')
       if (e.code === 'counterparty_not_found') return t('errors.counterpartyMissing')
+      if (e.code === 'bank_locked') return t('errors.bankLocked')
     }
     return t('errors.save')
   }
@@ -231,34 +234,42 @@ export function TransactionForm({
           <DialogHeader>
             <DialogTitle>{isEdit ? t('titleEdit') : t('titleNew')}</DialogTitle>
           </DialogHeader>
+          {bankLocked && (
+            <p data-testid="bank-locked-hint" className="text-xs text-ink-muted">
+              {t('bankLockedHint')}
+            </p>
+          )}
 
           <Tabs value={state.type} onValueChange={(value) => changeType(value as TxType)}>
             <TabsList className="w-full">
-              <TabsTrigger value="income" className="flex-1 data-active:text-income">
+              <TabsTrigger value="income" disabled={bankLocked} className="flex-1 data-active:text-income">
                 {t('income')}
               </TabsTrigger>
-              <TabsTrigger value="expense" className="flex-1 data-active:text-expense">
+              <TabsTrigger value="expense" disabled={bankLocked} className="flex-1 data-active:text-expense">
                 {t('expense')}
               </TabsTrigger>
-              <TabsTrigger value="transfer" className="flex-1">
+              <TabsTrigger value="transfer" disabled={bankLocked} className="flex-1">
                 {t('transfer')}
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value={state.type} className="mt-4 space-y-4">
-              <StatusField status={status} locked={futureDate} onChange={(next) => patch({ status: next })} />
+              {/* A disabled fieldset disables the native controls and the segmented buttons inside it. */}
+              <fieldset disabled={bankLocked} className="m-0 min-w-0 space-y-4 border-0 p-0">
+                <StatusField status={status} locked={futureDate} onChange={(next) => patch({ status: next })} />
 
-              <AmountFields
-                state={state}
-                status={status}
-                accounts={accounts}
-                baseCurrency={baseCurrency}
-                currency={currency}
-                toCurrency={crossCurrency && toAccount ? toAccount.currency : null}
-                errors={errors}
-                amountRef={amountRef}
-                onChange={patch}
-              />
+                <AmountFields
+                  state={state}
+                  status={status}
+                  accounts={accounts}
+                  baseCurrency={baseCurrency}
+                  currency={currency}
+                  toCurrency={crossCurrency && toAccount ? toAccount.currency : null}
+                  errors={errors}
+                  amountRef={amountRef}
+                  onChange={patch}
+                />
+              </fieldset>
 
               {state.type !== 'transfer' && (
                 <>
@@ -288,6 +299,7 @@ export function TransactionForm({
                 accrual={state.accrual}
                 showAccrual={state.type !== 'transfer'}
                 errors={errors}
+                paymentLocked={bankLocked}
                 onChange={patch}
               />
 

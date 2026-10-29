@@ -6,9 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import EnableBankingConnect from '@/components/settings/EnableBankingConnect'
 import { RequireAction } from '@/components/shell/RequireAction'
 
-// The Enable Banking callback returns here (`?eb_auth=` / `?eb_error=`). EnableBankingConnect
-// (unchanged in S01A) consumes only `eb_auth`; a user who cancels at the bank lands here with
-// `eb_error=1` and sees no message yet (known gap, tracked as a follow-up).
+// The Enable Banking callback returns here with `?eb_connected=1` or `?eb_error=1`; the connections
+// and their linking are read from the server by EnableBankingConnect.
 export default function BanksSettingsPage() {
   const t = useTranslations('settings.banks')
   const params = useParams()

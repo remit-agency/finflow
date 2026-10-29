@@ -1,6 +1,14 @@
 import { defineConfig, devices } from '@playwright/test'
+import { generateKeyPairSync } from 'node:crypto'
 
 const isCI = !!process.env.CI
+
+// A throw-away RSA key for the Enable Banking JWT (PKCS#8 PEM): the fake bank (tests/e2e/helpers/eb-stub.mjs) accepts any token.
+const e2eBankKey = generateKeyPairSync('rsa', {
+  modulusLength: 2048,
+  privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  publicKeyEncoding: { type: 'spki', format: 'pem' },
+}).privateKey
 
 // Env for the `next dev` server under test. Dummy, public-shaped values for the
 // emulator-only demo project "demo-finflow" — none of these are secrets.
@@ -20,6 +28,10 @@ const E2E_SERVER_ENV: Record<string, string> = {
   NEXT_TELEMETRY_DISABLED: '1',
   // The MF white list stub (tests/e2e/helpers/wl-stub.mjs): no e2e test calls the real government API.
   WL_API_BASE: 'http://127.0.0.1:4010',
+  // The bank connection (S09) talks to the fake bank (tests/e2e/helpers/eb-stub.mjs), never to the real Enable Banking API.
+  ENABLEBANKING_APP_ID: 'e2e-app',
+  ENABLEBANKING_PRIVATE_KEY: e2eBankKey,
+  EB_API_BASE: 'http://127.0.0.1:4011',
 }
 
 export default defineConfig({
@@ -59,6 +71,14 @@ export default defineConfig({
     {
       command: 'node tests/e2e/helpers/wl-stub.mjs',
       url: 'http://127.0.0.1:4010/health',
+      reuseExistingServer: false,
+      timeout: 30_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      command: 'node tests/e2e/helpers/eb-stub.mjs',
+      url: 'http://127.0.0.1:4011/health',
       reuseExistingServer: false,
       timeout: 30_000,
       stdout: 'pipe',

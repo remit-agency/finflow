@@ -16,7 +16,9 @@ export async function POST(req: Request, { params }: Ctx) {
     const { uid } = await requireUser(req)
     const { orgId } = await params
     await requireOrgRole(uid, orgId, ['owner', 'accountant'])
-    const input = parseTransactionInput(await readJsonBody(req, MAX_BODY_BYTES))
+    // `internal` only lets a bank-prefixed id (bk_) reach createTransaction, which accepts it only with the bank's mark:
+    // that is how an undo of a deleted bank operation restores it. Any other bk_ id is refused there (invalid_input).
+    const input = parseTransactionInput(await readJsonBody(req, MAX_BODY_BYTES), { internal: true })
     const { transaction, replayed } = await ledger.createTransaction(orgId, uid, input)
     return Response.json({ transaction }, { status: replayed ? 200 : 201, headers: { 'Cache-Control': 'no-store' } })
   } catch (e) {

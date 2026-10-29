@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { AccountsSidebar } from '@/components/shell/AccountsSidebar'
 import { AppHeader } from '@/components/shell/AppHeader'
+import { BankAutoSync } from '@/components/shell/BankAutoSync'
+import { BankNotice } from '@/components/shell/BankNotice'
 import { ModuleTabs } from '@/components/shell/ModuleTabs'
 import { NoAccess } from '@/components/shell/NoAccess'
 import { SettingsMenu } from '@/components/shell/SettingsMenu'
@@ -65,6 +67,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
             {granted && !inSettings && <ModuleTabs />}
             <VerifyEmailBanner />
+            {granted && <BankNotice />}
+            {granted && <BankAutoSync />}
             <main className="min-w-0 flex-1">
               {granted ? children : <div data-testid="shell-loading" className="h-full animate-pulse bg-canvas/40" aria-busy />}
             </main>

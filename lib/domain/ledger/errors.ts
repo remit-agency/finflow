@@ -8,9 +8,11 @@ export type LedgerErrorCode =
   | 'currency_mismatch'
   | 'future_actual'
   | 'account_has_operations'
+  | 'account_linked_to_bank'
   | 'currency_locked'
   | 'ledger_busy'
   | 'conflict'
+  | 'bank_locked'
 
 /** An expected failure of a ledger operation. `field` names the offending input field, if any. */
 export class LedgerError extends Error {

@@ -6,6 +6,7 @@ import {
   TX_TYPES,
   type Accrual,
   type Base,
+  type BankInfo,
   type Fx,
   type LedgerAccount,
   type LedgerTransaction,
@@ -69,6 +70,14 @@ export function transactionToDoc(tx: LedgerTransaction): Record<string, unknown>
   if (tx.projectId !== undefined) doc.projectId = tx.projectId
   if (tx.fx !== undefined) doc.fx = tx.fx
   if (tx.base !== undefined) doc.base = tx.base
+  if (tx.bank !== undefined) {
+    doc.source = 'bank'
+    const bank: Record<string, string> = { accountRef: tx.bank.accountRef }
+    if (tx.bank.entryReference !== undefined) bank.entryReference = tx.bank.entryReference
+    if (tx.bank.counterpartyName !== undefined) bank.counterpartyName = tx.bank.counterpartyName
+    if (tx.bank.remittance !== undefined) bank.remittance = tx.bank.remittance
+    doc.bank = bank
+  }
   return doc
 }
 
@@ -131,6 +140,14 @@ export function parseTransaction(id: string, data: unknown): LedgerTransaction |
     if (!isRecord(data.base) || !isMinor(data.base.payment) || !isMinor(data.base.accrual)) return null
     const base: Base = { payment: data.base.payment, accrual: data.base.accrual }
     tx.base = base
+  }
+  if (data.source === 'bank' && isRecord(data.bank) && typeof data.bank.accountRef === 'string') {
+    const bank: BankInfo = { accountRef: data.bank.accountRef }
+    for (const key of ['entryReference', 'counterpartyName', 'remittance'] as const) {
+      const value = data.bank[key]
+      if (typeof value === 'string') bank[key] = value
+    }
+    tx.bank = bank
   }
   return tx
 }

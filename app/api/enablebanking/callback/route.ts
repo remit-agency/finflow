@@ -1,5 +1,6 @@
 import { createJwt } from '@/lib/enablebanking/jwt'
 import { requireOrgRole, requireUser } from '@/lib/server/auth'
+import { bankDeps, banking } from '@/lib/server/banking'
 import { verifyEbState } from '@/lib/server/eb-state'
 import { errorResponse, HttpError } from '@/lib/server/http-error'
 
@@ -23,7 +24,9 @@ function redirectTo(req: Request, path: string): Response {
 // /api/enablebanking/session is verified first (forgeries get 400 and nothing else is touched),
 // then the session must belong to the same user as the state, then membership is checked.
 // All of that happens BEFORE the code is exchanged.
-// Bank connections are owner-only.
+// Bank connections are owner-only. On success the session is saved on the server (S09) and the
+// redirect carries `?eb_connected=1` only. The session id does reach the members of the company, as the
+// connection id in `GET /api/orgs/{orgId}/bank`: a non-secret handle; using it needs the app's private key.
 export async function GET(req: Request) {
   const params = new URL(req.url).searchParams
   const code = params.get('code')
@@ -76,8 +79,12 @@ export async function GET(req: Request) {
     }
 
     const data = await res.json()
-    const payload = Buffer.from(JSON.stringify({ sessionId: data.session_id })).toString('base64url')
-    return redirectTo(req, `${settingsPath}?eb_auth=${payload}`)
+    if (typeof data.session_id !== 'string') throw new Error('no session_id')
+    // S09: the server reads the session (accounts, validUntil) and keeps it; the redirect does not carry the session id.
+    const deps = bankDeps(req)
+    const session = await deps.eb.getSession(data.session_id)
+    await banking.saveSession(deps, orgId, verified.uid, session)
+    return redirectTo(req, `${settingsPath}?eb_connected=1`)
   } catch (e) {
     console.error('Callback error:', e)
     return redirectTo(req, `${settingsPath}?eb_error=1`)

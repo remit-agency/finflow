@@ -96,6 +96,10 @@ test.describe('ledger (emulators)', () => {
       { orgId: user.orgId, id: first!.id },
     )
     expect(status).toBe(204)
+    // The journal reads from the server (S08) and reloads when the browser announces a change of its own (or the
+    // tab becomes visible again). A real delete button goes through lib/api/ledger-client, which announces it; the
+    // raw fetch above does not, so the announcement is made here.
+    await page.evaluate(() => window.dispatchEvent(new Event('finflow:ledger-changed')))
     await expect(page.getByRole('row').filter({ hasText: 'Перший дохід' })).toHaveCount(0)
     await expect(row).toContainText(balanceText('1 000', '00'))
     // The income of 10 and the expense of 10 stay in the journal.

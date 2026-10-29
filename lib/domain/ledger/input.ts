@@ -8,6 +8,11 @@ export const MIN_DAY = '2000-01-01'
 
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/
 const RESERVED = /^__.*__$/
+/**
+ * The id prefix of a bank operation (`bk_` + the bank key). A client may not pick it: the ledger accepts a create with
+ * this id only when the bank's own mark for that key matches the create (see `createTransaction` in lib/server/ledger/write.ts).
+ */
+export const BANK_CLIENT_ID_PREFIX = 'bk_'
 
 const CREATE_KEYS = [
   'clientId', 'type', 'status', 'accountId', 'amountMinor', 'toAccountId', 'toAmountMinor', 'paymentDate',
@@ -77,7 +82,17 @@ function stringList(v: unknown, field: string, maxItems: number, maxLength: numb
   })
 }
 
-export function parseTransactionInput(body: unknown): TransactionInput {
+/**
+ * Options of a create. `internal` is for server code only, never for a value taken from a request body as it is:
+ * - the bank sync passes it (its operations carry `bk_` ids);
+ * - the create route passes it too, and only so that an undo of a deleted bank operation (which re-creates it under its
+ *   own `bk_` id) reaches `createTransaction`. There the bank mark decides, so a client still cannot make a bank operation.
+ */
+export interface ParseOptions {
+  internal?: boolean
+}
+
+export function parseTransactionInput(body: unknown, opts?: ParseOptions): TransactionInput {
   const r = asRecord(body)
   onlyKeys(r, CREATE_KEYS)
 
@@ -89,6 +104,7 @@ export function parseTransactionInput(body: unknown): TransactionInput {
   if (r.clientId !== undefined && !(typeof r.clientId === 'string' && CLIENT_ID.test(r.clientId) && !RESERVED.test(r.clientId))) {
     bad('clientId')
   }
+  if (typeof r.clientId === 'string' && r.clientId.startsWith(BANK_CLIENT_ID_PREFIX) && opts?.internal !== true) bad('clientId')
   if (!isId(r.accountId)) bad('accountId')
   const paymentDate = day(r.paymentDate, 'paymentDate')
 

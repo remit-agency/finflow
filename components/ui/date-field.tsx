@@ -12,13 +12,15 @@ interface Props {
   onChange: (day: string) => void
   placeholder: string
   calendarLabel: string
+  /** Shows the date but does not let it change (a locked field). */
+  disabled?: boolean
 }
 
 /**
  * A day field you can type into (DD.MM.YYYY, dots appear by themselves) or pick from the calendar button.
  * `onChange` gets a day key only for a real date and '' otherwise, so the form's own validation reports the rest.
  */
-export function DateField({ id, value, onChange, placeholder, calendarLabel }: Props) {
+export function DateField({ id, value, onChange, placeholder, calendarLabel, disabled = false }: Props) {
   // The text is kept as typed (also when incomplete) until it stops matching `value` (calendar pick, form following another date).
   const [draft, setDraft] = useState<string | null>(null)
   const picker = useRef<HTMLInputElement>(null)
@@ -34,6 +36,7 @@ export function DateField({ id, value, onChange, placeholder, calendarLabel }: P
         autoComplete="off"
         placeholder={placeholder}
         value={shown}
+        disabled={disabled}
         className="pr-9"
         onFocus={(e) => {
           // A prefilled date is replaced by typing instead of being appended to.
@@ -54,6 +57,7 @@ export function DateField({ id, value, onChange, placeholder, calendarLabel }: P
       <button
         type="button"
         aria-label={calendarLabel}
+        disabled={disabled}
         onClick={() => picker.current?.showPicker?.()}
         className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-ink-muted hover:text-ink"
       >
@@ -65,6 +69,7 @@ export function DateField({ id, value, onChange, placeholder, calendarLabel }: P
         type="date"
         tabIndex={-1}
         aria-hidden
+        disabled={disabled}
         value={value}
         onChange={(e) => {
           setDraft(null)
