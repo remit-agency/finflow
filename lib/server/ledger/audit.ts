@@ -6,6 +6,7 @@ export type AuditAction =
   | 'account.create' | 'account.update' | 'account.delete'
   | 'counterparty.create' | 'counterparty.update'
   | 'rule.create' | 'rule.update' | 'rule.delete' | 'rule.order'
+  | 'tag.create' | 'tag.update'
   | 'org.update' | 'ledger.rebuild' | 'migration.v2'
 
 /** What made a change when it was not a person's own edit (S10: the rules). */
