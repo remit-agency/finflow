@@ -4,6 +4,7 @@ import type { Rule } from '@/lib/domain/rules/types'
 import { runBackgroundSync } from '@/lib/server/banking/background'
 import { createWithRules, syncStep } from '@/lib/server/banking/sync'
 import { verifyLedger } from '@/lib/server/ledger/verify'
+import { listRules } from '@/lib/server/rules/read'
 import { createRule, updateRule } from '@/lib/server/rules/write'
 import { ORG, UID, clearFirestore, makeDeps, readDoc, seedAccount, seedCategory, seedCounterparty, seedOrg, testDb } from './helpers'
 import { bankDeps, ebTx, fakeEb, seedBank } from './bank-helpers'
@@ -128,5 +129,31 @@ describe('the background refresh (S09b) applies the rules too', () => {
     const summary = await runBackgroundSync(bankDeps(db, fakeEb(PAGE), new Date('2026-10-27T10:00:00Z')))
     expect(summary).toMatchObject({ synced: 1, imported: 3 })
     expect((await byRef('r1')).data).toMatchObject({ categoryId: 'k-fuel' })
+  })
+})
+
+describe('a malformed rule document (its ids would throw as Firestore paths)', () => {
+  /** Written directly, as an old or broken write could have left it: the action names a path-unsafe id. */
+  const badDoc = (id: string, actions: Record<string, unknown>, conditions: unknown[] = [{ kind: 'text', op: 'contains', values: ['orlen'] }]) =>
+    db.doc(`organizations/${ORG}/rules/${id}`).set({ schemaVersion: 1, orgId: ORG, name: id, type: 'expense', active: true, order: 0, conditions, actions })
+
+  it('does not stop the import: the operation is created without the category the document names', async () => {
+    await badDoc('r-bad', { categoryId: 'x/y' })
+    await createRule(makeDeps(db), ORG, UID, ruleInput({ name: 'Paliwo', actions: { categoryId: 'k-fuel' }, conditions: [{ kind: 'text', op: 'contains', values: ['orlen'] }] }))
+    await seedBank(db)
+    await runToEnd(bankDeps(db, fakeEb(PAGE)))
+    expect((await txCol().get()).size).toBe(3)
+    expect((await byRef('r1')).data).toMatchObject({ categoryId: 'k-fuel' })
+    expect((await byRef('r1')).data.autoRules).toEqual([{ id: expect.any(String), name: 'Paliwo' }])
+  })
+
+  it('a bad counterparty or account id in a document is left out as well, and the list still answers', async () => {
+    await badDoc('r-cp', { counterpartyId: 'a//b' })
+    await badDoc('r-acc', { categoryId: 'k-fuel' }, [{ kind: 'account', accountIds: ['a/b'] }])
+    await seedBank(db)
+    await runToEnd(bankDeps(db, fakeEb(PAGE)))
+    expect((await txCol().get()).size).toBe(3)
+    expect((await byRef('r1')).data.categoryId).toBeUndefined()
+    expect(await listRules(db, ORG)).toEqual([])
   })
 })

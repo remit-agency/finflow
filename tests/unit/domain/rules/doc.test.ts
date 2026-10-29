@@ -49,6 +49,40 @@ describe('rule documents', () => {
     expect(parseRule('r1', { ...ruleToDoc(rule), ...over })).toBeNull()
   })
 
+  it.each<[string, unknown]>([
+    ['a slash in a category id', 'x/y'],
+    ['a double slash in a category id', 'a//b'],
+    ['an empty category id', ''],
+    ['a reserved category id', '__x__'],
+    ['a number as category id', 5],
+  ])('reads %s as not a rule (a Firestore document path would throw)', (_name, categoryId) => {
+    expect(parseRule('r1', { ...ruleToDoc(rule), actions: { categoryId } })).toBeNull()
+  })
+
+  it.each<[string, unknown]>([
+    ['a slash in a counterparty id', 'a/b'],
+    ['a double slash in a counterparty id', 'a//b'],
+    ['an empty counterparty id', ''],
+    ['a number as counterparty id', 7],
+  ])('reads %s as not a rule', (_name, counterpartyId) => {
+    expect(parseRule('r1', { ...ruleToDoc(rule), actions: { counterpartyId } })).toBeNull()
+  })
+
+  it.each<[string, unknown]>([
+    ['a slash in an account id', 'a/b'],
+    ['a double slash in an account id', 'a//b'],
+    ['an empty account id', ''],
+    ['a non-string account id', 3],
+  ])('reads a rule with %s as not a rule', (_name, accountId) => {
+    const conditions = [{ kind: 'account', accountIds: ['a1', accountId] }]
+    expect(parseRule('r1', { ...ruleToDoc(rule), conditions })).toBeNull()
+  })
+
+  it('reads a rule whose ids are all valid', () => {
+    const conditions = [{ kind: 'account', accountIds: ['acc-1', 'acc_2'] }]
+    expect(parseRule('r1', { ...ruleToDoc(rule), conditions, actions: { categoryId: 'k-fuel', counterpartyId: 'cp-1' } })).not.toBeNull()
+  })
+
   it('reads a non-object as not a rule', () => {
     expect(parseRule('r1', null)).toBeNull()
   })

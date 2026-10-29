@@ -1,3 +1,4 @@
+import { isId } from '@/lib/domain/ledger/guards'
 import { isMinor } from '@/lib/domain/ledger/money'
 import {
   MAX_CONDITIONS,
@@ -19,6 +20,11 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 function nonEmptyStrings(v: unknown): string[] | null {
   return Array.isArray(v) && v.length > 0 && v.every((s) => typeof s === 'string' && s !== '') ? [...(v as string[])] : null
+}
+
+/** The ids of a document (account ids): the same rule as the input validation, so a path-unsafe id makes the document malformed. */
+function ids(v: unknown): string[] | null {
+  return Array.isArray(v) && v.length > 0 && v.every((s) => isId(s)) ? [...(v as string[])] : null
 }
 
 function conditionToDoc(c: RuleCondition): Record<string, unknown> {
@@ -59,7 +65,7 @@ function parseCondition(v: unknown): RuleCondition | null {
     return { kind: 'text', op: v.op as TextOp, values }
   }
   if (v.kind === 'account') {
-    const accountIds = nonEmptyStrings(v.accountIds)
+    const accountIds = ids(v.accountIds)
     return accountIds === null ? null : { kind: 'account', accountIds }
   }
   if (v.kind === 'amount') {
@@ -81,7 +87,7 @@ function parseActions(v: unknown): RuleActions | null {
   for (const key of ['categoryId', 'counterpartyId'] as const) {
     const value = v[key]
     if (value === undefined) continue
-    if (typeof value !== 'string' || value === '') return null
+    if (!isId(value)) return null
     out[key] = value
   }
   return out.categoryId === undefined && out.counterpartyId === undefined ? null : out
