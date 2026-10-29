@@ -440,6 +440,32 @@ test.describe('transaction form (emulators)', () => {
     await expect(dialog).toBeVisible()
   })
 
+  test('a list that opens under a resting pointer keeps the highlight on the chosen counterparty', async ({ page, request }) => {
+    await setupWithCounterpartyExpense(page, request, 'txf-picker-pointer')
+    const dialog = await openRow(page, 'Z kontrahentem')
+    const picker = dialog.getByRole('combobox', { name: 'Контрагент', exact: true })
+    const none = page.getByRole('option', { name: 'Без контрагента' })
+
+    // Leave the pointer where «none» opens, with the list closed (a click on the journal row can leave it there:
+    // the CI runner's wider toolbar put the row exactly under it).
+    await picker.focus()
+    const box = await none.boundingBox()
+    if (!box) throw new Error('the «none» option has no box')
+    await page.keyboard.press('Escape')
+    await expect(none).toHaveCount(0)
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+
+    await dialog.locator('#tx-category').focus()
+    await page.keyboard.press('Tab')
+    // The browser reports the pointer over «none» once the list is under it; two frames let the page react to that.
+    await expect(page.locator('[role="option"]:hover')).toHaveText('Без контрагента')
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    await page.keyboard.press('Enter')
+
+    await expect(picker).toHaveAttribute('aria-expanded', 'false')
+    await expect(picker).toHaveValue('Alfa')
+  })
+
   test('Escape while the picker list is open closes only the list', async ({ page, request }) => {
     await setupWithCounterpartyExpense(page, request, 'txf-picker-esc')
     const dialog = await openRow(page, 'Z kontrahentem')
