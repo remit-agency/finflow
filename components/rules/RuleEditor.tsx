@@ -172,7 +172,7 @@ export function RuleEditor({ orgId, rule, accounts, incomeCategories, expenseCat
             <legend className="text-sm font-medium text-ink">{t('editor.actions')}</legend>
             <div className="space-y-1">
               <Label htmlFor="rule-category">{t('editor.category')}</Label>
-              <NativeSelect id="rule-category" value={draft.categoryId} onChange={(e) => change({ categoryId: e.target.value })}>
+              <NativeSelect id="rule-category" wrapperClassName="w-full" value={draft.categoryId} onChange={(e) => change({ categoryId: e.target.value })}>
                 <option value="">{t('editor.noCategory')}</option>
                 {missingCategory && (
                   <option value={draft.categoryId} disabled>
@@ -209,23 +209,32 @@ export function RuleEditor({ orgId, rule, accounts, incomeCategories, expenseCat
             )}
           </div>
 
-          <DialogFooter className="gap-2 sm:justify-between">
-            {rule ? (
-              <Button type="button" variant="ghost" className="text-expense" onClick={() => void remove()} disabled={busy !== null}>
-                {tCommon('delete')}
-              </Button>
-            ) : (
-              <span />
+          {/* Sticky: the editor scrolls inside the dialog, and «Зберегти» must stay reachable without scrolling to the end.
+              -bottom-4 sits it on the edge of the dialog (its padding is 1rem), the hint says why «Зберегти» is off. */}
+          <div className="sticky -bottom-4 z-10 -mx-4 -mb-4 rounded-b-xl border-t bg-popover">
+            {input === null && (
+              <p id="rule-incomplete" className="px-4 pt-3 text-xs text-ink-muted">
+                {t('editor.incomplete')}
+              </p>
             )}
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={onClose} disabled={busy === 'save'}>
-                {tCommon('cancel')}
-              </Button>
-              <Button type="submit" disabled={input === null || busy !== null}>
-                {busy === 'save' ? t('editor.saving') : tCommon('save')}
-              </Button>
-            </div>
-          </DialogFooter>
+            <DialogFooter className="mx-0 mb-0 flex-row items-center justify-between gap-2 border-t-0 bg-muted/50">
+              {rule ? (
+                <Button type="button" variant="ghost" className="text-expense" onClick={() => void remove()} disabled={busy !== null}>
+                  {tCommon('delete')}
+                </Button>
+              ) : (
+                <span />
+              )}
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={onClose} disabled={busy === 'save'}>
+                  {tCommon('cancel')}
+                </Button>
+                <Button type="submit" aria-describedby={input === null ? 'rule-incomplete' : undefined} disabled={input === null || busy !== null}>
+                  {busy === 'save' ? t('editor.saving') : tCommon('save')}
+                </Button>
+              </div>
+            </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

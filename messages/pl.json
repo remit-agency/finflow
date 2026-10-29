@@ -621,7 +621,7 @@
           "amount": "Kwota"
         },
         "op": {
-          "label": "Warunek",
+          "label": "Porównanie",
           "contains": "zawiera",
           "notContains": "nie zawiera",
           "equals": "równa się"
@@ -632,7 +632,7 @@
         "currency": "Waluta",
         "min": "Od",
         "max": "Do",
-        "actions": "Akcje",
+        "actions": "Działania",
         "category": "Kategoria",
         "noCategory": "Nie przypisuj",
         "counterparty": "Kontrahent",
@@ -641,6 +641,7 @@
         "checkResult": "Operacje bez kategorii lub kontrahenta: {scanned}, pasuje: {matched}",
         "checkCapped": "Sprawdzono tylko ostatnie 2000 operacji",
         "saving": "Zapisywanie…",
+        "incomplete": "Aby zapisać, uzupełnij nazwę i wszystkie warunki oraz wybierz kategorię lub kontrahenta",
         "deleteConfirm": "Usunąć regułę „{name}”? Kategorie, które już przypisała, zostaną."
       },
       "apply": {

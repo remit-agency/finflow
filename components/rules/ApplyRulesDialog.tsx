@@ -64,7 +64,7 @@ export function ApplyRulesDialog({ orgId, onClose }: Props) {
     <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t('title')}</DialogTitle>
+          <DialogTitle className="leading-snug">{t('title')}</DialogTitle>
           <DialogDescription>{t('note')}</DialogDescription>
         </DialogHeader>
         <div data-testid="rules-apply-state" className="space-y-1 text-sm text-ink" aria-live="polite">

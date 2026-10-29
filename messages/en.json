@@ -621,7 +621,7 @@
           "amount": "Amount"
         },
         "op": {
-          "label": "Condition",
+          "label": "Comparison",
           "contains": "contains",
           "notContains": "does not contain",
           "equals": "equals"
@@ -641,6 +641,7 @@
         "checkResult": "Transactions without a category or counterparty: {scanned}, matching: {matched}",
         "checkCapped": "Only the latest 2000 transactions were checked",
         "saving": "Saving…",
+        "incomplete": "To save, fill in the name and every condition, and pick a category or a counterparty",
         "deleteConfirm": "Delete the rule “{name}”? The categories it already set stay."
       },
       "apply": {
