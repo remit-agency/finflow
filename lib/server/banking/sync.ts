@@ -6,11 +6,15 @@ import { mapBankTransaction, pickBalance } from '@/lib/domain/banking/map'
 import { addDays } from '@/lib/domain/ledger/days'
 import { parseAccount } from '@/lib/domain/ledger/doc'
 import { LedgerError, type LedgerErrorCode } from '@/lib/domain/ledger/errors'
-import { parseTransactionInput } from '@/lib/domain/ledger/input'
+import { parseTransactionInput, type TransactionInput } from '@/lib/domain/ledger/input'
 import { MAX_MINOR } from '@/lib/domain/ledger/money'
+import type { BankInfo } from '@/lib/domain/ledger/types'
+import { applyRules } from '@/lib/domain/rules/match'
+import type { Rule } from '@/lib/domain/rules/types'
 import { updateAccount } from '@/lib/server/ledger/accounts'
 import { accountsCol } from '@/lib/server/ledger/paths'
 import { createTransaction, type WriteResult } from '@/lib/server/ledger/write'
+import { loadUsableRules } from '@/lib/server/rules/read'
 import { todayDay } from '@/lib/utils/today'
 import type { BankDeps } from './deps'
 import type { EbTxPage } from './eb-api'
@@ -43,6 +47,44 @@ export interface SyncResult {
  * (an amount too large, a date before 2000). Every other LedgerError aborts the step (see `syncStep`).
  */
 const PERMANENT: ReadonlySet<LedgerErrorCode> = new Set(['invalid_input'])
+
+/** Ledger refusals that come from a rule's action: the operation is then written again without what the rules gave it. */
+const RULE_REFUSALS: ReadonlySet<LedgerErrorCode> = new Set(['category_not_found', 'counterparty_not_found', 'counterparty_archived'])
+
+/**
+ * Creates one imported operation with the category and the counterparty the rules give it (S10). The rules were read at
+ * the start of the step; when the ledger refuses because of one of their actions (the category or the counterparty
+ * changed since), the operation is written again without them: an operation is never lost because of a rule.
+ */
+export async function createWithRules(
+  deps: BankDeps,
+  orgId: string,
+  uid: string,
+  input: TransactionInput,
+  bank: BankInfo,
+  currency: string,
+  rules: readonly Rule[],
+): Promise<WriteResult> {
+  const outcome = applyRules(rules, {
+    type: input.type,
+    accountId: input.accountId,
+    currency,
+    amountMinor: input.amountMinor,
+    remittance: bank.remittance,
+    bankName: bank.counterpartyName,
+    description: input.description,
+  })
+  if (outcome.applied.length === 0) return createTransaction(deps.ledger, orgId, uid, input, bank)
+  const filled: TransactionInput = { ...input }
+  if (outcome.categoryId !== undefined) filled.categoryId = outcome.categoryId
+  if (outcome.counterpartyId !== undefined) filled.counterpartyId = outcome.counterpartyId
+  try {
+    return await createTransaction(deps.ledger, orgId, uid, filled, bank, { autoRules: outcome.applied })
+  } catch (e) {
+    if (e instanceof LedgerError && RULE_REFUSALS.has(e.code)) return createTransaction(deps.ledger, orgId, uid, input, bank)
+    throw e
+  }
+}
 
 async function acquire(deps: BankDeps, ref: DocumentReference, token: string): Promise<BankAccount> {
   return deps.db.runTransaction(async (t) => {
@@ -127,6 +169,8 @@ export async function syncStep(deps: BankDeps, orgId: string, uid: string, bankA
     const seenSnaps = entries.length === 0 ? [] : await deps.db.getAll(...entries.map((e) => seenCol.doc(e.key)))
     const seen = new Set(seenSnaps.filter((s) => s.exists).map((s) => s.id))
 
+    // The rules are read once per step, and only when a new operation arrives (S10).
+    let rules: Rule[] | null = null
     let imported = 0
     let skipped = 0
     let failed = 0
@@ -154,7 +198,9 @@ export async function syncStep(deps: BankDeps, orgId: string, uid: string, bankA
       }
       let written: WriteResult
       try {
-        written = await createTransaction(deps.ledger, orgId, uid, parseTransactionInput(mapped.input, { internal: true }), mapped.bank)
+        const input = parseTransactionInput(mapped.input, { internal: true })
+        rules ??= await loadUsableRules(deps.db, orgId)
+        written = await createWithRules(deps, orgId, uid, input, mapped.bank, acc.currency, rules)
       } catch (e) {
         if (!(e instanceof LedgerError)) throw e
         // Not an operation yet: no mark, it arrives on a later sync once the date is today or before.
