@@ -83,12 +83,14 @@ export default function RulesSettingsPage() {
                     <Badge variant="chip">{t(`type.${rule.type}`)}</Badge>
                     {!rule.active && <Badge variant="chip">{t('inactive')}</Badge>}
                     {rule.unusable.length > 0 && (
-                      <Badge variant="chip" data-testid="rule-unusable" title={t('unusableHint')} className="text-expense">
+                      <Badge variant="chip" data-testid="rule-unusable" className="text-expense">
                         {t('unusable')}
                       </Badge>
                     )}
                   </div>
                   <RuleSummary rule={rule} accounts={accounts} categories={categories} counterparties={counterparties} />
+                  {/* Visible text, not a tooltip: a phone has no hover. */}
+                  {rule.unusable.length > 0 && <p className="text-xs text-expense">{t('unusableHint')}</p>}
                 </div>
                 {canEdit && (
                   <div className="flex shrink-0 items-center gap-1">
