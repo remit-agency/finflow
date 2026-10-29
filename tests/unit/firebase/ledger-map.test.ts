@@ -84,3 +84,16 @@ describe('toUiTransaction', () => {
     expect('toCurrency' in ui).toBe(false)
   })
 })
+
+describe('toUiTransaction autoRules', () => {
+  const expense: LedgerTransaction = {
+    id: 't2', type: 'expense', status: 'actual', accountId: 'a1', amountMinor: 5000, currency: 'PLN',
+    paymentDate: '2026-10-20', accrual: { mode: 'date', date: '2026-10-20' }, isRecurring: false, tags: [], fileUrls: [],
+    categoryId: 'k-fuel',
+  }
+
+  it('carries the rules that filled the operation, and leaves an untouched one without them', () => {
+    expect(toUiTransaction('org1', { ...expense, autoRules: [{ id: 'r1', name: 'Paliwo' }] }).autoRules).toEqual([{ id: 'r1', name: 'Paliwo' }])
+    expect('autoRules' in toUiTransaction('org1', expense)).toBe(false)
+  })
+})

@@ -226,6 +226,7 @@
   },
   "journal": {
     "fromBank": "z banku",
+    "byRule": "wg reguły: {name}",
     "title": "Płatności",
     "showAllAccounts": "Pokaż wszystkie konta",
     "loadError": "Nie udało się wczytać dziennika operacji. Spróbuj ponownie.",

@@ -226,6 +226,7 @@
   },
   "journal": {
     "fromBank": "from bank",
+    "byRule": "by rule: {name}",
     "title": "Payments",
     "showAllAccounts": "Show all accounts",
     "loadError": "The journal could not be loaded. Try again.",

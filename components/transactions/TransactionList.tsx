@@ -398,6 +398,13 @@ export function TransactionList({
                         ) : (
                           <span className="text-ink-subtle">{t('noCategory')}</span>
                         )}
+                        {tx.autoRules && tx.autoRules.length > 0 && (
+                          <span className="mt-1 block">
+                            <Badge variant="chip" data-testid="rule-chip" className="font-normal text-ink-muted">
+                              {tJournal('byRule', { name: tx.autoRules.map((r) => r.name).join(', ') })}
+                            </Badge>
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="hidden pr-2 text-ink-muted md:table-cell">
                         {/* One line: the bank mark, then the counterparty (or the bank's name for it, muted), then the «вкажіть» chip. */}
