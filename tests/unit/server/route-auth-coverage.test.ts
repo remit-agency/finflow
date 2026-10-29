@@ -11,6 +11,12 @@ const ALLOW_LIST: Record<string, string> = {
   'auth/session': 'verifies the freshly issued ID token itself and mints the session',
   'auth/logout': 'clears the session; must work with a missing or broken one',
   health: 'public liveness probe',
+  'cron/bank-sync': 'authenticates with the BANK_CRON_SECRET bearer secret (lib/server/cron-auth), not a user session',
+}
+
+// Routes that read the Authorization header on purpose. Only the cron route, whose secret is the only way in.
+const READS_AUTHORIZATION_BY_DESIGN: Record<string, string> = {
+  'cron/bank-sync': 'compares the bearer secret in its own handler (bearerMatches)',
 }
 
 const ROUTE_FILE = /^route\.(ts|tsx|js|jsx)$/
@@ -119,6 +125,7 @@ describe('API route authentication coverage', () => {
 
   it('no route reads the incoming Authorization header', () => {
     for (const { key, file } of routes) {
+      if (key in READS_AUTHORIZATION_BY_DESIGN) continue
       expect(readFileSync(file, 'utf8'), key).not.toMatch(/headers\.get\(\s*['"]authorization['"]\s*\)/i)
     }
   })
