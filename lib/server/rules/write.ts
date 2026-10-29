@@ -103,14 +103,16 @@ export async function deleteRule(deps: RuleDeps, orgId: string, uid: string, id:
   })
 }
 
-/** Gives the rules the order of `ids`, which must be exactly the company's rules (else `conflict`: the list changed). */
+/** Gives the rules the order of `ids`, which must be exactly the company's listed rules (else `conflict`: the list changed). */
 export async function orderRules(deps: RuleDeps, orgId: string, uid: string, ids: readonly string[]): Promise<void> {
   const col = rulesCol(deps.db, orgId)
   await deps.db.runTransaction(async (t) => {
     const snap = await t.get(col)
-    const known = new Set(snap.docs.map((d) => d.id))
+    // The rules the list shows: a malformed document is hidden, so it is neither counted nor reordered.
+    const listed = snap.docs.map((d) => parseRule(d.id, d.data())).filter((r): r is Rule => r !== null)
+    const known = new Set(listed.map((r) => r.id))
     if (ids.length !== known.size || new Set(ids).size !== ids.length || ids.some((id) => !known.has(id))) throw new RuleError('conflict')
-    const before = sortRules(snap.docs.map((d) => parseRule(d.id, d.data())).filter((r): r is Rule => r !== null)).map((r) => r.id)
+    const before = sortRules(listed).map((r) => r.id)
     const ts = Timestamp.fromDate(deps.now())
     ids.forEach((id, i) => t.update(col.doc(id), { order: i, updatedAt: ts }))
     t.create(auditCol(deps.db, orgId).doc(), auditData(deps, 'rule.order', uid, 'rules', { ids: before }, { ids: [...ids] }))

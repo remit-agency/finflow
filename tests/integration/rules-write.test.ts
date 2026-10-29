@@ -138,6 +138,16 @@ describe('orderRules', () => {
     expect(await auditEntry('rule.order')).toMatchObject({ targetId: 'rules', before: { ids: [a.id, b.id, c.id] }, after: { ids: [c.id, a.id, b.id] } })
   })
 
+  it('orders the rules the list shows: a malformed document is not counted and keeps its order value', async () => {
+    const a = await createRule(deps, ORG, UID, ruleInput({ name: 'A' }))
+    const b = await createRule(deps, ORG, UID, ruleInput({ name: 'B' }))
+    await db.doc(`organizations/${ORG}/rules/r-bad`).set({ schemaVersion: 1, name: 'bad', orgId: ORG, order: 7, actions: { categoryId: 'x/y' } })
+    await orderRules(deps, ORG, UID, [b.id, a.id])
+    expect((await listRules(db, ORG)).map((r) => r.name)).toEqual(['B', 'A'])
+    expect((await readDoc(db, `organizations/${ORG}/rules/r-bad`))?.order).toBe(7)
+    expect((await failure(orderRules(deps, ORG, UID, [b.id, a.id, 'r-bad']))).code).toBe('conflict')
+  })
+
   it('refuses a list that is not exactly the company rules (conflict) and changes nothing', async () => {
     const a = await createRule(deps, ORG, UID, ruleInput({ name: 'A' }))
     const b = await createRule(deps, ORG, UID, ruleInput({ name: 'B' }))
