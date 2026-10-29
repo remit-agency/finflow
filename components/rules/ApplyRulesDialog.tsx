@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { applyToExisting, checkExisting, type ApplyTotals, type CheckTotals } from '@/lib/api/rules-client'
+import { applyToExisting, checkExisting, RulesRunError, type ApplyTotals, type CheckTotals } from '@/lib/api/rules-client'
 
 interface Props {
   orgId: string
@@ -16,7 +16,9 @@ type Phase =
   | { kind: 'ready'; totals: CheckTotals }
   | { kind: 'applying'; changed: number }
   | { kind: 'done'; totals: ApplyTotals }
-  | { kind: 'failed' }
+  | { kind: 'checkFailed' }
+  /** `changed`: the operations the steps before the failure already changed. */
+  | { kind: 'applyFailed'; changed: number }
 
 /**
  * «Застосувати до наявних»: counts first («буде змінено N»), applies after the confirmation with the progress, then the
@@ -26,6 +28,7 @@ export function ApplyRulesDialog({ orgId, onClose }: Props) {
   const t = useTranslations('settings.rules.apply')
   const tCommon = useTranslations('common')
   const [phase, setPhase] = useState<Phase>({ kind: 'checking', scanned: 0 })
+  // The newest request: the check, then the apply. Unmount (or a company switch) aborts whichever runs.
   const running = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -34,10 +37,10 @@ export function ApplyRulesDialog({ orgId, onClose }: Props) {
     checkExisting(orgId, { signal: controller.signal, onProgress: (p) => setPhase({ kind: 'checking', scanned: p.scanned }) }).then(
       (totals) => setPhase({ kind: 'ready', totals }),
       () => {
-        if (!controller.signal.aborted) setPhase({ kind: 'failed' })
+        if (!controller.signal.aborted) setPhase({ kind: 'checkFailed' })
       },
     )
-    return () => controller.abort()
+    return () => running.current?.abort()
   }, [orgId])
 
   const apply = async () => {
@@ -47,8 +50,8 @@ export function ApplyRulesDialog({ orgId, onClose }: Props) {
     try {
       const totals = await applyToExisting(orgId, { signal: controller.signal, onProgress: (p) => setPhase({ kind: 'applying', changed: p.changed }) })
       setPhase({ kind: 'done', totals })
-    } catch {
-      if (!controller.signal.aborted) setPhase({ kind: 'failed' })
+    } catch (err) {
+      if (!controller.signal.aborted) setPhase({ kind: 'applyFailed', changed: err instanceof RulesRunError ? err.totals.changed : 0 })
     }
   }
 
@@ -58,7 +61,7 @@ export function ApplyRulesDialog({ orgId, onClose }: Props) {
     onClose()
   }
 
-  const finished = phase.kind === 'done' || phase.kind === 'failed'
+  const finished = phase.kind === 'done' || phase.kind === 'checkFailed' || phase.kind === 'applyFailed'
 
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
@@ -69,23 +72,34 @@ export function ApplyRulesDialog({ orgId, onClose }: Props) {
         </DialogHeader>
         <div data-testid="rules-apply-state" className="space-y-1 text-sm text-ink" aria-live="polite">
           {phase.kind === 'checking' && <p>{t('checking', { scanned: phase.scanned })}</p>}
-          {phase.kind === 'ready' &&
-            (phase.totals.matchOps === 0 ? (
-              <p>{t('nothing')}</p>
-            ) : (
-              <>
-                <p className="font-medium">{t('willChange', { count: phase.totals.matchOps })}</p>
-                <p className="text-ink-muted">{t('breakdown', { categories: phase.totals.categories, counterparties: phase.totals.counterparties })}</p>
-              </>
-            ))}
+          {phase.kind === 'ready' && (
+            <>
+              {phase.totals.matchOps === 0 ? (
+                <p>{t('nothing')}</p>
+              ) : (
+                <>
+                  <p className="font-medium">{t('willChange', { count: phase.totals.matchOps })}</p>
+                  <p className="text-ink-muted">{t('breakdown', { categories: phase.totals.categories, counterparties: phase.totals.counterparties })}</p>
+                </>
+              )}
+              {phase.totals.stoppedEarly && <p className="text-ink-muted">{t('stoppedEarly')}</p>}
+            </>
+          )}
           {phase.kind === 'applying' && <p>{t('running', { changed: phase.changed })}</p>}
           {phase.kind === 'done' && (
             <>
               <p className="font-medium">{t('done', { changed: phase.totals.changed })}</p>
               {phase.totals.failed > 0 && <p className="text-expense">{t('failed', { failed: phase.totals.failed })}</p>}
+              {phase.totals.stoppedEarly && <p className="text-ink-muted">{t('stoppedEarly')}</p>}
             </>
           )}
-          {phase.kind === 'failed' && <p className="text-expense">{t('error')}</p>}
+          {phase.kind === 'checkFailed' && <p className="text-expense">{t('checkError')}</p>}
+          {phase.kind === 'applyFailed' && (
+            <>
+              <p className="text-expense">{t('error')}</p>
+              {phase.changed > 0 && <p className="font-medium">{t('changedBeforeError', { changed: phase.changed })}</p>}
+            </>
+          )}
         </div>
         <DialogFooter>
           <Button data-testid="rules-apply-close" variant="outline" onClick={close}>

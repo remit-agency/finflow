@@ -655,7 +655,10 @@
         "running": "Stosuję… zmieniono: {changed}",
         "done": "Zmienione operacje: {changed}",
         "failed": "Nie udało się zmienić: {failed}",
-        "error": "Nie udało się zastosować reguł"
+        "error": "Nie udało się zastosować reguł",
+        "changedBeforeError": "Zmieniono przed błędem: {changed}",
+        "checkError": "Nie udało się sprawdzić reguł",
+        "stoppedEarly": "Zatrzymano przed końcem: uruchom ponownie"
       },
       "errors": {
         "invalid": "Sprawdź warunki reguły",

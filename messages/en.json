@@ -655,7 +655,10 @@
         "running": "Applying… changed: {changed}",
         "done": "Transactions changed: {changed}",
         "failed": "Could not change: {failed}",
-        "error": "Could not apply the rules"
+        "error": "Could not apply the rules",
+        "changedBeforeError": "Changed before the error: {changed}",
+        "checkError": "Could not check the rules",
+        "stoppedEarly": "Stopped before the end: run it again"
       },
       "errors": {
         "invalid": "Check the rule's conditions",
