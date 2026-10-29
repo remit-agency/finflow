@@ -310,3 +310,38 @@ export async function deleteTransaction(deps: LedgerDeps, orgId: string, uid: st
   const prior = await loadPrior(deps, orgId, txId)
   return commit(deps, orgId, uid, { action: 'tx.delete', txId, prior, next: null })
 }
+
+/**
+ * Brings the stored `excluded` of one operation in line with its tags as they are now (S10t: a tag's flag changed after
+ * the operation was written). One Firestore transaction through `changeSet`: only the rollups move (the balances never
+ * depend on the flag), the operation keeps everything else, and the audit entry says `via: 'tag'`. False, writing
+ * nothing, when the operation is gone, is not a ledger v2 document or already agrees.
+ */
+export async function refreshExcluded(deps: LedgerDeps, orgId: string, uid: string, txId: string): Promise<boolean> {
+  const { db } = deps
+  const txRef = transactionsCol(db, orgId).doc(txId)
+  return db.runTransaction(async (t) => {
+    await assertUnlocked(t, deps, orgId)
+    const orgSnap = await t.get(orgRef(db, orgId))
+    const snap = await t.get(txRef)
+    const prior = snap.exists ? parseTransaction(snap.id, snap.data()) : null
+    if (!orgSnap.exists || prior === null) return false
+    const tagSnaps: DocumentSnapshot[] = []
+    for (const id of prior.tags) tagSnaps.push(await t.get(tagsCol(db, orgId).doc(id)))
+    const excluded = excludedFromTags(prior.tags, tagFlagsOf(tagSnaps))
+    if (excluded === (prior.excluded === true)) return false
+
+    const next = withExcluded(prior, excluded)
+    const change = changeSet(prior, next, orgSnap.get('currency') as string)
+    const ts = Timestamp.fromDate(deps.now())
+    for (const [id, delta] of Object.entries(change.balanceDeltas)) {
+      t.update(accountsCol(db, orgId).doc(id), { balanceMinor: FieldValue.increment(delta), updatedAt: ts })
+    }
+    for (const [id, flat] of change.rollupDeltas) {
+      t.set(rollupsCol(db, orgId).doc(id), nest(flat, (n) => FieldValue.increment(n)), { merge: true })
+    }
+    t.update(txRef, { excluded: excluded ? true : FieldValue.delete(), updatedAt: ts, updatedBy: uid })
+    t.create(auditCol(db, orgId).doc(), auditData(deps, 'tx.update', uid, txId, transactionToDoc(prior), transactionToDoc(next), { via: 'tag' }))
+    return true
+  })
+}
