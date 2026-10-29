@@ -6,7 +6,7 @@ import { compareKeys, encodeCursor, type JournalKey } from '@/lib/domain/journal
 import type { JournalPage, JournalRow } from '@/lib/domain/journal/types'
 import { parseAccount, parseTransaction } from '@/lib/domain/ledger/doc'
 import { balanceEffects } from '@/lib/domain/ledger/effects'
-import { cashDocId } from '@/lib/domain/ledger/rollups'
+import { cashDocId, excludedDocId } from '@/lib/domain/ledger/rollups'
 import type { LedgerAccount, LedgerTransaction } from '@/lib/domain/ledger/types'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import { accountsCol, counterpartiesCol, rollupsCol, transactionsCol } from '@/lib/server/ledger/paths'
@@ -52,6 +52,8 @@ function needsScan(f: JournalFilters): boolean {
     f.categoryIds.length > 0 ||
     f.counterpartyIds.length > 0 ||
     !!f.q ||
+    f.tagIds.length > 0 ||
+    f.excludedOnly ||
     (f.basis === 'accrual' && (f.from !== undefined || f.to !== undefined))
   )
 }
@@ -175,17 +177,28 @@ async function netAfterDay(deps: LedgerDeps, orgId: string, accountId: string, d
   return income - outflow + transferIn
 }
 
-/** Net movement per day for the days from `oldest` to `newest` that have a rollup. */
+/**
+ * Net movement per day for the days from `oldest` to `newest` that have a rollup. An operation excluded from analytics
+ * (S10t) still moved the account: its day sits in the `x_` twin of the daily rollup, which is read and added as well.
+ */
 async function netsBetween(deps: LedgerDeps, orgId: string, accountId: string, oldest: string, newest: string, stats: ReadStats): Promise<Map<string, number>> {
   const col = rollupsCol(deps.db, orgId)
-  const snap = await col
-    .where(FieldPath.documentId(), '>=', col.doc(cashDocId(accountId, oldest)))
-    .where(FieldPath.documentId(), '<=', col.doc(cashDocId(accountId, newest)))
-    .get()
-  stats.docsRead += snap.size
-  const prefix = cashDocId(accountId, '')
   const out = new Map<string, number>()
-  for (const d of snap.docs) out.set(d.id.slice(prefix.length), netOf(d.data() as DayNet))
+  const idsOf = [(day: string) => cashDocId(accountId, day), (day: string) => excludedDocId(cashDocId(accountId, day))]
+  await Promise.all(
+    idsOf.map(async (idOf) => {
+      const snap = await col
+        .where(FieldPath.documentId(), '>=', col.doc(idOf(oldest)))
+        .where(FieldPath.documentId(), '<=', col.doc(idOf(newest)))
+        .get()
+      stats.docsRead += snap.size
+      const prefix = idOf('')
+      for (const d of snap.docs) {
+        const day = d.id.slice(prefix.length)
+        out.set(day, (out.get(day) ?? 0) + netOf(d.data() as DayNet))
+      }
+    }),
+  )
   return out
 }
 

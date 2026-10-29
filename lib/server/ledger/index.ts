@@ -2,6 +2,7 @@ import 'server-only'
 import { toDay } from '@/lib/domain/ledger/days'
 import type { AccountInput, AccountPatch, OrgPatch } from '@/lib/domain/ledger/entity-input'
 import type { TransactionInput, TransactionPatch } from '@/lib/domain/ledger/input'
+import type { TagChange } from '@/lib/domain/tags/assign'
 import { getAdmin } from '@/lib/server/firebase-admin'
 import { resolveRate } from '@/lib/server/fx'
 import { todayUtcDay } from '@/lib/utils/today'
@@ -9,7 +10,7 @@ import { createAccount, deleteAccount, updateAccount } from './accounts'
 import type { LedgerDeps } from './deps'
 import { updateOrganization } from './org'
 import { rebuildLedger } from './rebuild'
-import { createTransaction, deleteTransaction, updateTransaction } from './write'
+import { createTransaction, deleteTransaction, retagTransaction, updateTransaction } from './write'
 
 export type { LedgerReport } from './verify'
 
@@ -23,6 +24,7 @@ export const ledger = {
   createTransaction: (orgId: string, uid: string, input: TransactionInput) => createTransaction(ledgerDeps(), orgId, uid, input),
   updateTransaction: (orgId: string, uid: string, txId: string, patch: TransactionPatch) => updateTransaction(ledgerDeps(), orgId, uid, txId, patch),
   deleteTransaction: (orgId: string, uid: string, txId: string) => deleteTransaction(ledgerDeps(), orgId, uid, txId),
+  retagTransaction: (orgId: string, uid: string, txId: string, change: TagChange) => retagTransaction(ledgerDeps(), orgId, uid, txId, change),
   createAccount: (orgId: string, uid: string, input: AccountInput) => createAccount(ledgerDeps(), orgId, uid, input),
   updateAccount: (orgId: string, uid: string, accountId: string, patch: AccountPatch) => updateAccount(ledgerDeps(), orgId, uid, accountId, patch),
   deleteAccount: (orgId: string, uid: string, accountId: string) => deleteAccount(ledgerDeps(), orgId, uid, accountId),

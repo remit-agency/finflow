@@ -3,8 +3,9 @@ import { parseBulkRequest } from '@/lib/domain/journal/bulk-input'
 import { parseTransactionInput } from '@/lib/domain/ledger/input'
 import { runBulk } from '@/lib/server/journal/bulk'
 import { verifyLedger } from '@/lib/server/ledger/verify'
-import { createTransaction, deleteTransaction, updateTransaction } from '@/lib/server/ledger/write'
-import { ORG, UID, balanceOf, clearFirestore, makeDeps, readDoc, seedAccount, seedCategory, seedCounterparty, seedOrg, testDb } from './helpers'
+import type { TagChange } from '@/lib/domain/tags/assign'
+import { createTransaction, deleteTransaction, retagTransaction, updateTransaction } from '@/lib/server/ledger/write'
+import { ORG, UID, auditActions, balanceOf, clearFirestore, makeDeps, readDoc, seedAccount, seedCategory, seedCounterparty, seedOrg, seedTag, testDb } from './helpers'
 
 const db = testDb()
 const deps = makeDeps(db)
@@ -12,6 +13,7 @@ const deps = makeDeps(db)
 const ledger = {
   updateTransaction: (orgId: string, uid: string, id: string, patch: Parameters<typeof updateTransaction>[4]) => updateTransaction(deps, orgId, uid, id, patch),
   deleteTransaction: (orgId: string, uid: string, id: string) => deleteTransaction(deps, orgId, uid, id),
+  retagTransaction: (orgId: string, uid: string, id: string, change: TagChange) => retagTransaction(deps, orgId, uid, id, change),
 }
 
 async function make(extra: Record<string, unknown>): Promise<string> {
@@ -109,6 +111,41 @@ describe('runBulk', () => {
       }
       const out = await runBulk(flaky, ORG, UID, parseBulkRequest({ action: 'delete', ids }))
       expect(out).toEqual([{ id: ids[0], ok: false, code: 'unknown' }, { id: ids[1], ok: true }])
+    })
+  })
+
+  describe('tags (S10t)', () => {
+    it('adds and takes off a tag; the excluding tag moves the rollups only, the balance stays', async () => {
+      await seedTag(db, ORG, 'vat', { excludeFromAnalytics: true })
+      await seedTag(db, ORG, 'q4')
+      const ids = [await make({}), await make({ tags: ['q4'] })]
+      expect(await runBulk(ledger, ORG, UID, parseBulkRequest({ action: 'update', ids, patch: { addTagIds: ['vat'] } }))).toEqual(ids.map((id) => ({ id, ok: true })))
+      expect(await readDoc(db, `organizations/${ORG}/transactions/${ids[0]}`)).toMatchObject({ tags: ['vat'], excluded: true })
+      expect(await readDoc(db, `organizations/${ORG}/transactions/${ids[1]}`)).toMatchObject({ tags: ['q4', 'vat'], excluded: true })
+      expect(await balanceOf(db, ORG, 'a1')).toBe(100_000 - 20_000)
+
+      await runBulk(ledger, ORG, UID, parseBulkRequest({ action: 'update', ids, patch: { removeTagIds: ['vat'] } }))
+      const second = await readDoc(db, `organizations/${ORG}/transactions/${ids[1]}`)
+      expect(second?.tags).toEqual(['q4'])
+      expect(second?.excluded).toBeUndefined()
+      expect((await verifyLedger(deps, ORG)).ok).toBe(true)
+    })
+
+    it('a change that leaves the list as it is writes nothing; an archived tag fails only its row', async () => {
+      await seedTag(db, ORG, 'q4')
+      await seedTag(db, ORG, 'old', { archived: true })
+      const id = await make({ tags: ['q4'] })
+      const before = (await auditActions(db, ORG)).length
+      expect(await runBulk(ledger, ORG, UID, parseBulkRequest({ action: 'update', ids: [id], patch: { addTagIds: ['q4'] } }))).toEqual([{ id, ok: true }])
+      expect((await auditActions(db, ORG)).length).toBe(before)
+      expect(await runBulk(ledger, ORG, UID, parseBulkRequest({ action: 'update', ids: [id], patch: { addTagIds: ['old'] } }))).toEqual([{ id, ok: false, code: 'tag_archived' }])
+    })
+
+    it('stops at 10 tags: the extra ones are not added', async () => {
+      for (let i = 0; i <= 10; i++) await seedTag(db, ORG, `t${i}`)
+      const id = await make({ tags: Array.from({ length: 9 }, (_, i) => `t${i}`) })
+      await runBulk(ledger, ORG, UID, parseBulkRequest({ action: 'update', ids: [id], patch: { addTagIds: ['t9', 't10'] } }))
+      expect((await readDoc(db, `organizations/${ORG}/transactions/${id}`))?.tags).toEqual(Array.from({ length: 10 }, (_, i) => `t${i}`))
     })
   })
 })

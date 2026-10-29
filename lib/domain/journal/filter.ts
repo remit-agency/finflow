@@ -5,6 +5,9 @@ import { TX_STATUSES, TX_TYPES, type LedgerTransaction, type TxStatus, type TxTy
 
 export type DateBasis = 'payment' | 'accrual'
 
+/** `tg=_none`: the operations without any tag (S10t). Tag ids are Firestore auto ids, so they are never `_none`. */
+export const NO_TAG = '_none'
+
 export interface JournalFilters {
   /** Inclusive days, compared with the payment date or with the accrual date or period (`basis`). */
   from?: string
@@ -20,9 +23,13 @@ export interface JournalFilters {
   status?: TxStatus
   accountId?: string
   categoryIds: string[]
+  /** Any of these tags (S10t); `NO_TAG` stands for «без тегів». */
+  tagIds: string[]
+  /** Only the operations excluded from analytics (S10t). */
+  excludedOnly: boolean
 }
 
-export const EMPTY_FILTERS: JournalFilters = { basis: 'payment', counterpartyIds: [], types: [], categoryIds: [] }
+export const EMPTY_FILTERS: JournalFilters = { basis: 'payment', counterpartyIds: [], types: [], categoryIds: [], tagIds: [], excludedOnly: false }
 
 const MAX_LIST = 30
 const MAX_QUERY = 100
@@ -52,7 +59,13 @@ function minor(raw: string | null): number | undefined {
 
 /** Lenient on purpose: a hand-edited link with a bad value just loses that value. */
 export function parseFilters(p: URLSearchParams): JournalFilters {
-  const f: JournalFilters = { ...EMPTY_FILTERS, counterpartyIds: ids(p.get('cp')), categoryIds: ids(p.get('cat')) }
+  const f: JournalFilters = {
+    ...EMPTY_FILTERS,
+    counterpartyIds: ids(p.get('cp')),
+    categoryIds: ids(p.get('cat')),
+    tagIds: ids(p.get('tg')),
+    excludedOnly: p.get('ex') === '1',
+  }
   const from = p.get('from')
   const to = p.get('to')
   if (isDay(from)) f.from = from
@@ -87,6 +100,8 @@ export function filtersToParams(f: JournalFilters): URLSearchParams {
   if (f.status) p.set('status', f.status)
   if (f.accountId) p.set('account', f.accountId)
   if (f.categoryIds.length) p.set('cat', f.categoryIds.join(','))
+  if (f.tagIds.length) p.set('tg', f.tagIds.join(','))
+  if (f.excludedOnly) p.set('ex', '1')
   return p
 }
 
@@ -102,7 +117,9 @@ export function hasActiveFilters(f: JournalFilters): boolean {
     f.types.length > 0 ||
     f.status !== undefined ||
     f.accountId !== undefined ||
-    f.categoryIds.length > 0
+    f.categoryIds.length > 0 ||
+    f.tagIds.length > 0 ||
+    f.excludedOnly
   )
 }
 
@@ -125,6 +142,11 @@ export function matchesFilters(tx: LedgerTransaction, f: JournalFilters, ctx: Fi
   if (f.categoryIds.length && (tx.categoryId === undefined || !f.categoryIds.includes(tx.categoryId))) return false
   if (f.counterpartyIds.length && (tx.counterpartyId === undefined || !f.counterpartyIds.includes(tx.counterpartyId))) return false
   if (f.accountId && tx.accountId !== f.accountId && tx.toAccountId !== f.accountId) return false
+  if (f.tagIds.length) {
+    const untagged = tx.tags.length === 0 && f.tagIds.includes(NO_TAG)
+    if (!untagged && !tx.tags.some((id) => f.tagIds.includes(id))) return false
+  }
+  if (f.excludedOnly && tx.excluded !== true) return false
 
   if (f.from !== undefined || f.to !== undefined) {
     const range = f.basis === 'payment' ? { from: tx.paymentDate, to: tx.paymentDate } : accrualBounds(tx)

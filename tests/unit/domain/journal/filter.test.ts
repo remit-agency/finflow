@@ -5,6 +5,7 @@ import {
   filtersToParams,
   hasActiveFilters,
   matchesFilters,
+  NO_TAG,
   normalizeText,
   parseFilters,
   type FilterContext,
@@ -120,5 +121,35 @@ describe('matchesFilters', () => {
     expect(search('GŁÓWNE')).toBe(true)
     expect(search('prad faktura')).toBe(true)
     expect(search('prad kasa')).toBe(false)
+  })
+})
+
+describe('tags (S10t)', () => {
+  it('tg and ex live in the address and count as filters', () => {
+    const f = { ...EMPTY_FILTERS, tagIds: ['vat', NO_TAG], excludedOnly: true }
+    expect(filtersToParams(f).toString()).toBe('tg=vat%2C_none&ex=1')
+    expect(parseFilters(filtersToParams(f))).toEqual(f)
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, tagIds: ['vat'] })).toBe(true)
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, excludedOnly: true })).toBe(true)
+  })
+
+  it('drops a bad tag id; ex is on only for 1', () => {
+    expect(parseFilters(new URLSearchParams('tg=a/b,,vat&ex=yes'))).toEqual({ ...EMPTY_FILTERS, tagIds: ['vat'] })
+  })
+
+  it('any of the chosen tags matches; _none matches an operation without tags', () => {
+    const f = (tagIds: string[]) => ({ ...EMPTY_FILTERS, tagIds })
+    expect(matchesFilters(tx({ tags: ['q4', 'vat'] }), f(['vat']), ctx)).toBe(true)
+    expect(matchesFilters(tx({ tags: ['q4'] }), f(['vat']), ctx)).toBe(false)
+    expect(matchesFilters(tx(), f(['vat']), ctx)).toBe(false)
+    expect(matchesFilters(tx(), f([NO_TAG]), ctx)).toBe(true)
+    expect(matchesFilters(tx({ tags: ['q4'] }), f([NO_TAG]), ctx)).toBe(false)
+    expect(matchesFilters(tx({ tags: ['q4'] }), f([NO_TAG, 'q4']), ctx)).toBe(true)
+  })
+
+  it('ex keeps only the operations excluded from analytics', () => {
+    const f = { ...EMPTY_FILTERS, excludedOnly: true }
+    expect(matchesFilters(tx({ tags: ['vat'], excluded: true }), f, ctx)).toBe(true)
+    expect(matchesFilters(tx({ tags: ['q4'] }), f, ctx)).toBe(false)
   })
 })

@@ -7,6 +7,7 @@ import { LedgerError } from '@/lib/domain/ledger/errors'
 import { applyPatch, BANK_CLIENT_ID_PREFIX, toRawInput, type TransactionInput, type TransactionPatch } from '@/lib/domain/ledger/input'
 import { nest } from '@/lib/domain/ledger/rollups'
 import type { AutoRuleRef, BankInfo, LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
+import { mergeTags, sameTags, type TagChange } from '@/lib/domain/tags/assign'
 import { excludedFromTags, tagFlagsOf, withExcluded } from '@/lib/domain/tags/exclude'
 import type { RateSnapshot } from '@/lib/server/fx/types'
 import { auditData, type AuditAction } from './audit'
@@ -309,6 +310,18 @@ export async function updateTransaction(
 export async function deleteTransaction(deps: LedgerDeps, orgId: string, uid: string, txId: string): Promise<WriteResult> {
   const prior = await loadPrior(deps, orgId, txId)
   return commit(deps, orgId, uid, { action: 'tx.delete', txId, prior, next: null })
+}
+
+/**
+ * Adds and takes off tags (the bulk change of the journal, S10t). The new list comes from the operation as it is stored
+ * (`mergeTags`: takes off first, then adds while there are fewer than 10) and goes through `updateTransaction` with the
+ * version read here, so a change made in between is a `conflict`, never lost. A list that stays the same writes nothing.
+ */
+export async function retagTransaction(deps: LedgerDeps, orgId: string, uid: string, txId: string, change: TagChange): Promise<WriteResult> {
+  const prior = await loadPrior(deps, orgId, txId)
+  const tags = mergeTags(prior.tx.tags, change.add, change.remove)
+  if (sameTags(tags, prior.tx.tags)) return { transaction: prior.tx, replayed: false }
+  return updateTransaction(deps, orgId, uid, txId, { tags }, { expectVersion: prior.version })
 }
 
 /**
