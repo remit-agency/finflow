@@ -310,14 +310,23 @@ describe('pages, parallel steps and a crash between the write and the mark', () 
   it('two steps at the same time: one runs, the other answers already_running', async () => {
     await seedBank(db)
     const eb = fakeEb({ '': { transactions: [ebTx('r1', '100.00', 'CRDT', '2026-10-20')], continuationKey: null } }, '100.00')
-    // The bank call of the first step waits, so the second step certainly starts while the lock is held.
+    // The bank call of the step that got the lock waits on a gate that opens only after the other step has been turned
+    // away, so the outcome does not depend on how fast the emulator is (a fixed pause failed on a loaded machine).
     const original = eb.getTransactions.bind(eb)
+    let openGate!: () => void
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve
+    })
     eb.getTransactions = async (uid, q) => {
-      await new Promise((resolve) => setTimeout(resolve, 400))
+      await gate
       return original(uid, q)
     }
     const deps = bankDeps(db, eb)
-    const settled = await Promise.allSettled([syncStep(deps, ORG, UID, 'ba1'), syncStep(deps, ORG, UID, 'ba1')])
+    const settle = (p: Promise<unknown>) => p.then((value) => ({ status: 'fulfilled' as const, value }), (reason: unknown) => ({ status: 'rejected' as const, reason }))
+    const runs = [settle(syncStep(deps, ORG, UID, 'ba1')), settle(syncStep(deps, ORG, UID, 'ba1'))]
+    expect((await Promise.race(runs)).status).toBe('rejected') // the step without the lock answers first
+    openGate()
+    const settled = await Promise.all(runs)
     expect(settled.filter((s) => s.status === 'fulfilled')).toHaveLength(1)
     const rejected = settled.filter((s): s is PromiseRejectedResult => s.status === 'rejected')
     expect(rejected).toHaveLength(1)
