@@ -1,3 +1,4 @@
+import { foldDiacritics } from '@/lib/domain/text/fold'
 import { bad } from './guards'
 
 export const NAME_MAX = 200
@@ -20,14 +21,7 @@ export function cleanName(v: unknown): string {
  * as a stress mark, are dropped).
  */
 export function nameKeyText(name: string): string {
-  return name
-    .normalize('NFD')
-    .replace(/(\p{Script=Latin})\p{M}+/gu, '$1')
-    .normalize('NFC')
-    // What is still a combining mark now (a stress mark, say) is not part of a precomposed letter: `й` and `ї` stay.
-    .replace(/\p{M}+/gu, '')
-    .replace(/ł/g, 'l')
-    .replace(/Ł/g, 'L')
+  return foldDiacritics(name)
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
