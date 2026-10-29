@@ -3,9 +3,9 @@ import { BankError } from '@/lib/server/banking/errors'
 import { classifyEbFailure, createEbApi } from '@/lib/server/banking/eb-api'
 
 function api(responses: Array<{ status?: number; json?: unknown; text?: string } | Error>, psu?: { ip?: string; userAgent?: string }) {
-  const calls: Array<{ url: string; headers: Record<string, string> }> = []
+  const calls: Array<{ url: string; headers: Record<string, string>; signal: AbortSignal | null | undefined }> = []
   const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
-    calls.push({ url, headers: Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>)) })
+    calls.push({ url, headers: Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>)), signal: init?.signal })
     const next = responses.shift()
     if (next === undefined) throw new Error('no more responses')
     if (next instanceof Error) throw next
@@ -78,6 +78,12 @@ describe('failures', () => {
     const { eb } = api([{ status: 429, text: '{}' }, new TypeError('fetch failed')])
     await expect(eb.getBalances('u1')).rejects.toMatchObject({ code: 'rate_limited' })
     await expect(eb.getBalances('u1')).rejects.toBeInstanceOf(BankError)
+  })
+  it('every bank request carries a timeout signal, and a timed-out request is bank_unavailable', async () => {
+    const { eb, calls } = api([{ json: { balances: [] } }, new DOMException('The operation was aborted due to timeout', 'TimeoutError')])
+    await eb.getBalances('u1')
+    expect(calls[0].signal).toBeInstanceOf(AbortSignal)
+    await expect(eb.getBalances('u1')).rejects.toMatchObject({ code: 'bank_unavailable' })
   })
 })
 

@@ -40,6 +40,9 @@ export interface EbApi {
   getTransactions(accountUid: string, query: { dateFrom: string; continuationKey?: string | null }): Promise<EbTxPage>
 }
 
+/** A bank request that does not answer within this time counts as the bank being unavailable (the route has 60 s). */
+export const REQUEST_TIMEOUT_MS = 20_000
+
 export interface EbApiOptions {
   /** Defaults to EB_API_BASE, then the real API (the e2e tests point it at a local fake bank). */
   base?: string
@@ -118,7 +121,7 @@ export function createEbApi(opts: EbApiOptions): EbApi {
     if (opts.psu?.userAgent) headers['psu-user-agent'] = opts.psu.userAgent
     let res: Response
     try {
-      res = await doFetch(`${base}${pathAndQuery}`, { headers })
+      res = await doFetch(`${base}${pathAndQuery}`, { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
     } catch {
       throw new BankError('bank_unavailable')
     }

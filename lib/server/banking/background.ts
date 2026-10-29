@@ -47,10 +47,12 @@ function accessLasts(conn: BankConnection | null, today: string): boolean {
   return conn !== null && conn.status === 'active' && todayDay(new Date(conn.validUntil)) >= today
 }
 
-async function syncAccount(deps: BankDeps, c: Candidate, uid: string): Promise<Outcome> {
+async function syncAccount(deps: BankDeps, c: Candidate, uid: string, deadline: number): Promise<Outcome> {
   let imported = 0
   try {
     for (let i = 0; i < BACKGROUND_MAX_STEPS; i++) {
+      // The first step always runs; a later one waits for the next slot once the run's time budget is used up.
+      if (i > 0 && Date.now() >= deadline) break
       const r = await syncStep(deps, c.orgId, uid, c.id)
       imported += r.imported
       if (r.done) break
@@ -69,8 +71,10 @@ async function syncAccount(deps: BankDeps, c: Candidate, uid: string): Promise<O
  * The background refresh: for every active, fully linked bank account that has not been tried in the current slot
  * (see `backgroundSlot`) and is not in a pause, runs `syncStep` (at most BACKGROUND_MAX_STEPS) and marks the slot as used.
  * `deps.eb` must be made without a person (no `psu-*` headers): the bank then counts the call as a background fetch.
- * A slot is used up by any attempt, a failed one too, so a bank outage does not eat the bank's daily limit;
- * only "busy" (the owner is syncing right now) and "out of time" leave it free for the next hourly run.
+ * The slot is claimed before the bank is asked, so a call that hangs or a run killed by the time limit still uses it up
+ * and the bank's daily limit is not spent again in the same slot. Only "busy" (the owner is syncing right now, the
+ * previous slot value is restored) and "out of time" (checked before an account is started) leave it free.
+ * A rate-limit answer also sets `backoffUntil`; a step that starts after the run's budget is used up is not started.
  */
 export async function runBackgroundSync(deps: BankDeps, opts: { budgetMs?: number } = {}): Promise<BackgroundSummary> {
   const started = Date.now()
@@ -125,8 +129,10 @@ export async function runBackgroundSync(deps: BankDeps, opts: { budgetMs?: numbe
       summary.failed++
       continue
     }
-    const outcome = await syncAccount(deps, c, uid)
+    await c.ref.update({ bgSlot: slot })
+    const outcome = await syncAccount(deps, c, uid, started + budgetMs)
     if (outcome.kind === 'busy') {
+      await c.ref.update({ bgSlot: c.acc.bgSlot })
       summary.skipped++
       summary.imported += outcome.imported
       continue
@@ -135,10 +141,9 @@ export async function runBackgroundSync(deps: BankDeps, opts: { budgetMs?: numbe
     else if (outcome.kind === 'rate_limited') summary.rateLimited++
     else summary.failed++
     summary.imported += outcome.imported
-    await c.ref.update({
-      bgSlot: slot,
-      ...(outcome.kind === 'rate_limited' ? { backoffUntil: new Date(now.getTime() + BACKOFF_MS).toISOString() } : {}),
-    })
+    if (outcome.kind === 'rate_limited') {
+      await c.ref.update({ backoffUntil: new Date(now.getTime() + BACKOFF_MS).toISOString() })
+    }
   }
   return summary
 }

@@ -47,10 +47,14 @@ describe('slots', () => {
     const eb = fakeEb({ '': { transactions: txs, continuationKey: null } })
     const deps = bankDeps(db, eb, MORNING)
     expect(await runBackgroundSync(deps)).toMatchObject({ synced: 1, imported: 100 })
+    // Each step is one bank request: the first run made 4 of them (one per step, 4 steps per slot).
+    expect(eb.calls).toHaveLength(4)
     expect((await txCol().get()).size).toBe(100)
     expect(await bankDoc()).toMatchObject({ bgSlot: '2026-10-27#08', cursor: { startedOn: '2026-10-27' } })
 
     expect(await runBackgroundSync(bankDeps(db, eb, NOON))).toMatchObject({ synced: 1, imported: 10 })
+    // The next slot resumes the cursor with one more request (the 5th) and finishes the account.
+    expect(eb.calls).toHaveLength(5)
     expect((await txCol().get()).size).toBe(110)
     expect((await verifyLedger(deps.ledger, ORG)).ok).toBe(true)
   })
@@ -72,6 +76,19 @@ describe('the bank limit', () => {
 
     const after = await runBackgroundSync(bankDeps(db, eb, EVENING)) // the pause ended at 17:00 Warsaw
     expect(after).toMatchObject({ slot: '2026-10-27#17', considered: 1, synced: 1, imported: 1 })
+  })
+
+  it('claims the slot before the bank is asked, so a call that never returns cannot be repeated in the same slot', async () => {
+    await seedBank(db, READY)
+    const eb = fakeEb(ONE)
+    const ask = eb.getTransactions
+    let claimedWhileAsking: unknown = 'not asked'
+    eb.getTransactions = async (uid, q) => {
+      claimedWhileAsking = (await bankDoc())?.bgSlot
+      return ask(uid, q)
+    }
+    await runBackgroundSync(bankDeps(db, eb, MORNING))
+    expect(claimedWhileAsking).toBe('2026-10-27#08')
   })
 
   it('another bank failure uses the slot without a pause and is counted as failed', async () => {
@@ -112,6 +129,12 @@ describe('what is left alone', () => {
     expect((await bankDoc())?.bgSlot ?? null).toBeNull()
   })
 
+  it('a busy account keeps the slot value it had before', async () => {
+    await seedBank(db, { ...READY, bgSlot: '2026-10-26#17', syncLock: { until: MORNING.getTime() + 60_000, token: 'other' } })
+    await runBackgroundSync(bankDeps(db, fakeEb(ONE), MORNING))
+    expect(await bankDoc()).toMatchObject({ bgSlot: '2026-10-26#17' })
+  })
+
   it('stops when the time budget is used up and leaves the slot free for the rest', async () => {
     await seedBank(db, READY)
     const eb = fakeEb(ONE)
@@ -119,5 +142,23 @@ describe('what is left alone', () => {
     expect(r).toMatchObject({ considered: 1, synced: 0, skipped: 1 })
     expect(eb.calls).toHaveLength(0)
     expect((await bankDoc())?.bgSlot ?? null).toBeNull()
+  })
+})
+
+describe('the time budget inside an account', () => {
+  it('a step that starts after the budget ran out is not started; what was imported stays and the account counts as synced', async () => {
+    await seedBank(db, READY)
+    const txs = Array.from({ length: 110 }, (_, i) => ebTx(`r${i}`, '1.00', 'CRDT', '2026-10-26'))
+    const eb = fakeEb({ '': { transactions: txs, continuationKey: null } })
+    const ask = eb.getTransactions
+    eb.getTransactions = async (uid, q) => {
+      const page = await ask(uid, q)
+      await new Promise((resolve) => setTimeout(resolve, 60)) // each bank call takes longer than the 50 ms budget
+      return page
+    }
+    const r = await runBackgroundSync(bankDeps(db, eb, MORNING), { budgetMs: 50 })
+    expect(r).toMatchObject({ synced: 1, failed: 0, imported: 25 })
+    expect(eb.calls).toHaveLength(1)
+    expect((await txCol().get()).size).toBe(25)
   })
 })
