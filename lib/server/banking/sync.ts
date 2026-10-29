@@ -86,6 +86,25 @@ export async function createWithRules(
   }
 }
 
+/** A failure's `code` (a ledger code, a Firestore code), never its message: a message may name a document. */
+function errorCode(e: unknown): string | number {
+  const code = typeof e === 'object' && e !== null ? (e as { code?: unknown }).code : undefined
+  return typeof code === 'string' || typeof code === 'number' ? code : 'unknown'
+}
+
+/**
+ * The rules a step applies. When they cannot be read, the step goes on without them (logged by code only): an operation
+ * is never lost, and never aborted, because its rules could not be read (S10).
+ */
+async function readStepRules(deps: BankDeps, orgId: string): Promise<Rule[]> {
+  try {
+    return await loadUsableRules(deps.db, orgId)
+  } catch (e) {
+    console.error('bank sync: rules could not be read', { orgId, code: errorCode(e) })
+    return []
+  }
+}
+
 async function acquire(deps: BankDeps, ref: DocumentReference, token: string): Promise<BankAccount> {
   return deps.db.runTransaction(async (t) => {
     const snap = await t.get(ref)
@@ -199,7 +218,7 @@ export async function syncStep(deps: BankDeps, orgId: string, uid: string, bankA
       let written: WriteResult
       try {
         const input = parseTransactionInput(mapped.input, { internal: true })
-        rules ??= await loadUsableRules(deps.db, orgId)
+        rules ??= await readStepRules(deps, orgId)
         written = await createWithRules(deps, orgId, uid, input, mapped.bank, acc.currency, rules)
       } catch (e) {
         if (!(e instanceof LedgerError)) throw e
