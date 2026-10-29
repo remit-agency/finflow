@@ -122,6 +122,24 @@ describe('a bank import with rules', () => {
   })
 })
 
+describe('a refusal of one action of a two-action rule during an import', () => {
+  it('the operation is still created; both actions of the rule are dropped with it (current behaviour, not changed here)', async () => {
+    await seedCounterparty(db, ORG, 'cp-archived-later', { archived: true })
+    await seedBank(db)
+    const deps = bankDeps(db, fakeEb(PAGE))
+    // The rule was read while the counterparty was active; the ledger now refuses only that action.
+    const written = await createWithRules(deps, ORG, UID, bankInput('bk_twoaction01'), { accountRef: 'ba1', counterpartyName: 'ORLEN STACJA 123' }, 'PLN', [
+      staleRule({ categoryId: 'k-fuel', counterpartyId: 'cp-archived-later' }),
+    ])
+    expect(written.replayed).toBe(false)
+    const doc = await readDoc(db, `organizations/${ORG}/transactions/bk_twoaction01`)
+    expect(doc).toMatchObject({ source: 'bank', amountMinor: 5_000 })
+    expect(doc?.categoryId).toBeUndefined()
+    expect(doc?.counterpartyId).toBeUndefined()
+    expect(doc?.autoRules).toBeUndefined()
+  })
+})
+
 describe('the background refresh (S09b) applies the rules too', () => {
   it('categorises what it imports', async () => {
     await createRule(makeDeps(db), ORG, UID, ruleInput())
