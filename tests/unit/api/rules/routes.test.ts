@@ -108,8 +108,8 @@ describe('POST /rules', () => {
     expect(await res.json()).toEqual(body)
   })
 
-  it('answers 413 for a body over 32 KB', async () => {
-    const res = await createRoute(req('POST', '/api/orgs/org-acme/rules', JSON.stringify({ ...BODY, name: 'x'.repeat(33 * 1024) })), ctx())
+  it('answers 413 for a body over 64 KB', async () => {
+    const res = await createRoute(req('POST', '/api/orgs/org-acme/rules', JSON.stringify({ ...BODY, name: 'x'.repeat(65 * 1024) })), ctx())
     expect(res.status).toBe(413)
   })
 })
