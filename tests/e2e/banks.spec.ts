@@ -4,21 +4,12 @@
 // lib/server/banking/link.ts stores them.
 import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test'
 import { registerViaUi, waitForShell, type RegisteredUser } from './helpers/app-ui'
-import { listDocs, replaceDoc, seedDoc, type SeedFields } from './helpers/emulator-firestore'
+import { SESSION, connectionFields, dayFromToday, seedConnection, seedLinkedBankAccount } from './helpers/bank-seed'
+import { listDocs, replaceDoc, seedDoc } from './helpers/emulator-firestore'
 import { seedLedgerAccount } from './helpers/ledger-seed'
-import { addDays } from '../../lib/domain/ledger/days'
-import { todayDay } from '../../lib/utils/today'
 
 const NEEDS_EMULATORS =
   'Needs the Auth + Firestore emulators. Run: firebase emulators:exec --only auth,firestore --project demo-finflow "npx playwright test"'
-
-/** The session id the fake bank answers for (tests/e2e/helpers/eb-stub.mjs). */
-const SESSION = 'e2e-session'
-const OWNER_UID = 'e2e-owner'
-
-/** Noon UTC is inside the same Warsaw calendar day, so the Warsaw day of this instant is exactly `day`. */
-const instantOnDay = (day: string): string => `${day}T12:00:00.000Z`
-const dayFromToday = (n: number): string => addDays(todayDay(), n)
 
 const rowsOf = (page: Page): Locator => page.locator('tbody').getByRole('row').filter({ has: page.getByRole('checkbox') })
 const accountRow = (page: Page, name: string): Locator =>
@@ -26,45 +17,6 @@ const accountRow = (page: Page, name: string): Locator =>
 const formDialog = (page: Page): Locator => page.getByRole('dialog').filter({ has: page.locator('#tx-amount') })
 const toast = (page: Page, text: string): Locator => page.locator('[data-sonner-toast]').filter({ hasText: text })
 const balanceText = (whole: string, fraction: string): RegExp => new RegExp(`${whole.replace(/\s/g, '\\s')},${fraction}`)
-
-function connectionFields(orgId: string, validUntilDay: string, status: 'active' | 'expired' = 'active'): SeedFields {
-  return {
-    orgId,
-    sessionId: SESSION,
-    institutionName: 'Fake Bank',
-    institutionCountry: 'PL',
-    psuType: 'business',
-    connectedAt: new Date().toISOString(),
-    validUntil: instantOnDay(validUntilDay),
-    status,
-    connectedBy: OWNER_UID,
-  }
-}
-
-async function seedConnection(request: APIRequestContext, orgId: string, validUntilDay: string, status: 'active' | 'expired' = 'active') {
-  await seedDoc(request, `organizations/${orgId}/bankConnections`, SESSION, connectionFields(orgId, validUntilDay, status))
-}
-
-/** A linked bank account in the shape link.ts stores it (lastSyncAt null: the next page load syncs it). */
-async function seedLinkedBankAccount(request: APIRequestContext, orgId: string, accountId: string): Promise<void> {
-  await seedDoc(request, `organizations/${orgId}/bankAccounts`, 'bank-acc-1', {
-    orgId,
-    connectionId: SESSION,
-    ebAccountUid: 'e2e-acc-1',
-    identificationHashes: ['e2e-hash-1'],
-    iban: 'PL61109010140000071219812874',
-    currency: 'PLN',
-    accountId,
-    importFrom: dayFromToday(-90),
-    status: 'active',
-    lastSyncAt: null,
-    syncedThrough: null,
-    cursor: null,
-    syncLock: null,
-    bankBalance: null,
-    firstSyncDone: false,
-  })
-}
 
 /** The FinFlow account the bank account is linked to, plus the expense category the locked-row test uses. */
 async function seedBankTarget(request: APIRequestContext, orgId: string): Promise<void> {
