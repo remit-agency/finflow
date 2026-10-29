@@ -44,6 +44,12 @@ export interface BankInfo {
   remittance?: string
 }
 
+/** A rule that filled the category or the counterparty of an operation (S10): its id and its name at that moment. */
+export interface AutoRuleRef {
+  id: string
+  name: string
+}
+
 export interface LedgerTransaction {
   id: string
   type: TxType
@@ -69,6 +75,8 @@ export interface LedgerTransaction {
   fx?: Fx
   base?: Base
   bank?: BankInfo
+  /** The rules that filled the category or the counterparty (S10). A person's change of either removes it. */
+  autoRules?: AutoRuleRef[]
 }
 
 export interface LedgerAccount {

@@ -59,6 +59,8 @@ export interface SeedOperation {
   counterpartyId?: string
   projectId?: string
   tags?: string[]
+  /** The rules that filled the operation (the «за правилом» chip of the journal). */
+  autoRules?: { id: string; name: string }[]
   /** Default: the payment day. */
   accrual?: { mode: 'date'; date: string } | { mode: 'period'; from: string; to: string }
   toAccountId?: string
@@ -85,6 +87,7 @@ function operationFields(orgId: string, data: SeedOperation) {
     description: data.description,
     isRecurring: false,
     tags: data.tags ?? [],
+    autoRules: data.autoRules,
     fileUrls: [],
     schemaVersion: 2,
     orgId,

@@ -294,6 +294,7 @@ export function TransactionList({
                   // The counterparty cell has a line when there is a counterparty, a fill chip or a bank operation (its mark).
                   const counterpartyLine = !!counterparty || showFill || !!tx.bank
                   const planned = tx.status === 'planned'
+                  const byRule = tx.autoRules && tx.autoRules.length > 0 ? tJournal('byRule', { name: tx.autoRules.map((r) => r.name).join(', ') }) : null
                   // A planned operation has not moved any money: its amount is neutral grey (the sign stays), not green or red.
                   const amountClass = planned ? 'text-ink-muted' : amount.className
 
@@ -371,6 +372,12 @@ export function TransactionList({
                         ) : (
                           <span className="block max-w-44 truncate text-xs text-ink-muted md:hidden">{categoryName}</span>
                         )}
+                        {/* The category column (and its chip) is hidden below md, so a phone gets the note as a plain line. */}
+                        {byRule !== null && (
+                          <span data-testid="rule-note" title={byRule} className="line-clamp-2 max-w-44 text-xs text-ink-muted md:hidden">
+                            {byRule}
+                          </span>
+                        )}
                         <span className="hidden max-w-56 truncate text-xs text-ink-muted md:block">
                           {account ? tAccountTypes(account.type) : ''}
                         </span>
@@ -397,6 +404,13 @@ export function TransactionList({
                           />
                         ) : (
                           <span className="text-ink-subtle">{t('noCategory')}</span>
+                        )}
+                        {byRule !== null && (
+                          <span className="mt-1 block">
+                            <Badge variant="chip" data-testid="rule-chip" title={byRule} className="max-w-72 font-normal text-ink-muted">
+                              <span className="truncate">{byRule}</span>
+                            </Badge>
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="hidden pr-2 text-ink-muted md:table-cell">

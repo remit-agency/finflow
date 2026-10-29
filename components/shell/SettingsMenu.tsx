@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -20,6 +21,16 @@ export function SettingsMenu({ variant }: { variant: 'panel' | 'pills' }) {
   const pathname = usePathname()
   const active = activeSettingsSection(pathname, orgId)
   const sections = visibleSettingsSections(role)
+  const pillsRef = useRef<HTMLElement>(null)
+
+  // The pill row scrolls sideways on a phone: bring the open section into view (it may be past the right edge).
+  useEffect(() => {
+    const nav = pillsRef.current
+    const pill = nav?.querySelector<HTMLElement>('[aria-current="page"]')
+    if (!nav || !pill) return
+    const left = pill.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft
+    nav.scrollLeft = left - (nav.clientWidth - pill.offsetWidth) / 2
+  }, [active])
 
   const back = (
     <Link
@@ -41,7 +52,7 @@ export function SettingsMenu({ variant }: { variant: 'panel' | 'pills' }) {
     return (
       <div className="space-y-3 lg:hidden">
         {back}
-        <nav aria-label={t('nav.settings')} className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
+        <nav ref={pillsRef} aria-label={t('nav.settings')} className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
           {sections.map((section) => {
             const isActive = section.slug === active
             return (

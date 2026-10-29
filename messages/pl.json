@@ -139,6 +139,7 @@
       "language": "Język",
       "categories": "Kategorie",
       "counterparties": "Kontrahenci",
+      "rules": "Reguły",
       "banks": "Banki",
       "subscription": "Subskrypcja"
     },
@@ -225,6 +226,7 @@
   },
   "journal": {
     "fromBank": "z banku",
+    "byRule": "wg reguły: {name}",
     "title": "Płatności",
     "showAllAccounts": "Pokaż wszystkie konta",
     "loadError": "Nie udało się wczytać dziennika operacji. Spróbuj ponownie.",
@@ -569,6 +571,105 @@
         "none": "Bez kontrahenta",
         "create": "Dodaj kontrahenta",
         "noMatches": "Nie znaleziono kontrahentów"
+      }
+    },
+    "rules": {
+      "title": "Reguły",
+      "description": "Kategoria i kontrahent dla nowych operacji z banku według tekstu, rachunku i kwoty. Reguła uzupełnia tylko puste pole.",
+      "add": "Dodaj regułę",
+      "applyOpen": "Zastosuj do istniejących",
+      "empty": "Nie ma jeszcze reguł",
+      "loadError": "Nie udało się wczytać reguł",
+      "inactive": "Wyłączona",
+      "unusable": "Nie działa",
+      "unusableHint": "Kategoria lub kontrahent zostały usunięte, zarchiwizowane albo kategoria ma inny typ",
+      "active": "Reguła „{name}” jest aktywna",
+      "edit": "Edytuj „{name}”",
+      "moveUp": "Wyżej: „{name}”",
+      "moveDown": "Niżej: „{name}”",
+      "saved": "Reguła zapisana",
+      "deleted": "Reguła usunięta",
+      "type": {
+        "income": "Wpływ",
+        "expense": "Wydatek"
+      },
+      "summary": {
+        "contains": "zawiera {values}",
+        "notContains": "nie zawiera {values}",
+        "equals": "równa się {values}",
+        "account": "rachunek {names}",
+        "amountRange": "kwota {min} – {max}",
+        "amountMin": "kwota od {min}",
+        "amountMax": "kwota do {max}",
+        "category": "kategoria {name}",
+        "counterparty": "kontrahent {name}",
+        "missing": "(usunięto)"
+      },
+      "editor": {
+        "titleNew": "Nowa reguła",
+        "titleEdit": "Edycja reguły",
+        "name": "Nazwa",
+        "type": "Typ operacji",
+        "active": "Aktywna",
+        "conditions": "Warunki (muszą być spełnione wszystkie)",
+        "addCondition": "Dodaj warunek",
+        "removeCondition": "Usuń warunek {index}",
+        "kind": {
+          "label": "Co sprawdzać",
+          "text": "Tekst",
+          "account": "Rachunek",
+          "amount": "Kwota"
+        },
+        "op": {
+          "label": "Porównanie",
+          "contains": "zawiera",
+          "notContains": "nie zawiera",
+          "equals": "równa się"
+        },
+        "values": "Słowa po przecinku",
+        "valuesHint": "Tytuł przelewu, nazwa strony w banku lub komentarz. Wielkość liter i znaki diakrytyczne nie mają znaczenia.",
+        "accounts": "Rachunki",
+        "currency": "Waluta",
+        "min": "Od",
+        "max": "Do",
+        "actions": "Działania",
+        "category": "Kategoria",
+        "noCategory": "Nie przypisuj",
+        "counterparty": "Kontrahent",
+        "check": "Sprawdź",
+        "checking": "Sprawdzanie…",
+        "checkResult": "Operacje bez kategorii lub kontrahenta: {scanned}, pasuje: {matched}",
+        "checkCapped": "Sprawdzono tylko ostatnie 2000 operacji",
+        "saving": "Zapisywanie…",
+        "incomplete": "Aby zapisać, uzupełnij nazwę i wszystkie warunki oraz wybierz kategorię lub kontrahenta",
+        "deleteConfirm": "Usunąć regułę „{name}”? Kategorie, które już przypisała, zostaną."
+      },
+      "apply": {
+        "title": "Zastosuj reguły do istniejących operacji",
+        "note": "Reguły uzupełniają tylko puste pola i nie zmieniają tego, co wybrano ręcznie.",
+        "checking": "Liczę operacje… przejrzano: {scanned}",
+        "willChange": "Operacje do zmiany: {count}",
+        "breakdown": "Kategoria: {categories}, kontrahent: {counterparties}",
+        "nothing": "Brak operacji, które reguły mogłyby zmienić",
+        "confirm": "Zastosuj",
+        "running": "Stosuję… zmieniono: {changed}",
+        "done": "Zmienione operacje: {changed}",
+        "failed": "Nie udało się zmienić: {failed}",
+        "error": "Nie udało się zastosować reguł",
+        "changedBeforeError": "Zmieniono przed błędem: {changed}",
+        "checkError": "Nie udało się sprawdzić reguł",
+        "stoppedEarly": "Zatrzymano przed końcem: uruchom ponownie"
+      },
+      "errors": {
+        "invalid": "Sprawdź warunki reguły",
+        "category": "Nie znaleziono kategorii lub ma ona inny typ",
+        "counterpartyMissing": "Nie znaleziono kontrahenta",
+        "counterpartyArchived": "Kontrahent jest w archiwum",
+        "limit": "Osiągnięto limit: 50 reguł na firmę",
+        "gone": "Reguła została już usunięta",
+        "conflict": "Lista reguł się zmieniła. Odśwież stronę",
+        "save": "Nie udało się zapisać reguły",
+        "check": "Nie udało się sprawdzić reguły"
       }
     },
     "banks": {

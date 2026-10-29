@@ -1,4 +1,4 @@
-import type { Accrual, BankInfo, TxStatus } from '@/lib/domain/ledger/types'
+import type { Accrual, AutoRuleRef, BankInfo, TxStatus } from '@/lib/domain/ledger/types'
 import type { Role } from '@/lib/shell/permissions'
 
 export interface Organization {
@@ -64,4 +64,6 @@ export interface Transaction {
   fileUrls: string[]
   /** Set on an operation imported from a bank (S09). */
   bank?: BankInfo
+  /** The rules that filled the category or the counterparty (S10). */
+  autoRules?: AutoRuleRef[]
 }

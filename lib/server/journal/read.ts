@@ -35,7 +35,7 @@ export type ReadResult = JournalPage & { stats: ReadStats }
  * The position of a document in the listing, or null when it has no payment date to sit under. A creation time that
  * is not a timestamp counts as the oldest possible one (the operation is still listed, last in its day).
  */
-function keyOf(d: DocumentSnapshot): JournalKey | null {
+export function keyOf(d: DocumentSnapshot): JournalKey | null {
   const created = d.get('createdAt')
   const paymentDate = d.get('paymentDate')
   if (typeof paymentDate !== 'string') return null

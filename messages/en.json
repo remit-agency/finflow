@@ -139,6 +139,7 @@
       "language": "Language",
       "categories": "Categories",
       "counterparties": "Counterparties",
+      "rules": "Rules",
       "banks": "Banks",
       "subscription": "Subscription"
     },
@@ -225,6 +226,7 @@
   },
   "journal": {
     "fromBank": "from bank",
+    "byRule": "by rule: {name}",
     "title": "Payments",
     "showAllAccounts": "Show all accounts",
     "loadError": "The journal could not be loaded. Try again.",
@@ -569,6 +571,105 @@
         "none": "No counterparty",
         "create": "Add counterparty",
         "noMatches": "No counterparties found"
+      }
+    },
+    "rules": {
+      "title": "Rules",
+      "description": "Category and counterparty for new bank transactions by text, account and amount. A rule only fills an empty field.",
+      "add": "Add rule",
+      "applyOpen": "Apply to existing",
+      "empty": "No rules yet",
+      "loadError": "Could not load the rules",
+      "inactive": "Off",
+      "unusable": "Not working",
+      "unusableHint": "The category or counterparty was deleted or archived, or the category has another type",
+      "active": "Rule “{name}” is active",
+      "edit": "Edit “{name}”",
+      "moveUp": "Move up: “{name}”",
+      "moveDown": "Move down: “{name}”",
+      "saved": "Rule saved",
+      "deleted": "Rule deleted",
+      "type": {
+        "income": "Income",
+        "expense": "Expense"
+      },
+      "summary": {
+        "contains": "contains {values}",
+        "notContains": "does not contain {values}",
+        "equals": "equals {values}",
+        "account": "account {names}",
+        "amountRange": "amount {min} – {max}",
+        "amountMin": "amount from {min}",
+        "amountMax": "amount up to {max}",
+        "category": "category {name}",
+        "counterparty": "counterparty {name}",
+        "missing": "(deleted)"
+      },
+      "editor": {
+        "titleNew": "New rule",
+        "titleEdit": "Edit rule",
+        "name": "Name",
+        "type": "Transaction type",
+        "active": "Active",
+        "conditions": "Conditions (all must hold)",
+        "addCondition": "Add condition",
+        "removeCondition": "Remove condition {index}",
+        "kind": {
+          "label": "What to check",
+          "text": "Text",
+          "account": "Account",
+          "amount": "Amount"
+        },
+        "op": {
+          "label": "Comparison",
+          "contains": "contains",
+          "notContains": "does not contain",
+          "equals": "equals"
+        },
+        "values": "Words separated by commas",
+        "valuesHint": "Payment details, the party's name at the bank or the comment. Case and diacritics do not matter.",
+        "accounts": "Accounts",
+        "currency": "Currency",
+        "min": "From",
+        "max": "To",
+        "actions": "Actions",
+        "category": "Category",
+        "noCategory": "Do not set",
+        "counterparty": "Counterparty",
+        "check": "Check",
+        "checking": "Checking…",
+        "checkResult": "Transactions without a category or counterparty: {scanned}, matching: {matched}",
+        "checkCapped": "Only the latest 2000 transactions were checked",
+        "saving": "Saving…",
+        "incomplete": "To save, fill in the name and every condition, and pick a category or a counterparty",
+        "deleteConfirm": "Delete the rule “{name}”? The categories it already set stay."
+      },
+      "apply": {
+        "title": "Apply the rules to existing transactions",
+        "note": "The rules only fill empty fields and never change what was chosen by hand.",
+        "checking": "Counting transactions… checked: {scanned}",
+        "willChange": "Transactions to change: {count}",
+        "breakdown": "Category: {categories}, counterparty: {counterparties}",
+        "nothing": "No transactions the rules could change",
+        "confirm": "Apply",
+        "running": "Applying… changed: {changed}",
+        "done": "Transactions changed: {changed}",
+        "failed": "Could not change: {failed}",
+        "error": "Could not apply the rules",
+        "changedBeforeError": "Changed before the error: {changed}",
+        "checkError": "Could not check the rules",
+        "stoppedEarly": "Stopped before the end: run it again"
+      },
+      "errors": {
+        "invalid": "Check the rule's conditions",
+        "category": "The category was not found or has another type",
+        "counterpartyMissing": "The counterparty was not found",
+        "counterpartyArchived": "The counterparty is archived",
+        "limit": "Limit reached: 50 rules per company",
+        "gone": "The rule was already deleted",
+        "conflict": "The list of rules changed. Reload the page",
+        "save": "Could not save the rule",
+        "check": "Could not check the rule"
       }
     },
     "banks": {

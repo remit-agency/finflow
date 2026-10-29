@@ -226,7 +226,7 @@ test.describe('app shell (emulators)', () => {
     }
   })
 
-  test('settings: a separate screen whose left column is the menu of six sections; the old URL redirects to Company with its query', async ({ page }) => {
+  test('settings: a separate screen whose left column is the menu of seven sections; the old URL redirects to Company with its query', async ({ page }) => {
     const user = await registerViaUi(page, 'settings')
     await waitForShell(page, user.companyName)
     const modules = page.getByRole('navigation', { name: 'Модулі' })
@@ -239,7 +239,7 @@ test.describe('app shell (emulators)', () => {
     // The settings menu replaces the accounts sidebar, and the module tabs are gone.
     const settingsColumn = page.getByRole('complementary', { name: 'Налаштування' })
     const menu = settingsColumn.getByRole('navigation', { name: 'Розділи налаштувань' })
-    await expect(menu.getByRole('link')).toHaveText(['Компанія', 'Мова', 'Категорії', 'Контрагенти', 'Банки', 'Підписка'])
+    await expect(menu.getByRole('link')).toHaveText(['Компанія', 'Мова', 'Категорії', 'Контрагенти', 'Правила', 'Банки', 'Підписка'])
     await expect(page.getByRole('navigation', { name: 'Розділи налаштувань' })).toHaveCount(1)
     await expect(accountsSidebar(page)).toHaveCount(0)
     await expect(modules).toHaveCount(0)
@@ -252,6 +252,7 @@ test.describe('app shell (emulators)', () => {
       { link: 'Мова', path: 'language', marker: page.getByRole('radio', { name: 'Polski', exact: true }) },
       { link: 'Категорії', path: 'categories', marker: page.getByText('Додати категорію', { exact: true }) },
       { link: 'Контрагенти', path: 'counterparties', marker: page.getByRole('button', { name: 'Додати контрагента' }) },
+      { link: 'Правила', path: 'rules', marker: page.getByRole('button', { name: 'Додати правило' }) },
       { link: 'Банки', path: 'banks', marker: page.getByRole('button', { name: 'Підключити банк' }) },
       { link: 'Підписка', path: 'subscription', marker: page.getByText(/trial plan/i) },
     ]
