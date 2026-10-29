@@ -6,7 +6,7 @@ import { parseAccount, parseTransaction, transactionToDoc } from '@/lib/domain/l
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import { applyPatch, BANK_CLIENT_ID_PREFIX, toRawInput, type TransactionInput, type TransactionPatch } from '@/lib/domain/ledger/input'
 import { nest } from '@/lib/domain/ledger/rollups'
-import type { BankInfo, LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
+import type { AutoRuleRef, BankInfo, LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
 import type { RateSnapshot } from '@/lib/server/fx/types'
 import { auditData, type AuditAction } from './audit'
 import type { LedgerDeps } from './deps'
@@ -17,6 +17,18 @@ export interface WriteResult {
   transaction: LedgerTransaction
   /** True when a create with an already used clientId returned the existing operation. */
   replayed: boolean
+}
+
+/**
+ * What only server code may add to a write, never a request body (S10).
+ * - `autoRules`: the rules that filled the category or the counterparty. The operation keeps them as its trace and the
+ *   audit entry says `via: 'rule'`.
+ * - `expectVersion` (update only): the write is refused with `conflict` unless the stored operation is still that version,
+ *   so a rule never replaces what a person chose after the rules read the operation.
+ */
+export interface WriteExtras {
+  autoRules?: AutoRuleRef[]
+  expectVersion?: Timestamp
 }
 
 /** A fully built operation plus what the build assumed about the world (re-checked inside the transaction). */
@@ -32,6 +44,8 @@ interface Job {
   txId: string
   prior: { tx: LedgerTransaction; version: Timestamp } | null
   next: Prepared | null
+  /** Set when the rules made the change (S10): the audit entry records it. */
+  via?: 'rule'
 }
 
 export function evidenceOf(s: RateSnapshot): RateEvidence {
@@ -169,6 +183,7 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
         job.txId,
         job.prior ? transactionToDoc(job.prior.tx) : null,
         job.next ? transactionToDoc(job.next.tx) : null,
+        job.via === undefined ? undefined : { via: job.via },
       ),
     )
 
@@ -219,12 +234,15 @@ export async function createTransaction(
   uid: string,
   input: TransactionInput,
   bank?: BankInfo,
+  extras: WriteExtras = {},
 ): Promise<WriteResult> {
   const txId = input.clientId ?? transactionsCol(deps.db, orgId).doc().id
   const provenance = bank ?? (await bankProvenanceOf(deps, orgId, input))
   const next = await prepare(deps, orgId, txId, input)
   if (provenance !== undefined) next.tx = { ...next.tx, bank: provenance }
-  return commit(deps, orgId, uid, { action: 'tx.create', txId, prior: null, next })
+  const autoRules = extras.autoRules ?? []
+  if (autoRules.length > 0) next.tx = { ...next.tx, autoRules: autoRules.map((r) => ({ id: r.id, name: r.name })) }
+  return commit(deps, orgId, uid, { action: 'tx.create', txId, prior: null, next, via: autoRules.length > 0 ? 'rule' : undefined })
 }
 
 async function loadPrior(deps: LedgerDeps, orgId: string, txId: string) {
@@ -235,21 +253,42 @@ async function loadPrior(deps: LedgerDeps, orgId: string, txId: string) {
   return { tx, version: snap.updateTime }
 }
 
+/**
+ * The trace an update leaves (S10). A write by the rules adds its rules to the trace (each once). Otherwise a change of
+ * the category or the counterparty is a person's choice and removes the trace; any other edit keeps it.
+ */
+function autoRulesAfter(prior: LedgerTransaction, next: LedgerTransaction, given: readonly AutoRuleRef[]): AutoRuleRef[] | undefined {
+  if (given.length > 0) {
+    const merged = [...(prior.autoRules ?? [])]
+    for (const r of given) if (!merged.some((m) => m.id === r.id)) merged.push({ id: r.id, name: r.name })
+    return merged
+  }
+  if (prior.categoryId !== next.categoryId || prior.counterpartyId !== next.counterpartyId) return undefined
+  return prior.autoRules
+}
+
 export async function updateTransaction(
   deps: LedgerDeps,
   orgId: string,
   uid: string,
   txId: string,
   patch: TransactionPatch,
+  extras: WriteExtras = {},
 ): Promise<WriteResult> {
   const prior = await loadPrior(deps, orgId, txId)
+  // The rules read the operation at `expectVersion`: anything a person did since then wins (S10).
+  if (extras.expectVersion !== undefined && !prior.version.isEqual(extras.expectVersion)) throw new LedgerError('conflict')
   const next = await prepare(deps, orgId, txId, applyPatch(toRawInput(prior.tx), patch))
   if (prior.tx.bank !== undefined) {
     assertBankUnlocked(prior.tx, next.tx)
     // toRawInput never carries `bank`, so an edit keeps the provenance from the prior document.
     next.tx = { ...next.tx, bank: prior.tx.bank }
   }
-  return commit(deps, orgId, uid, { action: 'tx.update', txId, prior, next })
+  const given = extras.autoRules ?? []
+  // toRawInput never carries `autoRules` either: the trace is decided here.
+  const autoRules = autoRulesAfter(prior.tx, next.tx, given)
+  if (autoRules !== undefined) next.tx = { ...next.tx, autoRules }
+  return commit(deps, orgId, uid, { action: 'tx.update', txId, prior, next, via: given.length > 0 ? 'rule' : undefined })
 }
 
 export async function deleteTransaction(deps: LedgerDeps, orgId: string, uid: string, txId: string): Promise<WriteResult> {

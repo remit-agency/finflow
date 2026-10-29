@@ -5,6 +5,7 @@ import {
   TX_STATUSES,
   TX_TYPES,
   type Accrual,
+  type AutoRuleRef,
   type Base,
   type BankInfo,
   type Fx,
@@ -46,6 +47,15 @@ function parseEvidence(v: unknown): RateEvidence | null {
   return { rate, from, to, requestedDate, rateDate, tableNo, source }
 }
 
+/** The rules that filled the operation. Only a trace: entries that are not `{ id, name }` strings are left out. */
+function parseAutoRules(v: unknown): AutoRuleRef[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out = v
+    .filter((r): r is AutoRuleRef => isRecord(r) && typeof r.id === 'string' && typeof r.name === 'string')
+    .map((r) => ({ id: r.id, name: r.name }))
+  return out.length > 0 ? out : undefined
+}
+
 /** The stored fields of an operation (no id, no server timestamps). Never contains `undefined`. */
 export function transactionToDoc(tx: LedgerTransaction): Record<string, unknown> {
   const doc: Record<string, unknown> = {
@@ -78,6 +88,7 @@ export function transactionToDoc(tx: LedgerTransaction): Record<string, unknown>
     if (tx.bank.remittance !== undefined) bank.remittance = tx.bank.remittance
     doc.bank = bank
   }
+  if (tx.autoRules !== undefined && tx.autoRules.length > 0) doc.autoRules = tx.autoRules.map((r) => ({ id: r.id, name: r.name }))
   return doc
 }
 
@@ -149,6 +160,8 @@ export function parseTransaction(id: string, data: unknown): LedgerTransaction |
     }
     tx.bank = bank
   }
+  const autoRules = parseAutoRules(data.autoRules)
+  if (autoRules !== undefined) tx.autoRules = autoRules
   return tx
 }
 
