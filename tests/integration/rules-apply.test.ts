@@ -1,15 +1,21 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { decodeCursor, type JournalKey } from '@/lib/domain/journal/order'
 import { parseTransactionInput } from '@/lib/domain/ledger/input'
 import type { BankInfo } from '@/lib/domain/ledger/types'
 import { RuleError } from '@/lib/domain/rules/errors'
 import type { ApplyStepResult, CheckStepResult } from '@/lib/domain/rules/types'
 import { verifyLedger } from '@/lib/server/ledger/verify'
-import { createTransaction } from '@/lib/server/ledger/write'
+import { createTransaction, updateTransaction } from '@/lib/server/ledger/write'
 import { applyStep, checkStep, previewRule } from '@/lib/server/rules/apply'
 import { createRule } from '@/lib/server/rules/write'
 import { ORG, UID, auditActions, clearFirestore, makeDeps, readDoc, seedAccount, seedCategory, seedCounterparty, seedOrg, testDb } from './helpers'
 import { ruleInput } from './rule-helpers'
+
+// The apply step writes through updateTransaction; a test may let a person's edit land just before one of those writes.
+vi.mock('@/lib/server/ledger/write', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/server/ledger/write')>()
+  return { ...real, updateTransaction: vi.fn(real.updateTransaction) }
+})
 
 const db = testDb()
 const deps = makeDeps(db)
@@ -122,6 +128,35 @@ describe('apply', () => {
     await createRule(deps, ORG, UID, ruleInput())
     await applyAll()
     expect(await applyAll()).toMatchObject({ changed: 0, failed: 0 })
+  })
+
+  it('a person edit that lands between the step read and its write wins: a conflict, counted as failed, nothing overwritten', async () => {
+    const ids = await seedOperations()
+    await createRule(deps, ORG, UID, ruleInput())
+    const actual = await vi.importActual<typeof import('@/lib/server/ledger/write')>('@/lib/server/ledger/write')
+    // The first write of the step is preceded by the person's edit of that same operation (no version check: a person).
+    const edited: string[] = []
+    vi.mocked(updateTransaction).mockImplementation(async (d, org, uid, id, patch, extras) => {
+      if (edited.length === 0) {
+        edited.push(id)
+        await actual.updateTransaction(d, org, UID, id, { categoryId: 'k-other' })
+      }
+      return actual.updateTransaction(d, org, uid, id, patch, extras)
+    })
+    try {
+      const totals = await applyAll()
+      expect(totals).toMatchObject({ changed: 4, failed: 1 })
+      const person = edited[0]
+      expect([ids.m1, ids.m2, ids.m3, ids.m4, ids.planned]).toContain(person)
+      expect(await txDoc(person)).toMatchObject({ categoryId: 'k-other' })
+      expect((await txDoc(person))?.autoRules).toBeUndefined()
+      expect((await txDoc(person))?.counterpartyId).toBeUndefined()
+      const updates = (await db.collection(`organizations/${ORG}/audit`).where('action', '==', 'tx.update').where('targetId', '==', person).get()).docs.map((d) => d.data())
+      expect(updates.map((u) => u.via ?? null)).toEqual([null])
+      expect((await verifyLedger(deps, ORG)).ok).toBe(true)
+    } finally {
+      vi.mocked(updateTransaction).mockImplementation(actual.updateTransaction)
+    }
   })
 
   it('fills only the empty field: an operation with a person\'s category gets just the counterparty', async () => {
