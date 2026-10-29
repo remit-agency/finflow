@@ -39,7 +39,7 @@ interface Candidate {
 
 type Outcome =
   | { kind: 'synced'; imported: number }
-  | { kind: 'busy' }
+  | { kind: 'busy'; imported: number }
   | { kind: 'rate_limited'; imported: number }
   | { kind: 'failed'; imported: number }
 
@@ -57,7 +57,7 @@ async function syncAccount(deps: BankDeps, c: Candidate, uid: string): Promise<O
     }
     return { kind: 'synced', imported }
   } catch (e) {
-    if (e instanceof BankError && e.code === 'already_running') return { kind: 'busy' }
+    if (e instanceof BankError && e.code === 'already_running') return { kind: 'busy', imported }
     if (e instanceof BankError && e.code === 'rate_limited') return { kind: 'rate_limited', imported }
     const code = e instanceof BankError || e instanceof LedgerError ? e.code : 'unknown'
     console.error('bank background sync failed', { orgId: c.orgId, bankAccountId: c.id, code })
@@ -128,6 +128,7 @@ export async function runBackgroundSync(deps: BankDeps, opts: { budgetMs?: numbe
     const outcome = await syncAccount(deps, c, uid)
     if (outcome.kind === 'busy') {
       summary.skipped++
+      summary.imported += outcome.imported
       continue
     }
     if (outcome.kind === 'synced') summary.synced++
