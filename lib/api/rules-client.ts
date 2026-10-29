@@ -53,6 +53,8 @@ export interface CheckTotals {
   matchOps: number
   categories: number
   counterparties: number
+  /** The step cap ended the count before the last step: the totals are partial. */
+  stoppedEarly: boolean
 }
 
 /** Counts, step by step, what «Застосувати до наявних» would change. Writes nothing. */
@@ -60,7 +62,7 @@ export async function checkExisting(
   orgId: string,
   opts: { signal?: AbortSignal; onProgress?: (totals: CheckTotals) => void } = {},
 ): Promise<CheckTotals> {
-  const totals: CheckTotals = { scanned: 0, matchOps: 0, categories: 0, counterparties: 0 }
+  const totals: CheckTotals = { scanned: 0, matchOps: 0, categories: 0, counterparties: 0, stoppedEarly: true }
   let cursor: string | null = null
   for (let i = 0; i < MAX_STEPS; i++) {
     const answer: CheckStepResult = await step<CheckStepResult>(orgId, cursor === null ? { mode: 'check' } : { mode: 'check', cursor }, opts.signal)
@@ -68,7 +70,10 @@ export async function checkExisting(
     totals.matchOps += answer.matchOps
     totals.categories += answer.categories
     totals.counterparties += answer.counterparties
-    if (answer.done || answer.cursor === null) break
+    if (answer.done || answer.cursor === null) {
+      totals.stoppedEarly = false
+      break
+    }
     cursor = answer.cursor
     opts.onProgress?.({ ...totals })
   }
@@ -79,6 +84,19 @@ export interface ApplyTotals {
   scanned: number
   changed: number
   failed: number
+  /** The step cap ended the run before done: the rest of the operations were not visited. */
+  stoppedEarly: boolean
+}
+
+/** A step failed after earlier steps: the counts so far stay with the error (`cause` is the step's error). */
+export class RulesRunError extends Error {
+  constructor(
+    public readonly totals: ApplyTotals,
+    public readonly cause: unknown,
+  ) {
+    super('rules run failed')
+    this.name = 'RulesRunError'
+  }
 }
 
 /** Runs «Застосувати до наявних» to the end; the journal reloads once when something changed. */
@@ -86,15 +104,23 @@ export async function applyToExisting(
   orgId: string,
   opts: { signal?: AbortSignal; onProgress?: (totals: ApplyTotals) => void } = {},
 ): Promise<ApplyTotals> {
-  const totals: ApplyTotals = { scanned: 0, changed: 0, failed: 0 }
+  const totals: ApplyTotals = { scanned: 0, changed: 0, failed: 0, stoppedEarly: true }
   let cursor: string | null = null
   try {
     for (let i = 0; i < MAX_STEPS; i++) {
-      const answer: ApplyStepResult = await step<ApplyStepResult>(orgId, cursor === null ? { mode: 'apply' } : { mode: 'apply', cursor }, opts.signal)
+      let answer: ApplyStepResult
+      try {
+        answer = await step<ApplyStepResult>(orgId, cursor === null ? { mode: 'apply' } : { mode: 'apply', cursor }, opts.signal)
+      } catch (err) {
+        throw new RulesRunError({ ...totals }, err)
+      }
       totals.scanned += answer.scanned
       totals.changed += answer.changed
       totals.failed += answer.failed
-      if (answer.done || answer.cursor === null) break
+      if (answer.done || answer.cursor === null) {
+        totals.stoppedEarly = false
+        break
+      }
       cursor = answer.cursor
       opts.onProgress?.({ ...totals })
     }

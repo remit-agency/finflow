@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const notify = vi.fn()
 vi.mock('@/lib/api/ledger-events', () => ({ notifyLedgerChanged: () => notify() }))
 
-import { applyToExisting, checkExisting, createRule, deleteRule, fetchRules, orderRules, previewRule } from '@/lib/api/rules-client'
+import { applyToExisting, checkExisting, createRule, deleteRule, fetchRules, orderRules, previewRule, RulesRunError } from '@/lib/api/rules-client'
 import type { RuleInput } from '@/lib/domain/rules/input'
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -59,11 +59,18 @@ describe('checkExisting', () => {
     vi.stubGlobal('fetch', fetchMock)
     const progress: number[] = []
     const totals = await checkExisting('org1', { onProgress: (t) => progress.push(t.scanned) })
-    expect(totals).toEqual({ scanned: 237, matchOps: 5, categories: 4, counterparties: 2 })
+    expect(totals).toEqual({ scanned: 237, matchOps: 5, categories: 4, counterparties: 2, stoppedEarly: false })
     expect(progress).toEqual([200])
     expect(fetchMock.mock.calls[0][0]).toBe('/api/orgs/org1/rules/apply')
     expect(fetchMock.mock.calls.map((c) => JSON.parse(c[1].body))).toEqual([{ mode: 'check' }, { mode: 'check', cursor: 'c1' }])
     expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('reports stoppedEarly when the step cap ends the count before done', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => json({ scanned: 1, matchOps: 0, categories: 0, counterparties: 0, done: false, cursor: 'c' }))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await checkExisting('org1')).toEqual({ scanned: 2000, matchOps: 0, categories: 0, counterparties: 0, stoppedEarly: true })
+    expect(fetchMock).toHaveBeenCalledTimes(2000)
   })
 })
 
@@ -74,7 +81,7 @@ describe('applyToExisting', () => {
       .mockResolvedValueOnce(json({ scanned: 140, changed: 3, failed: 1, done: true, cursor: null }))
     vi.stubGlobal('fetch', fetchMock)
     const progress: number[] = []
-    expect(await applyToExisting('org1', { onProgress: (t) => progress.push(t.changed) })).toEqual({ scanned: 200, changed: 28, failed: 1 })
+    expect(await applyToExisting('org1', { onProgress: (t) => progress.push(t.changed) })).toEqual({ scanned: 200, changed: 28, failed: 1, stoppedEarly: false })
     expect(progress).toEqual([25])
     expect(fetchMock.mock.calls.map((c) => JSON.parse(c[1].body))).toEqual([{ mode: 'apply' }, { mode: 'apply', cursor: 'c1' }])
     expect(notify).toHaveBeenCalledTimes(1)
@@ -85,6 +92,25 @@ describe('applyToExisting', () => {
     await applyToExisting('org1')
     expect(notify).not.toHaveBeenCalled()
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ error: 'forbidden' }, 403)))
-    await expect(applyToExisting('org1')).rejects.toMatchObject({ status: 403, code: 'forbidden' })
+    await expect(applyToExisting('org1')).rejects.toMatchObject({ cause: { status: 403, code: 'forbidden' }, totals: { changed: 0 } })
+  })
+
+  it('reports stoppedEarly when the step cap ends the run before done, keeping the counts', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => json({ scanned: 1, changed: 1, failed: 0, done: false, cursor: 'c' }))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await applyToExisting('org1')).toEqual({ scanned: 2000, changed: 2000, failed: 0, stoppedEarly: true })
+    expect(fetchMock).toHaveBeenCalledTimes(2000)
+    expect(notify).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the counts of the steps before a failure, with the error as the cause', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ scanned: 60, changed: 5, failed: 0, done: false, cursor: 'c1' }))
+      .mockResolvedValueOnce(json({ error: 'internal' }, 500))
+    vi.stubGlobal('fetch', fetchMock)
+    const err = await applyToExisting('org1').catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(RulesRunError)
+    expect(err).toMatchObject({ totals: { scanned: 60, changed: 5, failed: 0 }, cause: { status: 500, code: 'internal' } })
+    expect(notify).toHaveBeenCalledTimes(1)
   })
 })
