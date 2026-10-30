@@ -79,7 +79,9 @@ export function ApplyRulesDialog({ orgId, onClose }: Props) {
               ) : (
                 <>
                   <p className="font-medium">{t('willChange', { count: phase.totals.matchOps })}</p>
-                  <p className="text-ink-muted">{t('breakdown', { categories: phase.totals.categories, counterparties: phase.totals.counterparties })}</p>
+                  <p className="text-ink-muted">
+                    {t('breakdown', { categories: phase.totals.categories, counterparties: phase.totals.counterparties, tags: phase.totals.tags })}
+                  </p>
                 </>
               )}
               {phase.totals.stoppedEarly && <p className="text-ink-muted">{t('stoppedEarly')}</p>}

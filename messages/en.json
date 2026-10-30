@@ -646,10 +646,10 @@
       },
       "apply": {
         "title": "Apply the rules to existing transactions",
-        "note": "The rules only fill empty fields and never change what was chosen by hand.",
+        "note": "The rules only fill empty fields, add tags and never change what was chosen by hand.",
         "checking": "Counting transactions… checked: {scanned}",
         "willChange": "Transactions to change: {count}",
-        "breakdown": "Category: {categories}, counterparty: {counterparties}",
+        "breakdown": "Category: {categories}, counterparty: {counterparties}, tags: {tags}",
         "nothing": "No transactions the rules could change",
         "confirm": "Apply",
         "running": "Applying… changed: {changed}",

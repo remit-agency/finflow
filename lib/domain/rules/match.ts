@@ -1,4 +1,6 @@
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
+import { mergeTags } from '@/lib/domain/tags/assign'
+import { MAX_TX_TAGS } from '@/lib/domain/tags/types'
 import { normalizeRuleText } from './normalize'
 import type { Rule, RuleCondition, RuleOperation, RuleOutcome, TextCondition } from './types'
 
@@ -58,18 +60,22 @@ export function sortRules(rules: readonly Rule[]): Rule[] {
 
 /**
  * What the rules give an operation. Each empty field (category, counterparty) is filled by the first matching rule that
- * has that action; a field that is already set is never touched. `applied` lists only the rules that filled something.
- * Unusable actions must be removed before (`withoutUnusableActions`).
+ * has that action; a field that is already set is never touched. Tags (S10t) are added, not chosen: every matching rule
+ * adds the tags the operation does not have yet, in rule order, while it has fewer than 10; no rule takes a tag off.
+ * `applied` lists only the rules that gave something. Unusable actions must be removed before (`withoutUnusableActions`).
  */
 export function applyRules(rules: readonly Rule[], op: RuleOperation): RuleOutcome {
   const out: RuleOutcome = { applied: [] }
   if (op.type === 'transfer') return out
   let needCategory = op.categoryId === undefined
   let needCounterparty = op.counterpartyId === undefined
-  if (!needCategory && !needCounterparty) return out
+  const own = op.tagIds ?? []
+  let tags: string[] = [...own]
+  const nothingLeft = () => !needCategory && !needCounterparty && tags.length >= MAX_TX_TAGS
+  if (nothingLeft()) return out
   const texts = textsOf(op)
   for (const rule of sortRules(rules)) {
-    if (!needCategory && !needCounterparty) break
+    if (nothingLeft()) break
     if (!matchesWith(rule, op, texts)) continue
     let filled = false
     if (needCategory && rule.actions.categoryId !== undefined) {
@@ -82,8 +88,16 @@ export function applyRules(rules: readonly Rule[], op: RuleOperation): RuleOutco
       needCounterparty = false
       filled = true
     }
+    if (rule.actions.tagIds !== undefined) {
+      const merged = mergeTags(tags, rule.actions.tagIds)
+      if (merged.length > tags.length) {
+        tags = merged
+        filled = true
+      }
+    }
     if (filled) out.applied.push({ id: rule.id, name: rule.name })
   }
+  if (tags.length > own.length) out.tagIds = tags
   return out
 }
 
@@ -95,5 +109,6 @@ export function ruleOperationOf(tx: LedgerTransaction): RuleOperation {
   if (tx.description !== undefined) op.description = tx.description
   if (tx.categoryId !== undefined) op.categoryId = tx.categoryId
   if (tx.counterpartyId !== undefined) op.counterpartyId = tx.counterpartyId
+  if (tx.tags.length > 0) op.tagIds = tx.tags
   return op
 }

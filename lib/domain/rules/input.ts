@@ -2,6 +2,8 @@ import { decodeCursor, type JournalKey } from '@/lib/domain/journal/order'
 import { isId } from '@/lib/domain/ledger/guards'
 import { MAX_MINOR, isMinor } from '@/lib/domain/ledger/money'
 import { LEDGER_CURRENCIES } from '@/lib/domain/ledger/types'
+import { tagIdsOf } from '@/lib/domain/tags/assign'
+import { MAX_RULE_TAGS } from '@/lib/domain/tags/types'
 import { asRecord, bad, onlyKeys } from './guards'
 import { normalizeRuleText } from './normalize'
 import {
@@ -123,7 +125,7 @@ function conditions(v: unknown): RuleConditionInput[] {
 
 function actions(v: unknown): RuleActions {
   const r = asRecord(v, 'actions')
-  onlyKeys(r, ['categoryId', 'counterpartyId'], 'actions.')
+  onlyKeys(r, ['categoryId', 'counterpartyId', 'tagIds'], 'actions.')
   const out: RuleActions = {}
   if (r.categoryId !== undefined) {
     if (!isId(r.categoryId)) bad('actions.categoryId')
@@ -133,7 +135,12 @@ function actions(v: unknown): RuleActions {
     if (!isId(r.counterpartyId)) bad('actions.counterpartyId')
     out.counterpartyId = r.counterpartyId
   }
-  if (out.categoryId === undefined && out.counterpartyId === undefined) bad('actions')
+  if (r.tagIds !== undefined) {
+    const tagIds = tagIdsOf(r.tagIds, MAX_RULE_TAGS)
+    if (tagIds === null || tagIds.length === 0) bad('actions.tagIds')
+    out.tagIds = tagIds
+  }
+  if (out.categoryId === undefined && out.counterpartyId === undefined && out.tagIds === undefined) bad('actions')
   return out
 }
 

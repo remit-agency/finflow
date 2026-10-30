@@ -61,6 +61,8 @@ export interface CheckTotals {
   matchOps: number
   categories: number
   counterparties: number
+  /** Operations that would get at least one tag (S10t). */
+  tags: number
   /** The step cap ended the count before the last step: the totals are partial. */
   stoppedEarly: boolean
 }
@@ -70,7 +72,7 @@ export async function checkExisting(
   orgId: string,
   opts: { signal?: AbortSignal; onProgress?: (totals: CheckTotals) => void } = {},
 ): Promise<CheckTotals> {
-  const totals: CheckTotals = { scanned: 0, matchOps: 0, categories: 0, counterparties: 0, stoppedEarly: true }
+  const totals: CheckTotals = { scanned: 0, matchOps: 0, categories: 0, counterparties: 0, tags: 0, stoppedEarly: true }
   let cursor: string | null = null
   for (let i = 0; i < MAX_STEPS; i++) {
     const answer: CheckStepResult = await step<CheckStepResult>(orgId, cursor === null ? { mode: 'check' } : { mode: 'check', cursor }, opts.signal)
@@ -78,6 +80,7 @@ export async function checkExisting(
     totals.matchOps += answer.matchOps
     totals.categories += answer.categories
     totals.counterparties += answer.counterparties
+    totals.tags += answer.tags
     if (answer.done || answer.cursor === null) {
       totals.stoppedEarly = false
       break

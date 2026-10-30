@@ -97,7 +97,7 @@ describe('check', () => {
 
   it('without rules a step reads nothing and is done', async () => {
     await seedOperations()
-    expect(await checkStep(deps, ORG, null)).toEqual({ scanned: 0, matchOps: 0, categories: 0, counterparties: 0, done: true, cursor: null })
+    expect(await checkStep(deps, ORG, null)).toEqual({ scanned: 0, matchOps: 0, categories: 0, counterparties: 0, tags: 0, done: true, cursor: null })
   })
 })
 

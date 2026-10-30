@@ -17,6 +17,8 @@ const STATUS: Record<RuleErrorCode, number> = {
   category_not_found: 422,
   counterparty_not_found: 422,
   counterparty_archived: 422,
+  tag_not_found: 422,
+  tag_archived: 422,
 }
 
 /** A RuleError becomes an HttpError (the code, plus `field` when set); others go to the ledger mapping. */

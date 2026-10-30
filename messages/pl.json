@@ -646,10 +646,10 @@
       },
       "apply": {
         "title": "Zastosuj reguły do istniejących operacji",
-        "note": "Reguły uzupełniają tylko puste pola i nie zmieniają tego, co wybrano ręcznie.",
+        "note": "Reguły uzupełniają tylko puste pola, dodają tagi i nie zmieniają tego, co wybrano ręcznie.",
         "checking": "Liczę operacje… przejrzano: {scanned}",
         "willChange": "Operacje do zmiany: {count}",
-        "breakdown": "Kategoria: {categories}, kontrahent: {counterparties}",
+        "breakdown": "Kategoria: {categories}, kontrahent: {counterparties}, tagi: {tags}",
         "nothing": "Brak operacji, które reguły mogłyby zmienić",
         "confirm": "Zastosuj",
         "running": "Stosuję… zmieniono: {changed}",

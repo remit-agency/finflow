@@ -13,6 +13,8 @@ describe('toRuleHttpError', () => {
     [new RuleError('category_not_found', 'actions.categoryId'), 422],
     [new RuleError('counterparty_not_found', 'actions.counterpartyId'), 422],
     [new RuleError('counterparty_archived', 'actions.counterpartyId'), 422],
+    [new RuleError('tag_not_found', 'actions.tagIds'), 422],
+    [new RuleError('tag_archived', 'actions.tagIds'), 422],
   ])('%s', (error, status) => {
     const mapped = toRuleHttpError(error) as HttpError
     expect(mapped).toBeInstanceOf(HttpError)

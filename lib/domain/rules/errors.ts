@@ -6,6 +6,8 @@ export type RuleErrorCode =
   | 'category_not_found'
   | 'counterparty_not_found'
   | 'counterparty_archived'
+  | 'tag_not_found'
+  | 'tag_archived'
 
 /** An expected failure of a rule operation. `field` names the offending input field, if any. */
 export class RuleError extends Error {
