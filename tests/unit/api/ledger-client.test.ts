@@ -6,6 +6,7 @@ import {
   draftToBody,
   draftToPatch,
   updateAccount,
+  updateTransaction,
   type TransactionDraft,
 } from '@/lib/api/ledger-client'
 
@@ -116,6 +117,29 @@ describe('deleteTransaction', () => {
     expect(url).toBe('/api/orgs/o1/transactions/tx%201')
     expect(init.method).toBe('DELETE')
     expect(init.body).toBeUndefined()
+  })
+})
+
+describe('updateTransaction', () => {
+  it('sends an ordinary edit without the restore marker', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
+
+    await updateTransaction('o1', 't1', draft)
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/orgs/o1/transactions/t1')
+    expect(init.method).toBe('PATCH')
+  })
+
+  it('adds the restore marker to the path when asked', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
+
+    await updateTransaction('o1', 't1', draft, { restore: true })
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/orgs/o1/transactions/t1?restore=1')
   })
 })
 

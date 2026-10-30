@@ -81,6 +81,28 @@ describe('tags on an operation', () => {
     expect(await code(updateTransaction(deps, ORG, UID, transaction.id, parseTransactionPatch({ tags: ['q4'] })))).toBe('tag_archived:tags')
   })
 
+  it('the undo of a removal restores the archived tag only with the restore marker; a tag that no longer exists is still refused', async () => {
+    const { transaction } = await createTransaction(deps, ORG, UID, op({ tags: ['q4'] }))
+    await db.doc(`organizations/${ORG}/tags/q4`).update({ archived: true })
+    await updateTransaction(deps, ORG, UID, transaction.id, parseTransactionPatch({ tags: [] }))
+    const back = parseTransactionPatch({ tags: ['q4'] })
+
+    // The same full replace as the undo, without the marker: refused as a new assignment of an archived tag.
+    expect(await code(updateTransaction(deps, ORG, UID, transaction.id, back))).toBe('tag_archived:tags')
+    expect((await txDoc(transaction.id))?.tags).toEqual([])
+
+    // With the marker (the undo's restore of a previous state) the archived tag comes back.
+    await updateTransaction(deps, ORG, UID, transaction.id, back, { restore: true })
+    expect(await txDoc(transaction.id)).toMatchObject({ tags: ['q4'] })
+    expect((await txDoc(transaction.id))?.excluded).toBeUndefined()
+
+    // The marker accepts only tags that exist.
+    await updateTransaction(deps, ORG, UID, transaction.id, parseTransactionPatch({ tags: [] }))
+    expect(await code(updateTransaction(deps, ORG, UID, transaction.id, parseTransactionPatch({ tags: ['ghost'] }), { restore: true }))).toBe('tag_not_found:tags')
+    expect((await txDoc(transaction.id))?.tags).toEqual([])
+    expect((await verifyLedger(deps, ORG)).ok).toBe(true)
+  })
+
   it('adding and taking off the excluding tag moves the rollups between the twins; the balance never moves', async () => {
     const { transaction } = await createTransaction(deps, ORG, UID, op())
     await updateTransaction(deps, ORG, UID, transaction.id, parseTransactionPatch({ tags: ['vat'] }))

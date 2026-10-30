@@ -170,7 +170,23 @@ describe('PATCH /transactions/{txId}', () => {
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toBe('no-store')
     expect(await res.json()).toEqual({ transaction: TX })
-    expect(ledger.updateTransaction).toHaveBeenCalledWith('org-acme', 'user-alice', 't1', { description: 'new' })
+    expect(ledger.updateTransaction).toHaveBeenCalledWith('org-acme', 'user-alice', 't1', { description: 'new' }, { restore: false })
+  })
+
+  it('passes the restore marker of the undo to the ledger', async () => {
+    vi.mocked(ledger.updateTransaction).mockResolvedValue({ transaction: TX, replayed: false } as never)
+    const res = await patchTx(req('PATCH', '/api/orgs/org-acme/transactions/t1?restore=1', { description: 'new' }), ctx({ txId: 't1' }))
+    expect(res.status).toBe(200)
+    expect(ledger.updateTransaction).toHaveBeenCalledWith('org-acme', 'user-alice', 't1', { description: 'new' }, { restore: true })
+  })
+
+  it('refuses any query other than the restore marker, with a value other than 1, before writing', async () => {
+    for (const query of ['?restore=yes', '?restore=1&restore=1', '?restore', '?restore=1&other=1', '?other=1']) {
+      const res = await patchTx(req('PATCH', `/api/orgs/org-acme/transactions/t1${query}`, { description: 'x' }), ctx({ txId: 't1' }))
+      expect(res.status, query).toBe(400)
+      expect(await res.json(), query).toEqual({ error: 'invalid_input' })
+    }
+    expect(ledger.updateTransaction).not.toHaveBeenCalled()
   })
 
   it('answers 404 for an id with a dot', async () => {

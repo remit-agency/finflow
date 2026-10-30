@@ -27,10 +27,14 @@ export interface WriteResult {
  *   audit entry says `via: 'rule'`.
  * - `expectVersion` (update only): the write is refused with `conflict` unless the stored operation is still that version,
  *   so a rule never replaces what a person chose after the rules read the operation.
+ * - `restore` (update only): the write puts a previous state back (the undo of an edit or a bulk change). A tag of that
+ *   state that is archived by now is accepted, as long as it exists. The PATCH route sets it only from the `restore=1`
+ *   query marker (`parseRestoreMarker`), never from the body; an ordinary write keeps refusing archived tags.
  */
 export interface WriteExtras {
   autoRules?: AutoRuleRef[]
   expectVersion?: Timestamp
+  restore?: boolean
 }
 
 /** A fully built operation plus what the build assumed about the world (re-checked inside the transaction). */
@@ -48,6 +52,8 @@ interface Job {
   next: Prepared | null
   /** Set when the rules made the change (S10): the audit entry records it. */
   via?: 'rule'
+  /** Set when the write restores a previous state (WriteExtras.restore): archived tags of the new state are accepted. */
+  restore?: boolean
 }
 
 export function evidenceOf(s: RateSnapshot): RateEvidence {
@@ -157,7 +163,7 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
     tagSnaps.forEach((snap, i) => {
       if (priorTags.includes(nextTags[i])) return
       if (!snap.exists) throw new LedgerError('tag_not_found', 'tags')
-      if (snap.get('archived') === true) throw new LedgerError('tag_archived', 'tags')
+      if (snap.get('archived') === true && job.restore !== true) throw new LedgerError('tag_archived', 'tags')
     })
 
     // ---- writes ----
@@ -304,7 +310,14 @@ export async function updateTransaction(
   // toRawInput never carries `autoRules` either: the trace is decided here.
   const autoRules = autoRulesAfter(prior.tx, next.tx, given)
   if (autoRules !== undefined) next.tx = { ...next.tx, autoRules }
-  return commit(deps, orgId, uid, { action: 'tx.update', txId, prior, next, via: given.length > 0 ? 'rule' : undefined })
+  return commit(deps, orgId, uid, {
+    action: 'tx.update',
+    txId,
+    prior,
+    next,
+    via: given.length > 0 ? 'rule' : undefined,
+    restore: extras.restore === true,
+  })
 }
 
 export async function deleteTransaction(deps: LedgerDeps, orgId: string, uid: string, txId: string): Promise<WriteResult> {

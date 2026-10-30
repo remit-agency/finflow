@@ -67,7 +67,8 @@ describe('revertTransaction', () => {
     await revertTransaction('o1', stored)
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe(`/api/orgs/o1/transactions/${stored.id}`)
+    // The undo says it restores a previous state: the server may take back a tag archived since (S10t).
+    expect(url).toBe(`/api/orgs/o1/transactions/${stored.id}?restore=1`)
     expect(init.method).toBe('PATCH')
     const body = JSON.parse(init.body as string)
     expect(body).toMatchObject({ amountMinor: 12050, categoryId: 'c1', counterpartyId: 'cp1', description: 'Czynsz' })

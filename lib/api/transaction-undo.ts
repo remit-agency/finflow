@@ -7,7 +7,10 @@ export function restoreTransaction(orgId: string, tx: Transaction): Promise<stri
   return createTransaction(orgId, transactionToDraft(tx), tx.id)
 }
 
-/** Undo of an edit: the operation as it was stored before the edit is written back as a full replace. */
+/**
+ * Undo of an edit or of a bulk change: the operation as it was stored before is written back as a full replace. It says so
+ * (`restore`), because the state may carry a tag that is archived by now.
+ */
 export function revertTransaction(orgId: string, before: Transaction): Promise<void> {
-  return updateTransaction(orgId, before.id, transactionToDraft(before))
+  return updateTransaction(orgId, before.id, transactionToDraft(before), { restore: true })
 }

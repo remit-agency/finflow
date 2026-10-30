@@ -1,5 +1,5 @@
 import { isId } from '@/lib/domain/ledger/guards'
-import { parseTransactionPatch } from '@/lib/domain/ledger/input'
+import { parseRestoreMarker, parseTransactionPatch } from '@/lib/domain/ledger/input'
 import { requireOrgRole, requireUser } from '@/lib/server/auth'
 import { errorResponse, HttpError } from '@/lib/server/http-error'
 import { journal } from '@/lib/server/journal'
@@ -28,15 +28,17 @@ export async function GET(req: Request, { params }: Ctx) {
   }
 }
 
-// PATCH /api/orgs/{orgId}/transactions/{txId}  (owner, accountant)
+// PATCH /api/orgs/{orgId}/transactions/{txId}[?restore=1]  (owner, accountant)
+// `restore=1` marks the undo of an edit or a bulk change: the operation goes back to a previous state (S10t).
 export async function PATCH(req: Request, { params }: Ctx) {
   try {
     const { uid } = await requireUser(req)
     const { orgId, txId } = await params
     await requireOrgRole(uid, orgId, ['owner', 'accountant'])
     if (!isId(txId)) throw new HttpError(404, 'not_found')
+    const restore = parseRestoreMarker(new URL(req.url).searchParams)
     const patch = parseTransactionPatch(await readJsonBody(req, MAX_BODY_BYTES))
-    const { transaction } = await ledger.updateTransaction(orgId, uid, txId, patch)
+    const { transaction } = await ledger.updateTransaction(orgId, uid, txId, patch, { restore })
     return Response.json({ transaction }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (e) {
     return errorResponse(toHttpError(e))

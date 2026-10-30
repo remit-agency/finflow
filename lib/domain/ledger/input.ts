@@ -180,6 +180,20 @@ export function parseTransactionPatch(body: unknown): TransactionPatch {
   return r
 }
 
+/**
+ * The query marker of a PATCH that restores a previous state (the undo of an edit or a bulk change, S10t): `?restore=1` and
+ * nothing else. Anything other than that is refused like an unknown body key. It is not part of the patch.
+ */
+export const RESTORE_MARKER = 'restore'
+
+export function parseRestoreMarker(query: URLSearchParams): boolean {
+  for (const key of query.keys()) if (key !== RESTORE_MARKER) bad(key)
+  const values = query.getAll(RESTORE_MARKER)
+  if (values.length === 0) return false
+  if (values.length !== 1 || values[0] !== '1') bad(RESTORE_MARKER)
+  return true
+}
+
 /** A patch that replaces every editable field: optional fields absent from `raw` become null (cleared). */
 export function fullPatch(raw: RawInput): TransactionPatch {
   const patch: TransactionPatch = { ...raw }

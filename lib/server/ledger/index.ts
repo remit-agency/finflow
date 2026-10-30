@@ -10,7 +10,7 @@ import { createAccount, deleteAccount, updateAccount } from './accounts'
 import type { LedgerDeps } from './deps'
 import { updateOrganization } from './org'
 import { rebuildLedger } from './rebuild'
-import { createTransaction, deleteTransaction, retagTransaction, updateTransaction } from './write'
+import { createTransaction, deleteTransaction, retagTransaction, updateTransaction, type WriteExtras } from './write'
 
 export type { LedgerReport } from './verify'
 
@@ -22,7 +22,8 @@ export function ledgerDeps(): LedgerDeps {
 /** The ledger bound to the production Firestore, NBP rates and the Warsaw clock. */
 export const ledger = {
   createTransaction: (orgId: string, uid: string, input: TransactionInput) => createTransaction(ledgerDeps(), orgId, uid, input),
-  updateTransaction: (orgId: string, uid: string, txId: string, patch: TransactionPatch) => updateTransaction(ledgerDeps(), orgId, uid, txId, patch),
+  updateTransaction: (orgId: string, uid: string, txId: string, patch: TransactionPatch, extras: Pick<WriteExtras, 'restore'> = {}) =>
+    updateTransaction(ledgerDeps(), orgId, uid, txId, patch, extras),
   deleteTransaction: (orgId: string, uid: string, txId: string) => deleteTransaction(ledgerDeps(), orgId, uid, txId),
   retagTransaction: (orgId: string, uid: string, txId: string, change: TagChange) => retagTransaction(ledgerDeps(), orgId, uid, txId, change),
   createAccount: (orgId: string, uid: string, input: AccountInput) => createAccount(ledgerDeps(), orgId, uid, input),
