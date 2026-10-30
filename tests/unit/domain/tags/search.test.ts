@@ -38,6 +38,28 @@ describe('pickableTags', () => {
   it('offers archived tags when asked (taking a tag off)', () => {
     expect(pickableTags(TAGS, 'star', [], { includeArchived: true }).map((t) => t.id)).toEqual(['t4'])
   })
+
+  it('puts the tag whose name is the typed text first, ahead of the names that only start with it', () => {
+    const pool = [tag('in', 'Вхідний ПДВ'), tag('out', 'ПДВ', { excludeFromAnalytics: true })]
+    expect(pickableTags(pool, 'ПДВ', []).map((t) => t.id)).toEqual(['out', 'in'])
+    const vat = [tag('office', 'Office VAT'), tag('vat', 'VAT')]
+    expect(pickableTags(vat, 'VAT', []).map((t) => t.id)).toEqual(['vat', 'office'])
+  })
+
+  it('ranks the exact name, then the prefixes, then the other matches; each group in name order', () => {
+    const pool = [tag('urban', 'Urban'), tag('bankomat', 'Bankomat'), tag('bank', 'Bank'), tag('zeta', 'Zeta ba'), tag('alfa', 'Alfa ba')]
+    expect(pickableTags(pool, 'ban', []).map((t) => t.id)).toEqual(['bank', 'bankomat', 'urban'])
+    expect(pickableTags(pool, 'ba', []).map((t) => t.id)).toEqual(['bank', 'bankomat', 'alfa', 'urban', 'zeta'])
+  })
+
+  it('compares the exact name with case and diacritics ignored, like the name key', () => {
+    const pool = [tag('prefix', 'Zolwik'), tag('exact', 'Żółw')]
+    expect(pickableTags(pool, 'ZOLW', []).map((t) => t.id)).toEqual(['exact', 'prefix'])
+  })
+
+  it('leaves the rows in name order when nothing is typed', () => {
+    expect(pickableTags(TAGS, '', []).map((t) => t.name)).toEqual(['Bank', 'bankomat', 'Żywność', 'ПДВ'])
+  })
 })
 
 describe('tagByName', () => {
