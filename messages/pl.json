@@ -458,8 +458,12 @@
         "bankLocked": "Ta operacja pochodzi z banku: nie można zmienić kwoty, daty płatności ani rachunku",
         "counterpartyArchived": "Kontrahent jest w archiwum. Wybierz innego",
         "counterpartyMissing": "Nie znaleziono kontrahenta",
-        "delete": "Nie udało się usunąć operacji. Spróbuj ponownie."
-      }
+        "delete": "Nie udało się usunąć operacji. Spróbuj ponownie.",
+        "tagArchived": "Tag jest w archiwum. Usuń go z operacji",
+        "tagMissing": "Nie znaleziono tagu",
+        "tagCreate": "Nie udało się utworzyć tagu"
+      },
+      "tags": "Tagi"
     },
     "account": {
       "titleNew": "Nowe konto",
@@ -832,6 +836,15 @@
         "limit": "Osiągnięto limit: 100 tagów na firmę",
         "gone": "Ten tag już nie istnieje",
         "save": "Nie udało się zapisać tagu"
+      },
+      "picker": {
+        "label": "Tagi",
+        "placeholder": "Zacznij wpisywać nazwę tagu",
+        "create": "Utwórz „{name}”",
+        "noMatches": "Nie znaleziono tagów",
+        "remove": "Usuń tag „{name}”",
+        "full": "Nie więcej niż {max} tagów",
+        "excluded": "nie wliczany do analityki"
       }
     }
   },

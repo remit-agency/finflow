@@ -458,8 +458,12 @@
         "bankLocked": "This transaction was imported from the bank: the amount, payment date and account cannot be changed",
         "counterpartyArchived": "The counterparty is archived. Choose another one",
         "counterpartyMissing": "The counterparty was not found",
-        "delete": "Could not delete the transaction. Try again."
-      }
+        "delete": "Could not delete the transaction. Try again.",
+        "tagArchived": "The tag is archived. Remove it from the transaction",
+        "tagMissing": "The tag was not found",
+        "tagCreate": "Could not create the tag"
+      },
+      "tags": "Tags"
     },
     "account": {
       "titleNew": "New account",
@@ -832,6 +836,15 @@
         "limit": "Limit reached: 100 tags per company",
         "gone": "The tag no longer exists",
         "save": "Could not save the tag"
+      },
+      "picker": {
+        "label": "Tags",
+        "placeholder": "Start typing a tag name",
+        "create": "Create “{name}”",
+        "noMatches": "No tags found",
+        "remove": "Remove the tag “{name}”",
+        "full": "At most {max} tags",
+        "excluded": "not counted in analytics"
       }
     }
   },

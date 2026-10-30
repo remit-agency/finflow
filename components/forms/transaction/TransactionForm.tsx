@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/forms/transaction/ConfirmDialog'
 import { CounterpartyField } from '@/components/forms/transaction/CounterpartyField'
 import { DatesFields } from '@/components/forms/transaction/DatesFields'
 import { StatusField } from '@/components/forms/transaction/StatusField'
+import { TagsField } from '@/components/forms/transaction/TagsField'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -17,6 +18,8 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useCounterparties } from '@/lib/hooks/useCounterparties'
+import { useShell } from '@/lib/hooks/useShell'
+import { useTags } from '@/lib/hooks/useTags'
 import { LedgerApiError, createTransaction, deleteTransaction, updateTransaction } from '@/lib/api/ledger-client'
 import { buildCreateDraft, buildEditDraft, categoryAfterTypeChange, stateToDraft } from '@/lib/api/transaction-draft'
 import { restoreTransaction, revertTransaction } from '@/lib/api/transaction-undo'
@@ -87,6 +90,9 @@ export function TransactionForm({
   // Set synchronously: `busy` only changes on the next render, and two key events can arrive in one tick.
   const inFlight = useRef(false)
   const { counterparties } = useCounterparties(orgId)
+  // The form is mounted inside the shell (ShellProvider and the journal), which knows the role.
+  const { can } = useShell()
+  const { tags } = useTags(orgId)
   // One id per operation being created: a retry or a double click creates it once on the server.
   const clientIdRef = useRef(crypto.randomUUID())
 
@@ -130,6 +136,8 @@ export function TransactionForm({
       if (e.code === 'counterparty_archived') return t('errors.counterpartyArchived')
       if (e.code === 'counterparty_not_found') return t('errors.counterpartyMissing')
       if (e.code === 'bank_locked') return t('errors.bankLocked')
+      if (e.code === 'tag_archived') return t('errors.tagArchived')
+      if (e.code === 'tag_not_found') return t('errors.tagMissing')
     }
     return t('errors.save')
   }
@@ -312,6 +320,9 @@ export function TransactionForm({
                   placeholder={t('descriptionPlaceholder')}
                 />
               </div>
+
+              {/* Tags are not part of the bank lock (S10t): an imported operation can be tagged too. */}
+              <TagsField orgId={orgId} tags={tags} value={state.tagIds} onChange={(ids) => patch({ tagIds: ids })} canCreate={can('data.write')} />
 
               <button
                 type="button"
