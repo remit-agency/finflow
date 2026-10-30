@@ -141,7 +141,8 @@
       "counterparties": "Counterparties",
       "rules": "Rules",
       "banks": "Banks",
-      "subscription": "Subscription"
+      "subscription": "Subscription",
+      "tags": "Tags"
     },
     "nav": {
       "modules": "Modules",
@@ -782,6 +783,56 @@
       },
       "trialUntil": "Trial until {date}",
       "upgrade": "Upgrade to Pro"
+    },
+    "tags": {
+      "title": "Tags",
+      "description": "Your own labels for transactions. A tag marked “Exclude from analytics” keeps the transaction out of Cash Flow and P&L; account balances do not change.",
+      "add": "Add tag",
+      "empty": "No tags yet",
+      "archivedTitle": "Archive",
+      "excludedBadge": "Not counted in analytics",
+      "archivedBadge": "Archived",
+      "recalcPending": "Recalculation not finished",
+      "recalcContinue": "Continue",
+      "edit": "Edit “{name}”",
+      "saved": "Tag saved",
+      "limitHint": "Limit reached: 100 tags per company",
+      "editor": {
+        "titleNew": "New tag",
+        "titleEdit": "Edit tag",
+        "name": "Name",
+        "color": "Color",
+        "exclude": "Exclude from analytics",
+        "excludeHint": "Transactions with this tag stay out of Cash Flow and P&L. Account balances do not change.",
+        "archive": "Archive",
+        "restore": "Restore from archive",
+        "archivedNote": "An archived tag stays on old transactions but is not given to new ones.",
+        "saving": "Saving…",
+        "confirmTitle": "Recalculate transactions?",
+        "confirmBody": "Transactions to recalculate: {count}. Account balances do not change.",
+        "confirm": "Recalculate"
+      },
+      "colors": {
+        "slate": "Grey",
+        "sky": "Sky blue",
+        "emerald": "Green",
+        "amber": "Amber",
+        "rose": "Rose",
+        "violet": "Violet"
+      },
+      "recalc": {
+        "title": "Recalculating transactions",
+        "running": "Recalculating… checked: {scanned}",
+        "done": "Done. Transactions checked: {scanned}",
+        "failed": "The recalculation did not finish. Press “Continue” later."
+      },
+      "errors": {
+        "invalid": "Check the tag name",
+        "duplicate": "A tag with this name already exists",
+        "limit": "Limit reached: 100 tags per company",
+        "gone": "The tag no longer exists",
+        "save": "Could not save the tag"
+      }
     }
   },
   "analytics": {

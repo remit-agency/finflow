@@ -141,7 +141,8 @@
       "counterparties": "Kontrahenci",
       "rules": "Reguły",
       "banks": "Banki",
-      "subscription": "Subskrypcja"
+      "subscription": "Subskrypcja",
+      "tags": "Tagi"
     },
     "nav": {
       "modules": "Moduły",
@@ -782,6 +783,56 @@
       },
       "trialUntil": "Okres próbny do {date}",
       "upgrade": "Przejdź na Pro"
+    },
+    "tags": {
+      "title": "Tagi",
+      "description": "Własne etykiety operacji. Tag z opcją „Nie uwzględniaj w analityce” usuwa operację z Cash Flow i P&L, salda kont się nie zmieniają.",
+      "add": "Dodaj tag",
+      "empty": "Nie ma jeszcze tagów",
+      "archivedTitle": "Archiwum",
+      "excludedBadge": "Nie wliczany do analityki",
+      "archivedBadge": "W archiwum",
+      "recalcPending": "Przeliczanie niezakończone",
+      "recalcContinue": "Kontynuuj",
+      "edit": "Edytuj „{name}”",
+      "saved": "Tag zapisany",
+      "limitHint": "Osiągnięto limit: 100 tagów na firmę",
+      "editor": {
+        "titleNew": "Nowy tag",
+        "titleEdit": "Edycja tagu",
+        "name": "Nazwa",
+        "color": "Kolor",
+        "exclude": "Nie uwzględniaj w analityce",
+        "excludeHint": "Operacje z tym tagiem nie trafią do Cash Flow ani P&L. Salda kont się nie zmienią.",
+        "archive": "Do archiwum",
+        "restore": "Przywróć z archiwum",
+        "archivedNote": "Zarchiwizowany tag zostaje na starych operacjach, ale nie trafia do nowych.",
+        "saving": "Zapisywanie…",
+        "confirmTitle": "Przeliczyć operacje?",
+        "confirmBody": "Operacje do przeliczenia: {count}. Salda kont się nie zmienią.",
+        "confirm": "Przelicz"
+      },
+      "colors": {
+        "slate": "Szary",
+        "sky": "Błękitny",
+        "emerald": "Zielony",
+        "amber": "Bursztynowy",
+        "rose": "Różowy",
+        "violet": "Fioletowy"
+      },
+      "recalc": {
+        "title": "Przeliczanie operacji",
+        "running": "Przeliczam… przejrzano operacji: {scanned}",
+        "done": "Gotowe. Przejrzano operacji: {scanned}",
+        "failed": "Nie udało się dokończyć przeliczania. Kliknij „Kontynuuj” później."
+      },
+      "errors": {
+        "invalid": "Sprawdź nazwę tagu",
+        "duplicate": "Tag o tej nazwie już istnieje",
+        "limit": "Osiągnięto limit: 100 tagów na firmę",
+        "gone": "Ten tag już nie istnieje",
+        "save": "Nie udało się zapisać tagu"
+      }
     }
   },
   "analytics": {
