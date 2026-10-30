@@ -30,8 +30,11 @@ export default function TagsSettingsPage() {
     <li key={tag.id} data-testid="tag-row" className="flex items-center justify-between gap-3 py-3">
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
-          <TagDot color={tag.color} />
-          <span className={tag.archived ? 'font-medium text-ink-muted' : 'font-medium text-ink'}>{tag.name}</span>
+          {/* The dot and the name stay together: a long name wraps under itself, not away from its dot. */}
+          <span className="flex min-w-0 items-start gap-2">
+            <TagDot color={tag.color} className="mt-2" />
+            <span className={tag.archived ? 'min-w-0 font-medium break-words text-ink-muted' : 'min-w-0 font-medium break-words text-ink'}>{tag.name}</span>
+          </span>
           {tag.excludeFromAnalytics && (
             <Badge variant="chip" data-testid="tag-excluded">
               {t('excludedBadge')}
