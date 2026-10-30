@@ -15,6 +15,7 @@ import { orderRules, updateRule } from '@/lib/api/rules-client'
 import { MAX_RULES, type ListedRule } from '@/lib/domain/rules/types'
 import { useCounterparties } from '@/lib/hooks/useCounterparties'
 import { useRules } from '@/lib/hooks/useRules'
+import { useTags } from '@/lib/hooks/useTags'
 import { useShell } from '@/lib/hooks/useShell'
 
 export default function RulesSettingsPage() {
@@ -23,6 +24,7 @@ export default function RulesSettingsPage() {
   const canEdit = can('data.write')
   const { rules, loading, error, refreshing, reload } = useRules(orgId)
   const { counterparties } = useCounterparties(orgId)
+  const { tags } = useTags(orgId)
   // 'new': the editor of a new rule; a rule: its editor.
   const [editing, setEditing] = useState<ListedRule | 'new' | null>(null)
   const [applying, setApplying] = useState(false)
@@ -90,7 +92,7 @@ export default function RulesSettingsPage() {
                       </Badge>
                     )}
                   </div>
-                  <RuleSummary rule={rule} accounts={accounts} categories={categories} counterparties={counterparties} />
+                  <RuleSummary rule={rule} accounts={accounts} categories={categories} counterparties={counterparties} tags={tags} />
                   {/* Visible text, not a tooltip: a phone has no hover. */}
                   {rule.unusable.length > 0 && <p className="text-xs text-expense">{t('unusableHint')}</p>}
                 </div>
@@ -136,6 +138,7 @@ export default function RulesSettingsPage() {
           incomeCategories={incomeCategories}
           expenseCategories={expenseCategories}
           counterparties={counterparties}
+          tags={tags}
           currency={org?.currency ?? ''}
           onClose={() => setEditing(null)}
           onSaved={reload}

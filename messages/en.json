@@ -592,14 +592,14 @@
     },
     "rules": {
       "title": "Rules",
-      "description": "Category and counterparty for new bank transactions by text, account and amount. A rule only fills an empty field.",
+      "description": "Category, counterparty and tags for new bank transactions by text, account and amount. A rule only fills empty fields and only adds tags.",
       "add": "Add rule",
       "applyOpen": "Apply to existing",
       "empty": "No rules yet",
       "loadError": "Could not load the rules",
       "inactive": "Off",
       "unusable": "Not working",
-      "unusableHint": "The category or counterparty was deleted or archived, or the category has another type",
+      "unusableHint": "The category, the counterparty or a tag was deleted or archived, or the category has another type",
       "active": "Rule “{name}” is active",
       "edit": "Edit “{name}”",
       "moveUp": "Move up: “{name}”",
@@ -620,7 +620,8 @@
         "amountMax": "amount up to {max}",
         "category": "category {name}",
         "counterparty": "counterparty {name}",
-        "missing": "(deleted)"
+        "missing": "(deleted)",
+        "tags": "tags {names}"
       },
       "editor": {
         "titleNew": "New rule",
@@ -655,11 +656,13 @@
         "counterparty": "Counterparty",
         "check": "Check",
         "checking": "Checking…",
-        "checkResult": "Transactions without a category or counterparty: {scanned}, matching: {matched}",
+        "checkResult": "Transactions the rule could add something to: {scanned}, matching: {matched}",
         "checkCapped": "Only the latest 2000 transactions were checked",
         "saving": "Saving…",
-        "incomplete": "To save, fill in the name and every condition, and pick a category or a counterparty",
-        "deleteConfirm": "Delete the rule “{name}”? The categories it already set stay."
+        "incomplete": "To save, fill in the name and every condition, and pick a category, a counterparty or tags",
+        "deleteConfirm": "Delete the rule “{name}”? The categories it already set stay.",
+        "tags": "Add tags",
+        "tagsHint": "The rule only adds these tags to the ones a transaction has; it never removes any."
       },
       "apply": {
         "title": "Apply the rules to existing transactions",
@@ -686,7 +689,9 @@
         "gone": "The rule was already deleted",
         "conflict": "The list of rules changed. Reload the page",
         "save": "Could not save the rule",
-        "check": "Could not check the rule"
+        "check": "Could not check the rule",
+        "tagMissing": "The tag was not found",
+        "tagArchived": "The tag is archived"
       }
     },
     "banks": {

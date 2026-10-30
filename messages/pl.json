@@ -592,14 +592,14 @@
     },
     "rules": {
       "title": "Reguły",
-      "description": "Kategoria i kontrahent dla nowych operacji z banku według tekstu, rachunku i kwoty. Reguła uzupełnia tylko puste pole.",
+      "description": "Kategoria, kontrahent i tagi dla nowych operacji z banku według tekstu, rachunku i kwoty. Reguła uzupełnia tylko puste pola i tylko dodaje tagi.",
       "add": "Dodaj regułę",
       "applyOpen": "Zastosuj do istniejących",
       "empty": "Nie ma jeszcze reguł",
       "loadError": "Nie udało się wczytać reguł",
       "inactive": "Wyłączona",
       "unusable": "Nie działa",
-      "unusableHint": "Kategoria lub kontrahent zostały usunięte, zarchiwizowane albo kategoria ma inny typ",
+      "unusableHint": "Kategoria, kontrahent lub tag zostały usunięte, zarchiwizowane albo kategoria ma inny typ",
       "active": "Reguła „{name}” jest aktywna",
       "edit": "Edytuj „{name}”",
       "moveUp": "Wyżej: „{name}”",
@@ -620,7 +620,8 @@
         "amountMax": "kwota do {max}",
         "category": "kategoria {name}",
         "counterparty": "kontrahent {name}",
-        "missing": "(usunięto)"
+        "missing": "(usunięto)",
+        "tags": "tagi {names}"
       },
       "editor": {
         "titleNew": "Nowa reguła",
@@ -655,11 +656,13 @@
         "counterparty": "Kontrahent",
         "check": "Sprawdź",
         "checking": "Sprawdzanie…",
-        "checkResult": "Operacje bez kategorii lub kontrahenta: {scanned}, pasuje: {matched}",
+        "checkResult": "Operacje, którym reguła może coś dodać: {scanned}, pasuje: {matched}",
         "checkCapped": "Sprawdzono tylko ostatnie 2000 operacji",
         "saving": "Zapisywanie…",
-        "incomplete": "Aby zapisać, uzupełnij nazwę i wszystkie warunki oraz wybierz kategorię lub kontrahenta",
-        "deleteConfirm": "Usunąć regułę „{name}”? Kategorie, które już przypisała, zostaną."
+        "incomplete": "Aby zapisać, uzupełnij nazwę i wszystkie warunki oraz wybierz kategorię, kontrahenta lub tagi",
+        "deleteConfirm": "Usunąć regułę „{name}”? Kategorie, które już przypisała, zostaną.",
+        "tags": "Dodaj tagi",
+        "tagsHint": "Reguła tylko dodaje te tagi do istniejących, niczego nie zdejmuje."
       },
       "apply": {
         "title": "Zastosuj reguły do istniejących operacji",
@@ -686,7 +689,9 @@
         "gone": "Reguła została już usunięta",
         "conflict": "Lista reguł się zmieniła. Odśwież stronę",
         "save": "Nie udało się zapisać reguły",
-        "check": "Nie udało się sprawdzić reguły"
+        "check": "Nie udało się sprawdzić reguły",
+        "tagMissing": "Nie znaleziono tagu",
+        "tagArchived": "Tag jest w archiwum"
       }
     },
     "banks": {

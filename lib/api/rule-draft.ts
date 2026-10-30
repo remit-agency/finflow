@@ -18,6 +18,8 @@ export interface RuleDraft {
   /** '' sets no category. */
   categoryId: string
   counterpartyId: string | null
+  /** Tags the rule adds (S10t); [] adds none. */
+  tagIds: string[]
 }
 
 /** An empty condition of a kind; an amount starts in `currency` (the company currency, '' while it loads). */
@@ -29,7 +31,7 @@ export function newCondition(kind: DraftCondition['kind'], currency: string): Dr
 
 /** A new rule: an expense with one empty text condition (bank rules are mostly about expenses). */
 export function emptyDraft(): RuleDraft {
-  return { name: '', type: 'expense', active: true, conditions: [newCondition('text', '')], categoryId: '', counterpartyId: null }
+  return { name: '', type: 'expense', active: true, conditions: [newCondition('text', '')], categoryId: '', counterpartyId: null, tagIds: [] }
 }
 
 /** The words of a text condition: split at commas, semicolons and line breaks, trimmed, empty ones dropped. */
@@ -53,6 +55,7 @@ export function draftFromRule(rule: Rule, locale: Locale): RuleDraft {
     }),
     categoryId: rule.actions.categoryId ?? '',
     counterpartyId: rule.actions.counterpartyId ?? null,
+    tagIds: [...(rule.actions.tagIds ?? [])],
   }
 }
 
@@ -67,7 +70,7 @@ function minorOf(text: string): number | undefined | null {
 export function draftToInput(d: RuleDraft): RuleInput | null {
   const name = d.name.trim()
   if (name === '' || d.conditions.length === 0) return null
-  if (d.categoryId === '' && d.counterpartyId === null) return null
+  if (d.categoryId === '' && d.counterpartyId === null && d.tagIds.length === 0) return null
   const conditions: RuleConditionInput[] = []
   for (const c of d.conditions) {
     if (c.kind === 'text') {
@@ -97,6 +100,7 @@ export function draftToInput(d: RuleDraft): RuleInput | null {
     actions: {
       ...(d.categoryId === '' ? {} : { categoryId: d.categoryId }),
       ...(d.counterpartyId === null ? {} : { counterpartyId: d.counterpartyId }),
+      ...(d.tagIds.length === 0 ? {} : { tagIds: [...d.tagIds] }),
     },
   }
 }

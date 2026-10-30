@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import type { Counterparty } from '@/lib/domain/counterparties/types'
 import { fromMinor } from '@/lib/domain/ledger/money'
 import type { ListedRule, RuleCondition } from '@/lib/domain/rules/types'
+import type { Tag } from '@/lib/domain/tags/types'
 import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import type { Account, Category } from '@/types'
@@ -13,10 +14,11 @@ interface Props {
   accounts: Account[]
   categories: Category[]
   counterparties: Counterparty[]
+  tags: Tag[]
 }
 
-/** One line under the rule's name: what it checks, then what it sets. A deleted account, category or counterparty reads «(видалено)». */
-export function RuleSummary({ rule, accounts, categories, counterparties }: Props) {
+/** One line under the rule's name: what it checks, then what it sets. A deleted account, category, counterparty or tag reads «(видалено)». */
+export function RuleSummary({ rule, accounts, categories, counterparties, tags }: Props) {
   const t = useTranslations('settings.rules.summary')
   const { money } = useFormatters()
   const categoryName = useCategoryName()
@@ -32,12 +34,13 @@ export function RuleSummary({ rule, accounts, categories, counterparties }: Prop
     return min !== null ? t('amountMin', { min }) : t('amountMax', { max: max ?? '' })
   }
 
-  const { categoryId, counterpartyId } = rule.actions
+  const { categoryId, counterpartyId, tagIds } = rule.actions
   const category = categoryId === undefined ? undefined : categories.find((c) => c.id === categoryId)
   const counterparty = counterpartyId === undefined ? undefined : counterparties.find((c) => c.id === counterpartyId)
   const actions: string[] = []
   if (categoryId !== undefined) actions.push(t('category', { name: category ? categoryName(category) : t('missing') }))
   if (counterpartyId !== undefined) actions.push(t('counterparty', { name: counterparty?.name ?? t('missing') }))
+  if (tagIds !== undefined) actions.push(t('tags', { names: tagIds.map((id) => tags.find((x) => x.id === id)?.name ?? t('missing')).join(', ') }))
 
   return (
     <p className="text-xs text-ink-muted">
