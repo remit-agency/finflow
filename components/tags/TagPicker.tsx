@@ -76,6 +76,9 @@ export function TagPicker({ id, tags, value, onChange, max = MAX_TX_TAGS, includ
   }
 
   const choose = async (row: Row) => {
+    // The list closes on a choice: left open it covers what lies under the field (the dialog's buttons). Typing or
+    // ArrowDown opens it again.
+    setOpen(false)
     if (row.kind === 'tag') {
       onChange([...value, row.tag.id])
       setQuery('')
@@ -104,9 +107,11 @@ export function TagPicker({ id, tags, value, onChange, max = MAX_TX_TAGS, includ
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       if (open && rows.length > 0) setMoved(Math.max(highlighted - 1, 0))
-    } else if (e.key === 'Enter' && open) {
-      // On the open list Enter never submits the form: it chooses the highlighted row, or closes the list when none is.
+    } else if (e.key === 'Enter') {
+      // Enter never submits the form from the picker: on the open list it chooses the highlighted row, or closes the list
+      // when none is highlighted.
       e.preventDefault()
+      if (!open) return
       if (highlighted >= 0) void choose(rows[highlighted])
       else close()
     } else if (e.key === 'Escape' && open) {
