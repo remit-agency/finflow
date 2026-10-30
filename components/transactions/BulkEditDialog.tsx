@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { CounterpartyPicker } from '@/components/counterparties/CounterpartyPicker'
+import { TagPicker } from '@/components/tags/TagPicker'
 import { Button } from '@/components/ui/button'
 import { DateField } from '@/components/ui/date-field'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -13,6 +14,7 @@ import { Segmented } from '@/components/ui/segmented'
 import type { Counterparty } from '@/lib/domain/counterparties/types'
 import { categoryTypeOf, splitByPatch, type BulkPatch } from '@/lib/domain/journal/selection'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
+import { MAX_TX_TAGS, type Tag } from '@/lib/domain/tags/types'
 import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import type { Category } from '@/types'
 import type { BulkField } from './SelectionBar'
@@ -24,6 +26,8 @@ interface Props {
   incomeCategories: Category[]
   expenseCategories: Category[]
   counterparties: Counterparty[]
+  /** The company's tags (S10t). */
+  tags: Tag[]
   busy: boolean
   progress: { done: number; total: number } | null
   onApply: (patch: BulkPatch) => void
@@ -32,7 +36,7 @@ interface Props {
 }
 
 /** One field changed on every selected row; shows what will be skipped before anything is sent. */
-export function BulkEditDialog({ field, rows, today, incomeCategories, expenseCategories, counterparties, busy, progress, onApply, onStop, onClose }: Props) {
+export function BulkEditDialog({ field, rows, today, incomeCategories, expenseCategories, counterparties, tags, busy, progress, onApply, onStop, onClose }: Props) {
   const t = useTranslations('journal.bulk')
   const tForm = useTranslations('forms.transaction')
   const categoryName = useCategoryName()
@@ -45,6 +49,10 @@ export function BulkEditDialog({ field, rows, today, incomeCategories, expenseCa
   const [mode, setMode] = useState<'date' | 'period'>('date')
   const [from, setFrom] = useState(today)
   const [to, setTo] = useState(today)
+  const [addTags, setAddTags] = useState<string[]>([])
+  const [removeTags, setRemoveTags] = useState<string[]>([])
+  // Only a tag that some selected operation has can be taken off.
+  const onRows = [...new Set(rows.flatMap((r) => r.tags))]
 
   const type = categoryTypeOf(rows)
   const categories = type === 'income' ? incomeCategories : type === 'expense' ? expenseCategories : []
@@ -63,6 +71,10 @@ export function BulkEditDialog({ field, rows, today, incomeCategories, expenseCa
       case 'accrual':
         if (mode === 'date') return day ? { accrual: { mode: 'date', date: day } } : null
         return from && to && from <= to ? { accrual: { mode: 'period', from, to } } : null
+      case 'addTags':
+        return addTags.length > 0 ? { addTagIds: addTags } : null
+      case 'removeTags':
+        return removeTags.length > 0 ? { removeTagIds: removeTags } : null
     }
   }
   const current = patch()
@@ -157,6 +169,20 @@ export function BulkEditDialog({ field, rows, today, incomeCategories, expenseCa
             )}
           </div>
         )}
+
+        {field === 'addTags' && (
+          <div className="space-y-1.5">
+            <TagPicker tags={tags} value={addTags} onChange={setAddTags} max={MAX_TX_TAGS} />
+            <p className="text-sm text-ink-muted">{t('tagsAddHint')}</p>
+          </div>
+        )}
+
+        {field === 'removeTags' &&
+          (onRows.length > 0 ? (
+            <TagPicker tags={tags} value={removeTags} onChange={setRemoveTags} max={MAX_TX_TAGS} includeArchived only={onRows} />
+          ) : (
+            <p className="text-sm text-ink-muted">{t('tagsNone')}</p>
+          ))}
 
         {preview && (skippedTransfers > 0 || skippedFuture > 0) && (
           <p className="text-sm text-ink-muted">

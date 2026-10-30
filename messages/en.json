@@ -256,7 +256,10 @@
       "basisAccrual": "Transaction date",
       "amountFrom": "Amount from",
       "amountTo": "to",
-      "counterparties": "Counterparties"
+      "counterparties": "Counterparties",
+      "tags": "Tags",
+      "untagged": "No tags",
+      "excludedOnly": "Only excluded from analytics"
     },
     "list": {
       "emptyTitle": "No transactions yet",
@@ -299,7 +302,9 @@
       "field_accrual": "Change transaction date or period",
       "selectAllMatching": "Select all matching the filter (up to 1000)",
       "selecting": "Selecting operations…",
-      "limitReached": "The first {limit} are selected. More match the filter."
+      "limitReached": "The first {limit} are selected. More match the filter.",
+      "field_addTags": "Add tag",
+      "field_removeTags": "Remove tag"
     },
     "bulk": {
       "title_category": "Change category",
@@ -342,8 +347,14 @@
         "rate_unavailable": "The exchange rate is unavailable",
         "provider_unavailable": "The NBP exchange rate is temporarily unavailable",
         "invalid_input": "Not allowed for this operation",
-        "unknown": "Something went wrong"
-      }
+        "unknown": "Something went wrong",
+        "tag_not_found": "The tag was not found",
+        "tag_archived": "The tag is archived"
+      },
+      "title_addTags": "Add tags",
+      "title_removeTags": "Remove tags",
+      "tagsAddHint": "The tags are added to the ones a transaction has, at most 10 each.",
+      "tagsNone": "The selected transactions have no tags"
     },
     "delete": {
       "title": "{count, plural, one {Delete # operation?} other {Delete # operations?}}",
@@ -382,7 +393,8 @@
       "column_amountBase": "Amount in company currency",
       "column_rate": "Exchange rate",
       "column_rateDate": "Rate date",
-      "column_balanceAfter": "Account balance after"
+      "column_balanceAfter": "Account balance after",
+      "column_tags": "Tags"
     }
   },
   "forms": {

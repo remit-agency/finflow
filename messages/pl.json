@@ -256,7 +256,10 @@
       "basisAccrual": "Data transakcji",
       "amountFrom": "Kwota od",
       "amountTo": "do",
-      "counterparties": "Kontrahenci"
+      "counterparties": "Kontrahenci",
+      "tags": "Tagi",
+      "untagged": "Bez tagów",
+      "excludedOnly": "Tylko niewliczane do analityki"
     },
     "list": {
       "emptyTitle": "Nie ma jeszcze operacji",
@@ -299,7 +302,9 @@
       "field_accrual": "Zmień datę transakcji lub okres",
       "selectAllMatching": "Zaznacz wszystkie wg filtra (do 1000)",
       "selecting": "Zaznaczanie operacji wg filtra…",
-      "limitReached": "Zaznaczono pierwsze {limit}. Filtr obejmuje więcej operacji."
+      "limitReached": "Zaznaczono pierwsze {limit}. Filtr obejmuje więcej operacji.",
+      "field_addTags": "Dodaj tag",
+      "field_removeTags": "Zdejmij tag"
     },
     "bulk": {
       "title_category": "Zmiana kategorii",
@@ -342,8 +347,14 @@
         "rate_unavailable": "Kurs waluty jest niedostępny",
         "provider_unavailable": "Kurs NBP jest tymczasowo niedostępny",
         "invalid_input": "Niedozwolone dla tej operacji",
-        "unknown": "Coś poszło nie tak"
-      }
+        "unknown": "Coś poszło nie tak",
+        "tag_not_found": "Nie znaleziono tagu",
+        "tag_archived": "Tag jest w archiwum"
+      },
+      "title_addTags": "Dodawanie tagów",
+      "title_removeTags": "Zdejmowanie tagów",
+      "tagsAddHint": "Tagi dochodzą do istniejących, najwyżej 10 na operację.",
+      "tagsNone": "Wybrane operacje nie mają tagów"
     },
     "delete": {
       "title": "Usunąć {count, plural, one {# operację} few {# operacje} many {# operacji} other {# operacji}}?",
@@ -382,7 +393,8 @@
       "column_amountBase": "Kwota w walucie firmy",
       "column_rate": "Kurs wymiany",
       "column_rateDate": "Data kursu",
-      "column_balanceAfter": "Saldo konta po operacji"
+      "column_balanceAfter": "Saldo konta po operacji",
+      "column_tags": "Tagi"
     }
   },
   "forms": {

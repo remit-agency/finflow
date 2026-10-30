@@ -13,6 +13,7 @@ export const EXPORT_COLUMNS = [
   'category',
   'counterparty',
   'comment',
+  'tags',
   'amount',
   'currency',
   'amountBase',
@@ -29,6 +30,8 @@ export interface ExportContext {
   accountName: (id: string) => string
   categoryName: (id: string) => string
   counterpartyName: (id: string) => string
+  /** The name of a tag (S10t). */
+  tagName: (id: string) => string
   statusLabel: (status: string) => string
   typeLabel: (type: string) => string
   baseCurrency: string
@@ -77,6 +80,7 @@ export function exportRow({ tx, balanceAfterMinor }: JournalRow, ctx: ExportCont
     category: tx.categoryId === undefined ? '' : ctx.categoryName(tx.categoryId),
     counterparty: tx.counterpartyId === undefined ? '' : ctx.counterpartyName(tx.counterpartyId),
     comment: tx.description ?? '',
+    tags: tx.tags.map(ctx.tagName).join(', '),
     amount: formatAmount(sign * tx.amountMinor, ctx.decimal),
     currency: tx.currency,
     amountBase: base ? formatAmount(sign * base.payment, ctx.decimal) : '',

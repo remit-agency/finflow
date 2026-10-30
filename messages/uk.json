@@ -256,7 +256,10 @@
       "basisAccrual": "Дата транзакції",
       "amountFrom": "Сума від",
       "amountTo": "до",
-      "counterparties": "Контрагенти"
+      "counterparties": "Контрагенти",
+      "tags": "Теги",
+      "untagged": "Без тегів",
+      "excludedOnly": "Лише не враховані в аналітиці"
     },
     "list": {
       "emptyTitle": "Операцій ще немає",
@@ -299,7 +302,9 @@
       "field_accrual": "Змінити дату транзакції або період",
       "selectAllMatching": "Позначити всі за фільтром (до 1000)",
       "selecting": "Позначаємо операції за фільтром…",
-      "limitReached": "Позначено перші {limit}. За фільтром є ще операції."
+      "limitReached": "Позначено перші {limit}. За фільтром є ще операції.",
+      "field_addTags": "Додати тег",
+      "field_removeTags": "Зняти тег"
     },
     "bulk": {
       "title_category": "Зміна категорії",
@@ -342,8 +347,14 @@
         "rate_unavailable": "Курс недоступний",
         "provider_unavailable": "Курс НБП тимчасово недоступний",
         "invalid_input": "Не дозволено для цієї операції",
-        "unknown": "Щось пішло не так"
-      }
+        "unknown": "Щось пішло не так",
+        "tag_not_found": "Тег не знайдено",
+        "tag_archived": "Тег в архіві"
+      },
+      "title_addTags": "Додавання тегів",
+      "title_removeTags": "Зняття тегів",
+      "tagsAddHint": "Теги додаються до наявних, не більше 10 на операцію.",
+      "tagsNone": "У вибраних операціях немає тегів"
     },
     "delete": {
       "title": "Видалити операцій: {count}?",
@@ -382,7 +393,8 @@
       "column_amountBase": "Сума у валюті компанії",
       "column_rate": "Курс",
       "column_rateDate": "Дата курсу",
-      "column_balanceAfter": "Залишок на рахунку після"
+      "column_balanceAfter": "Залишок на рахунку після",
+      "column_tags": "Теги"
     }
   },
   "forms": {

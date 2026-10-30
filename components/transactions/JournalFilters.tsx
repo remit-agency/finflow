@@ -5,14 +5,16 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 import { PeriodSelect } from '@/components/analytics/PeriodSelect'
+import { TagDot } from '@/components/tags/TagDot'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Segmented } from '@/components/ui/segmented'
 import type { Counterparty } from '@/lib/domain/counterparties/types'
-import { EMPTY_FILTERS, hasActiveFilters, type JournalFilters } from '@/lib/domain/journal/filter'
+import { EMPTY_FILTERS, hasActiveFilters, NO_TAG, type JournalFilters } from '@/lib/domain/journal/filter'
 import { toMinor, fromMinor } from '@/lib/domain/ledger/money'
 import type { TxType } from '@/lib/domain/ledger/types'
+import type { Tag } from '@/lib/domain/tags/types'
 import { useIsPhone } from '@/lib/hooks/useIsPhone'
 import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { cn } from '@/lib/utils'
@@ -29,6 +31,8 @@ interface Props {
   incomeCategories: Category[]
   expenseCategories: Category[]
   counterparties: Counterparty[]
+  /** The company's tags (S10t), archived ones included: old operations carry them. */
+  tags: Tag[]
   /** Shown at the end of the toolbar row (the selected-account chip, the export button). */
   accessory?: ReactNode
 }
@@ -69,7 +73,7 @@ function useDraftField(external: string, same: (draft: string) => boolean, apply
 
 const TYPES: TxType[] = ['income', 'expense', 'transfer']
 
-export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, expenseCategories, counterparties, accessory }: Props) {
+export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, expenseCategories, counterparties, tags, accessory }: Props) {
   const t = useTranslations('journal.filters')
   const categoryName = useCategoryName()
   // The phone has room for about half a row per select: the short «all» labels keep them from clipping.
@@ -126,6 +130,12 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
       counterpartyIds: viewRef.current.filters.counterpartyIds.includes(id)
         ? viewRef.current.filters.counterpartyIds.filter((x) => x !== id)
         : [...viewRef.current.filters.counterpartyIds, id],
+    })
+  const toggleTag = (id: string) =>
+    set({
+      tagIds: viewRef.current.filters.tagIds.includes(id)
+        ? viewRef.current.filters.tagIds.filter((x) => x !== id)
+        : [...viewRef.current.filters.tagIds, id],
     })
   const allCategories = [...incomeCategories, ...expenseCategories]
   const selectedCategory = filters.categoryIds[0] ?? '_all'
@@ -269,6 +279,29 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
                   </label>
                 ))}
               </div>
+            </fieldset>
+          )}
+
+          {tags.length > 0 && (
+            <fieldset data-testid="journal-tag-filter">
+              <legend className="mb-1 text-sm text-ink-muted">{t('tags')}</legend>
+              <div className="flex max-h-32 flex-wrap gap-x-4 gap-y-1 overflow-y-auto">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input type="checkbox" className="accent-brand" checked={filters.tagIds.includes(NO_TAG)} onChange={() => toggleTag(NO_TAG)} />
+                  <span>{t('untagged')}</span>
+                </label>
+                {tags.map((tag) => (
+                  <label key={tag.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input type="checkbox" className="accent-brand" checked={filters.tagIds.includes(tag.id)} onChange={() => toggleTag(tag.id)} />
+                    <TagDot color={tag.color} />
+                    <span className={tag.archived ? 'text-ink-muted' : undefined}>{tag.name}</span>
+                  </label>
+                ))}
+              </div>
+              <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" className="accent-brand" checked={filters.excludedOnly} onChange={(e) => set({ excludedOnly: e.target.checked })} />
+                <span>{t('excludedOnly')}</span>
+              </label>
             </fieldset>
           )}
         </div>

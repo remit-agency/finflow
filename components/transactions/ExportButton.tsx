@@ -11,6 +11,7 @@ import type { Counterparty } from '@/lib/domain/counterparties/types'
 import { buildCsv, EXPORT_COLUMNS, exportRow } from '@/lib/domain/journal/csv'
 import type { JournalFilters } from '@/lib/domain/journal/filter'
 import type { JournalRow } from '@/lib/domain/journal/types'
+import type { Tag } from '@/lib/domain/tags/types'
 import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { downloadText, exportFileName } from '@/lib/utils/download'
@@ -28,10 +29,11 @@ interface Props {
   counterparties: Counterparty[]
   incomeCategories: Category[]
   expenseCategories: Category[]
+  tags: Tag[]
   baseCurrency: string
 }
 
-export function ExportButton({ orgId, filters, accounts, counterparties, incomeCategories, expenseCategories, baseCurrency }: Props) {
+export function ExportButton({ orgId, filters, accounts, counterparties, incomeCategories, expenseCategories, tags, baseCurrency }: Props) {
   const t = useTranslations('journal.export')
   const { locale } = useFormatters()
   const categoryLabel = useCategoryName()
@@ -59,11 +61,13 @@ export function ExportButton({ orgId, filters, accounts, counterparties, incomeC
       const accountName = new Map(accounts.map((a) => [a.id, a.name]))
       const counterpartyName = new Map(counterparties.map((c) => [c.id, c.name]))
       const categoryName = new Map([...incomeCategories, ...expenseCategories].map((c) => [c.id, categoryLabel(c)]))
+      const tagName = new Map(tags.map((tag) => [tag.id, tag.name]))
       const ctx = {
         decimal: locale === 'en' ? ('.' as const) : (',' as const),
         accountName: (id: string) => accountName.get(id) ?? id,
         categoryName: (id: string) => categoryName.get(id) ?? id,
         counterpartyName: (id: string) => counterpartyName.get(id) ?? id,
+        tagName: (id: string) => tagName.get(id) ?? id,
         statusLabel: (s: string) => t(`status_${s}` as 'status_actual'),
         typeLabel: (type: string) => t(`type_${type}` as 'type_income'),
         baseCurrency,

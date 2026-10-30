@@ -45,6 +45,7 @@ const ctx = {
   accountName: (id: string) => ({ a1: 'Konto', a2: 'Kasa' })[id] ?? id,
   categoryName: (id: string) => ({ k1: 'Czynsz' })[id] ?? id,
   counterpartyName: (id: string) => ({ c1: 'ZUS' })[id] ?? id,
+  tagName: (id: string) => ({ vat: 'ПДВ', q4: 'Q4' })[id] ?? id,
   statusLabel: (s: string) => (s === 'actual' ? 'Faktyczna' : 'Planowana'),
   typeLabel: (t: string) => t,
   baseCurrency: 'PLN',
@@ -116,5 +117,10 @@ describe('exportRow', () => {
     expect(cells[EXPORT_COLUMNS.indexOf('amount')]).toBe('-123,45')
     expect(cells[EXPORT_COLUMNS.indexOf('toAccount')]).toBe('Kasa')
     expect(cells[EXPORT_COLUMNS.indexOf('amountBase')]).toBe('')
+  })
+  it('names the tags, separated by a comma and a space (S10t)', () => {
+    expect(EXPORT_COLUMNS.indexOf('tags')).toBe(EXPORT_COLUMNS.indexOf('comment') + 1)
+    expect(exportRow(row({ tags: ['vat', 'q4'] }), ctx)[EXPORT_COLUMNS.indexOf('tags')]).toBe('ПДВ, Q4')
+    expect(exportRow(row({}), ctx)[EXPORT_COLUMNS.indexOf('tags')]).toBe('')
   })
 })

@@ -22,6 +22,7 @@ import { useCounterparties } from '@/lib/hooks/useCounterparties'
 import { useJournal } from '@/lib/hooks/useJournal'
 import { useJournalSelection } from '@/lib/hooks/useJournalSelection'
 import { useShell } from '@/lib/hooks/useShell'
+import { useTags } from '@/lib/hooks/useTags'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { PAGE_CONTAINER } from '@/lib/ui/layout'
 import { undoToast } from '@/lib/ui/undo-toast'
@@ -41,6 +42,7 @@ export default function TransactionsPage() {
   const { money } = useFormatters()
   const { orgId, org, accounts, incomeCategories, expenseCategories, selectedAccountId, selectAccount, can } = useShell()
   const { counterparties } = useCounterparties(orgId)
+  const { tags } = useTags(orgId)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -248,6 +250,7 @@ export default function TransactionsPage() {
         incomeCategories={incomeCategories}
         expenseCategories={expenseCategories}
         counterparties={counterparties}
+        tags={tags}
         accessory={
           <>
             {selectedAccount && (
@@ -271,6 +274,7 @@ export default function TransactionsPage() {
               counterparties={counterparties}
               incomeCategories={incomeCategories}
               expenseCategories={expenseCategories}
+              tags={tags}
               baseCurrency={baseCurrency}
             />
           </>
@@ -306,6 +310,7 @@ export default function TransactionsPage() {
         incomeCategories={incomeCategories}
         expenseCategories={expenseCategories}
         counterparties={counterparties}
+        tags={tags}
         orgId={orgId}
         loading={loading}
         filtered={hasActiveFilters(filters)}
@@ -327,6 +332,7 @@ export default function TransactionsPage() {
           incomeCategories={incomeCategories}
           expenseCategories={expenseCategories}
           counterparties={counterparties}
+          tags={tags}
           busy={busy}
           progress={progress}
           onApply={(patch) => void applyChange(patch)}
