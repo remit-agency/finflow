@@ -1,6 +1,7 @@
 import { isDay } from '@/lib/domain/ledger/days'
 import { MIN_DAY } from '@/lib/domain/ledger/input'
 import type { TxStatus, TxType } from '@/lib/domain/ledger/types'
+import { sameTags } from '@/lib/domain/tags/assign'
 import {
   accrualError,
   accrualStateOf,
@@ -27,6 +28,8 @@ export interface FormState {
   accrual: AccrualState
   description: string
   isRecurring: boolean
+  /** Tag ids (S10t), in the order chosen. */
+  tagIds: string[]
 }
 
 export interface InitialStateOptions {
@@ -54,6 +57,7 @@ export function initialFormState(o: InitialStateOptions): FormState {
       accrual: emptyAccrual(o.today),
       description: '',
       isRecurring: false,
+      tagIds: [],
     }
   }
   const paymentDate = tx.date.toISOString().slice(0, 10)
@@ -70,6 +74,7 @@ export function initialFormState(o: InitialStateOptions): FormState {
     accrual: tx.type === 'transfer' ? emptyAccrual(paymentDate) : accrualStateOf(tx.accrual, paymentDate),
     description: tx.description ?? '',
     isRecurring: tx.isRecurring,
+    tagIds: [...tx.tags],
   }
 }
 
@@ -108,6 +113,7 @@ const SCALAR_FIELDS = [
 export function isDirty(baseline: FormState, current: FormState): boolean {
   if (SCALAR_FIELDS.some((k) => baseline[k] !== current[k])) return true
   if (baseline.description.trim() !== current.description.trim()) return true
+  if (!sameTags(baseline.tagIds, current.tagIds)) return true
   const a = baseline.accrual
   const b = current.accrual
   return a.on !== b.on || a.mode !== b.mode || a.date !== b.date || a.from !== b.from || a.to !== b.to

@@ -5,8 +5,8 @@ import { effectiveStatus } from '@/lib/domain/transaction-form/status'
 import { parseAmountInput } from '@/lib/utils/amount-input'
 import type { Transaction } from '@/types'
 
-/** What the transaction form edits itself: everything in a draft except what it has no control for (project, tags, files). */
-export type FormOwnedDraft = Omit<TransactionDraft, 'projectId' | 'tags' | 'fileUrls'>
+/** What the transaction form edits itself: everything in a draft except what it has no control for (project, files). */
+export type FormOwnedDraft = Omit<TransactionDraft, 'projectId' | 'fileUrls'>
 
 /** The `YYYY-MM-DD` UTC day of a stored payment date. */
 function paymentDay(date: Date): string {
@@ -22,6 +22,7 @@ export function stateToDraft(state: FormState, o: { today: string; crossCurrency
     amount: parseAmountInput(state.amount) ?? 0,
     paymentDate: state.paymentDate,
     isRecurring: state.isRecurring,
+    tags: [...state.tagIds],
   }
   if (state.type === 'transfer') {
     draft.toAccountId = state.toAccountId
@@ -37,21 +38,20 @@ export function stateToDraft(state: FormState, o: { today: string; crossCurrency
   return draft
 }
 
-/** A draft for a new operation: it has no tags, files or project yet. */
+/** A draft for a new operation: it has the tags the form chose, and no files or project yet. */
 export function buildCreateDraft(form: FormOwnedDraft): TransactionDraft {
-  return { ...form, tags: [], fileUrls: [] }
+  return { ...form, fileUrls: [] }
 }
 
 /**
  * A draft for saving an edited operation. The edit is sent as a full replace (absent optional fields are
- * cleared), so the three fields the form has no control for must be carried over from the stored operation,
- * or an edit of the amount alone would erase them: project, tags and files. Everything else (category,
- * counterparty, accrual, status, description) comes from the form, so the person can still change or clear it.
+ * cleared), so the two fields the form has no control for must be carried over from the stored operation,
+ * or an edit of the amount alone would erase them: project and files. Everything else (category, counterparty,
+ * accrual, status, description, tags since S10t) comes from the form, so the person can still change or clear it.
  */
 export function buildEditDraft(transaction: Transaction, form: FormOwnedDraft): TransactionDraft {
   const draft: TransactionDraft = {
     ...form,
-    tags: [...transaction.tags],
     fileUrls: [...transaction.fileUrls],
   }
   if (transaction.projectId !== undefined) draft.projectId = transaction.projectId

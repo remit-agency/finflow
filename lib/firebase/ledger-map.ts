@@ -40,5 +40,6 @@ export function toUiTransaction(orgId: string, tx: LedgerTransaction): Transacti
   if (tx.projectId !== undefined) ui.projectId = tx.projectId
   if (tx.bank !== undefined) ui.bank = tx.bank
   if (tx.autoRules !== undefined) ui.autoRules = tx.autoRules
+  if (tx.excluded === true) ui.excluded = true
   return ui
 }

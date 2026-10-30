@@ -40,6 +40,7 @@ describe('initialFormState', () => {
       accrual: emptyAccrual(TODAY),
       description: '',
       isRecurring: false,
+      tagIds: [],
     })
   })
 
@@ -121,5 +122,19 @@ describe('isDirty', () => {
 
   it('ignores whitespace around the description', () => {
     expect(isDirty({ ...fresh(), description: 'a' }, { ...fresh(), description: ' a ' })).toBe(false)
+  })
+})
+
+describe('tags in the form (S10t)', () => {
+  it('a stored operation brings its tags, a new one starts without', () => {
+    expect(fresh().tagIds).toEqual([])
+    expect(fresh({ transaction: stored({ tags: ['vat', 'q4'] }) }).tagIds).toEqual(['vat', 'q4'])
+  })
+
+  it('a change of the tags is a change of the form; the same tags are not', () => {
+    const base = fresh({ transaction: stored({ tags: ['vat'] }) })
+    expect(isDirty(base, { ...base, tagIds: ['vat'] })).toBe(false)
+    expect(isDirty(base, { ...base, tagIds: ['vat', 'q4'] })).toBe(true)
+    expect(isDirty(base, { ...base, tagIds: [] })).toBe(true)
   })
 })
