@@ -96,7 +96,15 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
     viewRef.current = next
     onChangeRef.current(next)
   }
-  const set = (patch: Partial<JournalFilters>) => apply({ ...viewRef.current, filters: { ...viewRef.current.filters, ...patch } })
+  // A checkbox shows the person's toggle at once: its value reaches the address (and so `filters`) only after the router
+  // has run. The toggle stays shown while `filters` is still the object it was made from; the address's next value wins.
+  const [toggled, setToggled] = useState<{ from: JournalFilters; next: JournalFilters } | null>(null)
+  const set = (patch: Partial<JournalFilters>) => {
+    const next = { ...viewRef.current.filters, ...patch }
+    setToggled({ from: filters, next })
+    apply({ ...viewRef.current, filters: next })
+  }
+  const shown = toggled !== null && toggled.from === filters ? toggled.next : filters
 
   const search = useDraftField(
     filters.q ?? '',
@@ -213,7 +221,7 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
               <legend className="sr-only">{t('type')}</legend>
               {TYPES.map((type) => (
                 <label key={type} className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input type="checkbox" className="accent-brand" checked={filters.types.includes(type)} onChange={() => toggleType(type)} />
+                  <input type="checkbox" className="accent-brand" checked={shown.types.includes(type)} onChange={() => toggleType(type)} />
                   <span>{t(`type_${type}`)}</span>
                 </label>
               ))}
@@ -274,7 +282,7 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
               <div className="flex max-h-32 flex-wrap gap-x-4 gap-y-1 overflow-y-auto">
                 {counterparties.map((c) => (
                   <label key={c.id} className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input type="checkbox" className="accent-brand" checked={filters.counterpartyIds.includes(c.id)} onChange={() => toggleCounterparty(c.id)} />
+                    <input type="checkbox" className="accent-brand" checked={shown.counterpartyIds.includes(c.id)} onChange={() => toggleCounterparty(c.id)} />
                     <span>{c.name}</span>
                   </label>
                 ))}
@@ -287,19 +295,19 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
               <legend className="mb-1 text-sm text-ink-muted">{t('tags')}</legend>
               <div className="flex max-h-32 flex-wrap gap-x-4 gap-y-1 overflow-y-auto">
                 <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input type="checkbox" className="accent-brand" checked={filters.tagIds.includes(NO_TAG)} onChange={() => toggleTag(NO_TAG)} />
+                  <input type="checkbox" className="accent-brand" checked={shown.tagIds.includes(NO_TAG)} onChange={() => toggleTag(NO_TAG)} />
                   <span>{t('untagged')}</span>
                 </label>
                 {tags.map((tag) => (
                   <label key={tag.id} className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input type="checkbox" className="accent-brand" checked={filters.tagIds.includes(tag.id)} onChange={() => toggleTag(tag.id)} />
+                    <input type="checkbox" className="accent-brand" checked={shown.tagIds.includes(tag.id)} onChange={() => toggleTag(tag.id)} />
                     <TagDot color={tag.color} />
                     <span className={tag.archived ? 'text-ink-muted' : undefined}>{tag.name}</span>
                   </label>
                 ))}
               </div>
               <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm">
-                <input type="checkbox" className="accent-brand" checked={filters.excludedOnly} onChange={(e) => set({ excludedOnly: e.target.checked })} />
+                <input type="checkbox" className="accent-brand" checked={shown.excludedOnly} onChange={(e) => set({ excludedOnly: e.target.checked })} />
                 <span>{t('excludedOnly')}</span>
               </label>
             </fieldset>
