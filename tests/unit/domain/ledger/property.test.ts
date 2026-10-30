@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computeLedger } from '@/lib/domain/ledger/expected'
-import { diffRollups } from '@/lib/domain/ledger/rollups'
+import { addInto, diffRollups, EXCLUDED_PREFIX, type RollupDocs } from '@/lib/domain/ledger/rollups'
+import { withExcluded } from '@/lib/domain/tags/exclude'
 import { ACCOUNTS, BASE, Model, randomTx, rng } from './model'
 
 function checkAgainstOracle(model: Model): void {
@@ -8,6 +9,13 @@ function checkAgainstOracle(model: Model): void {
   expect(oracle.invalid).toEqual([])
   expect(model.balances).toEqual(oracle.balances)
   expect(diffRollups(model.rollups, oracle.rollups)).toEqual([])
+}
+
+/** The x_ twins added back into their analytics documents: the rollups as they would be if nothing were excluded. */
+function foldExcluded(docs: RollupDocs): RollupDocs {
+  const out: RollupDocs = new Map()
+  for (const [id, flat] of docs) addInto(out, new Map([[id.startsWith(EXCLUDED_PREFIX) ? id.slice(EXCLUDED_PREFIX.length) : id, flat]]))
+  return out
 }
 
 describe('ledger algebra (random create / update / delete sequences)', () => {
@@ -72,5 +80,25 @@ describe('ledger algebra (random create / update / delete sequences)', () => {
     let valid = 0
     for (let i = 0; i < 200; i++) if (randomTx(r, `t${i}`)) valid++
     expect(valid).toBeGreaterThan(120)
+  })
+
+  it('the excluded flag never moves a balance: without it the same operations give the same balances, and the x_ twins fold back', () => {
+    let excludedDocs = 0
+    for (let seed = 1; seed <= 100; seed++) {
+      const r = rng(9000 + seed)
+      const flagged = new Model()
+      const plain = new Model()
+      for (let i = 0; i < 30; i++) {
+        const tx = randomTx(r, `t${i}`)
+        if (!tx) continue
+        flagged.commit(null, tx)
+        plain.commit(null, withExcluded(tx, false))
+      }
+      expect(flagged.balances).toEqual(plain.balances)
+      expect(diffRollups(foldExcluded(flagged.rollups), plain.rollups)).toEqual([])
+      for (const id of plain.rollups.keys()) expect(id.startsWith(EXCLUDED_PREFIX)).toBe(false)
+      excludedDocs += [...flagged.rollups.keys()].filter((id) => id.startsWith(EXCLUDED_PREFIX)).length
+    }
+    expect(excludedDocs).toBeGreaterThan(0)
   })
 })

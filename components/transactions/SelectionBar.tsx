@@ -9,9 +9,9 @@ import type { LedgerTransaction } from '@/lib/domain/ledger/types'
 import { fromMinor } from '@/lib/domain/ledger/money'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 
-export type BulkField = 'category' | 'counterparty' | 'comment' | 'paymentDate' | 'accrual'
+export type BulkField = 'category' | 'counterparty' | 'comment' | 'paymentDate' | 'accrual' | 'addTags' | 'removeTags'
 
-const FIELDS: BulkField[] = ['category', 'counterparty', 'comment', 'paymentDate', 'accrual']
+const FIELDS: BulkField[] = ['category', 'counterparty', 'comment', 'paymentDate', 'accrual', 'addTags', 'removeTags']
 
 interface Props {
   rows: LedgerTransaction[]

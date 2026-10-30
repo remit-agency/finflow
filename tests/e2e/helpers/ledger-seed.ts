@@ -59,6 +59,8 @@ export interface SeedOperation {
   counterpartyId?: string
   projectId?: string
   tags?: string[]
+  /** Stored as the ledger stores it (S10t): only when true. */
+  excluded?: boolean
   /** The rules that filled the operation (the «за правилом» chip of the journal). */
   autoRules?: { id: string; name: string }[]
   /** Default: the payment day. */
@@ -87,6 +89,7 @@ function operationFields(orgId: string, data: SeedOperation) {
     description: data.description,
     isRecurring: false,
     tags: data.tags ?? [],
+    excluded: data.excluded === true ? true : undefined,
     autoRules: data.autoRules,
     fileUrls: [],
     schemaVersion: 2,

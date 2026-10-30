@@ -97,3 +97,14 @@ describe('toUiTransaction autoRules', () => {
     expect('autoRules' in toUiTransaction('org1', expense)).toBe(false)
   })
 })
+
+describe('toUiTransaction excluded (S10t)', () => {
+  it('carries the flag of an excluded operation and leaves the others without it', () => {
+    const tx: LedgerTransaction = {
+      id: 't1', type: 'expense', status: 'actual', accountId: 'a1', amountMinor: 100, currency: 'PLN',
+      paymentDate: '2026-10-20', accrual: { mode: 'date', date: '2026-10-20' }, isRecurring: false, tags: ['vat'], fileUrls: [],
+    }
+    expect(toUiTransaction('org1', { ...tx, excluded: true }).excluded).toBe(true)
+    expect('excluded' in toUiTransaction('org1', tx)).toBe(false)
+  })
+})

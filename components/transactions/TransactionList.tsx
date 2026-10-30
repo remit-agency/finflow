@@ -9,10 +9,12 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { LazyTransactionForm } from '@/components/forms/lazy'
 import { FillChip } from '@/components/transactions/FillChip'
+import { TagChips } from '@/components/tags/TagChips'
 import { fetchTransaction } from '@/lib/api/journal-client'
 import { notifyLedgerChanged } from '@/lib/api/ledger-events'
 import { LedgerApiError } from '@/lib/api/ledger-client'
 import type { Counterparty } from '@/lib/domain/counterparties/types'
+import type { Tag } from '@/lib/domain/tags/types'
 import { fromMinor } from '@/lib/domain/ledger/money'
 import { toUiTransaction } from '@/lib/firebase/ledger-map'
 import { useShell } from '@/lib/hooks/useShell'
@@ -39,6 +41,8 @@ interface TransactionListProps {
   incomeCategories: Category[]
   expenseCategories: Category[]
   counterparties: Counterparty[]
+  /** The company's tags (S10t): the chips of every row. */
+  tags: Tag[]
   orgId: string
   loading: boolean
   /** Any filter, search or period is active: an empty list then means «nothing matches», not «no operations yet». */
@@ -62,6 +66,7 @@ export function TransactionList({
   incomeCategories,
   expenseCategories,
   counterparties,
+  tags,
   orgId,
   loading,
   filtered,
@@ -169,6 +174,7 @@ export function TransactionList({
 
   const accountMap = Object.fromEntries(accounts.map((a) => [a.id, a]))
   const counterpartyMap = Object.fromEntries(counterparties.map((c) => [c.id, c]))
+  const tagsById = new Map(tags.map((tag) => [tag.id, tag]))
   const allCategories = [...incomeCategories, ...expenseCategories]
   const categoryMap = Object.fromEntries(allCategories.map((c) => [c.id, c]))
 
@@ -378,6 +384,8 @@ export function TransactionList({
                             {byRule}
                           </span>
                         )}
+                        {/* The comment column (and its chips) is hidden below md: the phone gets the tags under the account. */}
+                        <TagChips ids={tx.tags} tagsById={tagsById} testId="tag-chip-phone" className="mt-1 max-w-44 md:hidden" />
                         <span className="hidden max-w-56 truncate text-xs text-ink-muted md:block">
                           {account ? tAccountTypes(account.type) : ''}
                         </span>
@@ -439,6 +447,7 @@ export function TransactionList({
                         {(tx.description || !counterpartyLine) && (
                           <span className="block max-w-72 truncate">{tx.description || '—'}</span>
                         )}
+                        <TagChips ids={tx.tags} tagsById={tagsById} testId="tag-chip" className="mt-1 max-w-72" />
                       </TableCell>
                       <TableCell className={cn('py-3.5 pr-4 text-right font-semibold tabular-nums sm:hidden', amountClass)}>
                         {amountLabel(tx)}

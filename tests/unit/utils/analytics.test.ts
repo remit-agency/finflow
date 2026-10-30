@@ -208,3 +208,17 @@ describe('buildPL over a period', () => {
     )
   })
 })
+
+describe('operations excluded from analytics (S10t)', () => {
+  it('Cash Flow and P&L leave them out', () => {
+    const vatIn = { ...tx('income', 230, '2026-10-20T10:00:00Z', 'cat-in'), excluded: true }
+    const vatOut = { ...tx('expense', 230, '2026-10-20T11:00:00Z', 'cat-ex'), excluded: true }
+    const sale = tx('income', 1000, '2026-10-21T10:00:00Z', 'cat-in')
+    const period = resolvePeriod({ preset: 'currentMonth' }, NOW)
+    const flow = buildCashFlow([vatIn, vatOut, sale], period, 'uk')
+    expect(flow.buckets.reduce((sum, b) => sum + b.income, 0)).toBe(1000)
+    expect(flow.buckets.reduce((sum, b) => sum + b.expense, 0)).toBe(0)
+    const pl = buildPL([vatIn, vatOut, sale], [category('cat-in', 'income', 'Sprzedaż'), category('cat-ex', 'expense', 'Koszty')], period, 'Bez kategorii')
+    expect(pl.rows.map((r) => [r.categoryId, r.total])).toEqual([['cat-in', 1000]])
+  })
+})

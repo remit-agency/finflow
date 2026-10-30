@@ -30,10 +30,10 @@ const PROJECT_ID = 'demo-finflow'
 // FIRESTORE_RULES_FILE lets the "red" check run this suite against a deliberately open ruleset.
 const RULES_FILE = process.env.FIRESTORE_RULES_FILE ?? resolve(process.cwd(), 'firestore.rules')
 const DAY = 24 * 60 * 60 * 1000
-// Written by the server only (S05, S06, S10): clients may read accounts, transactions, rollups, counterparties and rules, the owner reads audit.
-const SERVER_WRITTEN_SUBS = ['accounts', 'transactions', 'rollups', 'audit', 'counterparties', 'rules'] as const
-const MEMBER_READ_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'counterparties', 'rules'] as const
-const ALL_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'counterparties', 'rules'] as const
+// Written by the server only (S05, S06, S10, S10t): clients may read accounts, transactions, rollups, counterparties, rules and tags, the owner reads audit.
+const SERVER_WRITTEN_SUBS = ['accounts', 'transactions', 'rollups', 'audit', 'counterparties', 'rules', 'tags'] as const
+const MEMBER_READ_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'counterparties', 'rules', 'tags'] as const
+const ALL_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'counterparties', 'rules', 'tags'] as const
 // S09: the bank collections written by the server only. bankAccounts and bankSeen are closed to every client role.
 const BANK_SERVER_ONLY_SUBS = ['bankAccounts', 'bankSeen'] as const
 
@@ -268,7 +268,7 @@ describe('collection group query on members (the "my companies" query)', () => {
   })
 
   it('does not open other collection groups', async () => {
-    for (const group of ['accounts', 'transactions', 'categories', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'ledger', 'counterparties', 'counterpartyKeys', 'rules']) {
+    for (const group of ['accounts', 'transactions', 'categories', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'ledger', 'counterparties', 'counterpartyKeys', 'rules', 'tags', 'tagKeys']) {
       await assertFails(getDocs(collectionGroup(as('alice'), group)))
     }
   })
@@ -411,6 +411,27 @@ describe('counterparty keys and rate limits are closed to every client', () => {
   it('an anonymous caller cannot read them either', async () => {
     await assertFails(getDoc(doc(anon(), 'organizations/orgA/counterpartyKeys/name_acme')))
     await assertFails(getDoc(doc(anon(), 'rateLimits/lookup_alice_m_1')))
+  })
+})
+
+describe('tag keys are closed to every client (S10t)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(fs(ctx), 'organizations/orgA/tagKeys/name_vat'), { tagId: 't1' })
+    })
+  })
+
+  it.each(['alice', 'carol', 'dave', 'erin'])('%s cannot read or write a tag key', async (uid) => {
+    const key = doc(as(uid), 'organizations/orgA/tagKeys/name_vat')
+    await assertFails(getDoc(key))
+    await assertFails(getDocs(collection(as(uid), 'organizations/orgA/tagKeys')))
+    await assertFails(setDoc(doc(as(uid), 'organizations/orgA/tagKeys/name_new'), { tagId: 't2' }))
+    await assertFails(updateDoc(key, { tagId: 't2' }))
+    await assertFails(deleteDoc(key))
+  })
+
+  it('an anonymous caller cannot read them either', async () => {
+    await assertFails(getDoc(doc(anon(), 'organizations/orgA/tagKeys/name_vat')))
   })
 })
 

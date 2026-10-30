@@ -7,11 +7,13 @@ import { LedgerError } from '@/lib/domain/ledger/errors'
 import { applyPatch, BANK_CLIENT_ID_PREFIX, toRawInput, type TransactionInput, type TransactionPatch } from '@/lib/domain/ledger/input'
 import { nest } from '@/lib/domain/ledger/rollups'
 import type { AutoRuleRef, BankInfo, LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
+import { mergeTags, sameTags, type TagChange } from '@/lib/domain/tags/assign'
+import { excludedFromTags, tagFlagsOf, withExcluded } from '@/lib/domain/tags/exclude'
 import type { RateSnapshot } from '@/lib/server/fx/types'
 import { auditData, type AuditAction } from './audit'
 import type { LedgerDeps } from './deps'
 import { assertUnlocked } from './lock'
-import { accountsCol, auditCol, categoriesCol, counterpartiesCol, orgRef, rollupsCol, transactionsCol } from './paths'
+import { accountsCol, auditCol, categoriesCol, counterpartiesCol, orgRef, rollupsCol, tagsCol, transactionsCol } from './paths'
 
 export interface WriteResult {
   transaction: LedgerTransaction
@@ -25,10 +27,14 @@ export interface WriteResult {
  *   audit entry says `via: 'rule'`.
  * - `expectVersion` (update only): the write is refused with `conflict` unless the stored operation is still that version,
  *   so a rule never replaces what a person chose after the rules read the operation.
+ * - `restore` (update only): the write puts a previous state back (the undo of an edit or a bulk change). A tag of that
+ *   state that is archived by now is accepted, as long as it exists. The PATCH route sets it only from the `restore=1`
+ *   query marker (`parseRestoreMarker`), never from the body; an ordinary write keeps refusing archived tags.
  */
 export interface WriteExtras {
   autoRules?: AutoRuleRef[]
   expectVersion?: Timestamp
+  restore?: boolean
 }
 
 /** A fully built operation plus what the build assumed about the world (re-checked inside the transaction). */
@@ -46,6 +52,8 @@ interface Job {
   next: Prepared | null
   /** Set when the rules made the change (S10): the audit entry records it. */
   via?: 'rule'
+  /** Set when the write restores a previous state (WriteExtras.restore): archived tags of the new state are accepted. */
+  restore?: boolean
 }
 
 export function evidenceOf(s: RateSnapshot): RateEvidence {
@@ -115,6 +123,12 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
     const counterpartyId = job.next?.tx.counterpartyId
     const counterpartyIsNew = counterpartyId !== undefined && counterpartyId !== job.prior?.tx.counterpartyId
     const counterpartySnap = counterpartyId !== undefined && counterpartyIsNew ? await t.get(counterpartiesCol(db, orgId).doc(counterpartyId)) : null
+    // Tags (S10t): every tag of the new state is read, so `excluded` follows the flags as they are inside this
+    // transaction. Only a tag this write newly gives the operation is checked: an edit of something else, or taking an
+    // archived tag off, never fails because of a tag.
+    const nextTags = job.next?.tx.tags ?? []
+    const tagSnaps: DocumentSnapshot[] = []
+    for (const id of nextTags) tagSnaps.push(await t.get(tagsCol(db, orgId).doc(id)))
 
     // ---- checks (nothing is written yet) ----
     if (!orgSnap.exists) throw new LedgerError('not_found', 'org')
@@ -145,10 +159,18 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
       if (!counterpartySnap.exists) throw new LedgerError('counterparty_not_found', 'counterpartyId')
       if (counterpartySnap.get('archived') === true) throw new LedgerError('counterparty_archived', 'counterpartyId')
     }
+    const priorTags = job.prior?.tx.tags ?? []
+    tagSnaps.forEach((snap, i) => {
+      if (priorTags.includes(nextTags[i])) return
+      if (!snap.exists) throw new LedgerError('tag_not_found', 'tags')
+      if (snap.get('archived') === true && job.restore !== true) throw new LedgerError('tag_archived', 'tags')
+    })
 
     // ---- writes ----
     const ts = Timestamp.fromDate(deps.now())
-    const change = changeSet(job.prior?.tx ?? null, job.next?.tx ?? null, baseCurrency)
+    // `excluded` is the ledger's own field: decided here from the tags read above, never taken from a request.
+    const next = job.next ? withExcluded(job.next.tx, excludedFromTags(nextTags, tagFlagsOf(tagSnaps))) : null
+    const change = changeSet(job.prior?.tx ?? null, next, baseCurrency)
 
     for (const [id, delta] of Object.entries(change.balanceDeltas)) {
       t.update(accountsCol(db, orgId).doc(id), { balanceMinor: FieldValue.increment(delta), updatedAt: ts })
@@ -157,10 +179,10 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
       t.set(rollupsCol(db, orgId).doc(id), nest(flat, (n) => FieldValue.increment(n)), { merge: true })
     }
 
-    if (job.next) {
+    if (next) {
       const old = currentSnap.data() ?? {}
       t.set(txRef, {
-        ...transactionToDoc(job.next.tx),
+        ...transactionToDoc(next),
         // Provenance of a migrated operation (S05 migration) outlives edits.
         ...(job.prior && old.migratedFrom !== undefined ? { migratedFrom: old.migratedFrom } : {}),
         ...(job.prior && old.legacy !== undefined ? { legacy: old.legacy } : {}),
@@ -182,12 +204,12 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
         uid,
         job.txId,
         job.prior ? transactionToDoc(job.prior.tx) : null,
-        job.next ? transactionToDoc(job.next.tx) : null,
+        next ? transactionToDoc(next) : null,
         job.via === undefined ? undefined : { via: job.via },
       ),
     )
 
-    return { transaction: job.next ? job.next.tx : (job.prior as NonNullable<typeof job.prior>).tx, replayed: false }
+    return { transaction: next ?? (job.prior as NonNullable<typeof job.prior>).tx, replayed: false }
   })
 }
 
@@ -288,10 +310,64 @@ export async function updateTransaction(
   // toRawInput never carries `autoRules` either: the trace is decided here.
   const autoRules = autoRulesAfter(prior.tx, next.tx, given)
   if (autoRules !== undefined) next.tx = { ...next.tx, autoRules }
-  return commit(deps, orgId, uid, { action: 'tx.update', txId, prior, next, via: given.length > 0 ? 'rule' : undefined })
+  return commit(deps, orgId, uid, {
+    action: 'tx.update',
+    txId,
+    prior,
+    next,
+    via: given.length > 0 ? 'rule' : undefined,
+    restore: extras.restore === true,
+  })
 }
 
 export async function deleteTransaction(deps: LedgerDeps, orgId: string, uid: string, txId: string): Promise<WriteResult> {
   const prior = await loadPrior(deps, orgId, txId)
   return commit(deps, orgId, uid, { action: 'tx.delete', txId, prior, next: null })
+}
+
+/**
+ * Adds and takes off tags (the bulk change of the journal, S10t). The new list comes from the operation as it is stored
+ * (`mergeTags`: takes off first, then adds while there are fewer than 10) and goes through `updateTransaction` with the
+ * version read here, so a change made in between is a `conflict`, never lost. A list that stays the same writes nothing.
+ */
+export async function retagTransaction(deps: LedgerDeps, orgId: string, uid: string, txId: string, change: TagChange): Promise<WriteResult> {
+  const prior = await loadPrior(deps, orgId, txId)
+  const tags = mergeTags(prior.tx.tags, change.add, change.remove)
+  if (sameTags(tags, prior.tx.tags)) return { transaction: prior.tx, replayed: false }
+  return updateTransaction(deps, orgId, uid, txId, { tags }, { expectVersion: prior.version })
+}
+
+/**
+ * Brings the stored `excluded` of one operation in line with its tags as they are now (S10t: a tag's flag changed after
+ * the operation was written). One Firestore transaction through `changeSet`: only the rollups move (the balances never
+ * depend on the flag), the operation keeps everything else, and the audit entry says `via: 'tag'`. False, writing
+ * nothing, when the operation is gone, is not a ledger v2 document or already agrees.
+ */
+export async function refreshExcluded(deps: LedgerDeps, orgId: string, uid: string, txId: string): Promise<boolean> {
+  const { db } = deps
+  const txRef = transactionsCol(db, orgId).doc(txId)
+  return db.runTransaction(async (t) => {
+    await assertUnlocked(t, deps, orgId)
+    const orgSnap = await t.get(orgRef(db, orgId))
+    const snap = await t.get(txRef)
+    const prior = snap.exists ? parseTransaction(snap.id, snap.data()) : null
+    if (!orgSnap.exists || prior === null) return false
+    const tagSnaps: DocumentSnapshot[] = []
+    for (const id of prior.tags) tagSnaps.push(await t.get(tagsCol(db, orgId).doc(id)))
+    const excluded = excludedFromTags(prior.tags, tagFlagsOf(tagSnaps))
+    if (excluded === (prior.excluded === true)) return false
+
+    const next = withExcluded(prior, excluded)
+    const change = changeSet(prior, next, orgSnap.get('currency') as string)
+    const ts = Timestamp.fromDate(deps.now())
+    for (const [id, delta] of Object.entries(change.balanceDeltas)) {
+      t.update(accountsCol(db, orgId).doc(id), { balanceMinor: FieldValue.increment(delta), updatedAt: ts })
+    }
+    for (const [id, flat] of change.rollupDeltas) {
+      t.set(rollupsCol(db, orgId).doc(id), nest(flat, (n) => FieldValue.increment(n)), { merge: true })
+    }
+    t.update(txRef, { excluded: excluded ? true : FieldValue.delete(), updatedAt: ts, updatedBy: uid })
+    t.create(auditCol(db, orgId).doc(), auditData(deps, 'tx.update', uid, txId, transactionToDoc(prior), transactionToDoc(next), { via: 'tag' }))
+    return true
+  })
 }

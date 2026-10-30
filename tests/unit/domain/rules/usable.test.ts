@@ -6,6 +6,7 @@ import { unusableActions, withoutUnusableActions } from '@/lib/domain/rules/usab
 const targets: ActionTargets = {
   categories: new Map<string, RuleType>([['k-fuel', 'expense'], ['k-sales', 'income']]),
   counterparties: new Map<string, { archived: boolean }>([['cp-orlen', { archived: false }], ['cp-old', { archived: true }]]),
+  tags: new Map<string, { archived: boolean }>(),
 }
 const base: Rule = {
   id: 'r1', name: 'Paliwo', type: 'expense', active: true, order: 0, createdAtMs: 0,

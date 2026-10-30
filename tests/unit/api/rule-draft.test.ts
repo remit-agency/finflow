@@ -75,3 +75,22 @@ describe('draftFromRule', () => {
     expect(newCondition('amount', 'PLN')).toEqual({ kind: 'amount', currency: 'PLN', min: '', max: '' })
   })
 })
+
+describe('tags (S10t)', () => {
+  it('a rule with only tags is complete and sends them', () => {
+    expect(draftToInput(complete({ categoryId: '', counterpartyId: null, tagIds: ['vat'] }))?.actions).toEqual({ tagIds: ['vat'] })
+  })
+
+  it('a new draft has no tags; a stored rule brings its own, not shared', () => {
+    expect(emptyDraft().tagIds).toEqual([])
+    const rule: Rule = {
+      id: 'r1', name: 'ПДВ', type: 'expense', active: true, order: 0, createdAtMs: 0,
+      conditions: [{ kind: 'text', op: 'contains', values: ['vat'] }], actions: { tagIds: ['vat', 'q4'] },
+    }
+    const draft = draftFromRule(rule, 'pl')
+    expect(draft.tagIds).toEqual(['vat', 'q4'])
+    draft.tagIds.push('x')
+    expect(rule.actions.tagIds).toEqual(['vat', 'q4'])
+    expect(draftToInput(draftFromRule(rule, 'pl'))?.actions).toEqual({ tagIds: ['vat', 'q4'] })
+  })
+})

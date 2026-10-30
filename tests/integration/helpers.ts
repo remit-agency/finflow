@@ -4,6 +4,8 @@ import { addDays } from '@/lib/domain/ledger/days'
 import { accountToDoc } from '@/lib/domain/ledger/doc'
 import { flatten } from '@/lib/domain/ledger/rollups'
 import { counterpartyToDoc } from '@/lib/domain/counterparties/doc'
+import { tagToDoc } from '@/lib/domain/tags/doc'
+import { tagNameKey } from '@/lib/domain/tags/keys'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import type { RateSnapshot } from '@/lib/server/fx/types'
 
@@ -58,6 +60,19 @@ export async function seedAccount(db: Firestore, orgId: string, id: string, curr
 export async function seedCounterparty(db: Firestore, orgId: string, id: string, options: { archived?: boolean } = {}): Promise<void> {
   const doc = counterpartyToDoc({ id, name: id, ibans: [], archived: options.archived === true })
   await db.doc(`organizations/${orgId}/counterparties/${id}`).set({ ...doc, orgId })
+}
+
+/** A tag in the shape the server stores (lib/domain/tags/doc.ts) with its name key; `name` defaults to the id. */
+export async function seedTag(
+  db: Firestore,
+  orgId: string,
+  id: string,
+  options: { name?: string; excludeFromAnalytics?: boolean; archived?: boolean } = {},
+): Promise<void> {
+  const name = options.name ?? id
+  const doc = tagToDoc({ id, name, color: 'slate', excludeFromAnalytics: options.excludeFromAnalytics === true, archived: options.archived === true, recalcPending: false })
+  await db.doc(`organizations/${orgId}/tags/${id}`).set({ ...doc, orgId })
+  await db.doc(`organizations/${orgId}/tagKeys/${tagNameKey(name)}`).set({ tagId: id })
 }
 
 export async function readDoc(db: Firestore, path: string): Promise<Record<string, unknown> | undefined> {

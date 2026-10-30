@@ -142,7 +142,8 @@ function daysOf(range: { start: Date; end: Date }): number {
 /**
  * Cash Flow over a resolved period (`resolvePeriod`): transactions outside the range are left
  * out; buckets are UTC months when the range is longer than 31 days and UTC days otherwise.
- * Transfers do not count. `balance` is the running total of `net` from the start of the range.
+ * Transfers and operations excluded from analytics by their tags (S10t) do not count. `balance` is the running total
+ * of `net` from the start of the range.
  * `locale` (the UI language) only decides the bucket labels.
  */
 export function buildCashFlow(transactions: Transaction[], range: PeriodRange, locale: Locale): CashFlowReport {
@@ -167,7 +168,7 @@ export function buildCashFlow(transactions: Transaction[], range: PeriodRange, l
   const byKey = new Map(buckets.map((b) => [b.key, b]))
   const keyOf = granularity === 'month' ? monthKeyUtc : dayKeyUtc
   for (const tx of transactions) {
-    if (!inRange(tx, bounded)) continue
+    if (tx.excluded || !inRange(tx, bounded)) continue
     const entry = byKey.get(keyOf(txDate(tx)))
     if (!entry) continue
     if (tx.type === 'income') entry.income += tx.amount
@@ -188,7 +189,7 @@ export function buildCashFlow(transactions: Transaction[], range: PeriodRange, l
 /**
  * P&L over a resolved period: income and expense by category for the transactions inside the
  * range, split by the UTC months the range touches (the table's columns) with a total per row.
- * Transfers do not count; transactions without a known category go to two rows (income and
+ * Transfers and operations excluded from analytics (S10t) do not count; transactions without a known category go to two rows (income and
  * expense) named `uncategorizedName` (the translated «Без категорії»). `nameOf` is the label of a
  * category row (the UI passes the localized name); it defaults to the stored name.
  */
@@ -236,7 +237,7 @@ export function buildPL(
 
   // Aggregate
   for (const tx of transactions) {
-    if (tx.type === 'transfer') continue
+    if (tx.type === 'transfer' || tx.excluded) continue
     if (!inRange(tx, bounded)) continue
     const key = monthKeyUtc(txDate(tx))
 

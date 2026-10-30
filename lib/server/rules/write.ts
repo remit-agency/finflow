@@ -6,7 +6,7 @@ import { withCurrency, type RuleInput, type RulePatch } from '@/lib/domain/rules
 import { sortRules } from '@/lib/domain/rules/match'
 import { MAX_RULES, type Rule, type RuleType } from '@/lib/domain/rules/types'
 import { auditData } from '@/lib/server/ledger/audit'
-import { auditCol, categoriesCol, counterpartiesCol, orgRef, rulesCol } from '@/lib/server/ledger/paths'
+import { auditCol, categoriesCol, counterpartiesCol, orgRef, rulesCol, tagsCol } from '@/lib/server/ledger/paths'
 
 /** What a rule write needs: Admin Firestore and the clock (the ledger deps have both). */
 export interface RuleDeps {
@@ -14,12 +14,19 @@ export interface RuleDeps {
   now: () => Date
 }
 
-/** The category must exist and have the rule's type; the counterparty must exist and not be archived. */
-function assertTargets(type: RuleType, category: DocumentSnapshot | null, counterparty: DocumentSnapshot | null): void {
+/**
+ * The category must exist and have the rule's type; the counterparty must exist and not be archived; every tag the write
+ * gives the action anew must exist and not be archived (S10t).
+ */
+function assertTargets(type: RuleType, category: DocumentSnapshot | null, counterparty: DocumentSnapshot | null, tags: readonly DocumentSnapshot[] = []): void {
   if (category !== null && (!category.exists || category.get('type') !== type)) throw new RuleError('category_not_found', 'actions.categoryId')
   if (counterparty !== null) {
     if (!counterparty.exists) throw new RuleError('counterparty_not_found', 'actions.counterpartyId')
     if (counterparty.get('archived') === true) throw new RuleError('counterparty_archived', 'actions.counterpartyId')
+  }
+  for (const tag of tags) {
+    if (!tag.exists) throw new RuleError('tag_not_found', 'actions.tagIds')
+    if (tag.get('archived') === true) throw new RuleError('tag_archived', 'actions.tagIds')
   }
 }
 
@@ -33,10 +40,12 @@ export async function createRule(deps: RuleDeps, orgId: string, uid: string, inp
     const existing = await t.get(col)
     const category = input.actions.categoryId === undefined ? null : await t.get(categoriesCol(deps.db, orgId).doc(input.actions.categoryId))
     const counterparty = input.actions.counterpartyId === undefined ? null : await t.get(counterpartiesCol(deps.db, orgId).doc(input.actions.counterpartyId))
+    const tags: DocumentSnapshot[] = []
+    for (const id of input.actions.tagIds ?? []) tags.push(await t.get(tagsCol(deps.db, orgId).doc(id)))
 
     if (!org.exists) throw new RuleError('not_found')
     if (existing.size >= MAX_RULES) throw new RuleError('limit_reached')
-    assertTargets(input.type, category, counterparty)
+    assertTargets(input.type, category, counterparty, tags)
 
     const orders = existing.docs.map((d) => d.get('order')).filter((n): n is number => typeof n === 'number' && Number.isSafeInteger(n))
     const ts = Timestamp.fromDate(deps.now())
@@ -74,7 +83,11 @@ export async function updateRule(deps: RuleDeps, orgId: string, uid: string, id:
     const checkCounterparty = actions.counterpartyId !== undefined && actions.counterpartyId !== prior.actions.counterpartyId
     const category = checkCategory ? await t.get(categoriesCol(deps.db, orgId).doc(actions.categoryId as string)) : null
     const counterparty = checkCounterparty ? await t.get(counterpartiesCol(deps.db, orgId).doc(actions.counterpartyId as string)) : null
-    assertTargets(type, category, counterparty)
+    // Only the tags the patch adds to the action are checked: an unusable rule can still be switched off or renamed.
+    const addedTags = (actions.tagIds ?? []).filter((id) => !(prior.actions.tagIds ?? []).includes(id))
+    const tags: DocumentSnapshot[] = []
+    for (const id of addedTags) tags.push(await t.get(tagsCol(deps.db, orgId).doc(id)))
+    assertTargets(type, category, counterparty, tags)
 
     const after: Rule = {
       ...prior,

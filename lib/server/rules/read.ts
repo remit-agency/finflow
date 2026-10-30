@@ -2,9 +2,9 @@ import 'server-only'
 import type { Firestore } from 'firebase-admin/firestore'
 import { parseRule } from '@/lib/domain/rules/doc'
 import { sortRules } from '@/lib/domain/rules/match'
-import type { ActionTargets, ListedRule, Rule, RuleType } from '@/lib/domain/rules/types'
+import type { ActionTargets, ListedRule, Rule, RuleActions, RuleType } from '@/lib/domain/rules/types'
 import { unusableActions, withoutUnusableActions } from '@/lib/domain/rules/usable'
-import { categoriesCol, counterpartiesCol, rulesCol } from '@/lib/server/ledger/paths'
+import { categoriesCol, counterpartiesCol, rulesCol, tagsCol } from '@/lib/server/ledger/paths'
 
 /** Every readable rule of the company (at most 50) in the order they apply; a malformed document is left out. */
 export async function readRules(db: Firestore, orgId: string): Promise<Rule[]> {
@@ -12,20 +12,21 @@ export async function readRules(db: Firestore, orgId: string): Promise<Rule[]> {
   return sortRules(snap.docs.map((d) => parseRule(d.id, d.data())).filter((r): r is Rule => r !== null))
 }
 
-function idsOf(rules: readonly Rule[], key: 'categoryId' | 'counterpartyId'): string[] {
-  return [...new Set(rules.flatMap((r) => {
-    const id = r.actions[key]
-    return id === undefined ? [] : [id]
-  }))]
+function idsOf(rules: readonly Rule[], pick: (actions: RuleActions) => readonly string[]): string[] {
+  return [...new Set(rules.flatMap((r) => pick(r.actions)))]
 }
 
-/** The categories and counterparties the rules' actions name: one `getAll` each, none when nothing is named. */
+const one = (id: string | undefined): string[] => (id === undefined ? [] : [id])
+
+/** The categories, counterparties and tags the rules' actions name: one `getAll` each, none when nothing is named. */
 export async function readTargets(db: Firestore, orgId: string, rules: readonly Rule[]): Promise<ActionTargets> {
-  const categoryIds = idsOf(rules, 'categoryId')
-  const counterpartyIds = idsOf(rules, 'counterpartyId')
-  const [categorySnaps, counterpartySnaps] = await Promise.all([
+  const categoryIds = idsOf(rules, (a) => one(a.categoryId))
+  const counterpartyIds = idsOf(rules, (a) => one(a.counterpartyId))
+  const tagIds = idsOf(rules, (a) => a.tagIds ?? [])
+  const [categorySnaps, counterpartySnaps, tagSnaps] = await Promise.all([
     categoryIds.length === 0 ? Promise.resolve([]) : db.getAll(...categoryIds.map((id) => categoriesCol(db, orgId).doc(id))),
     counterpartyIds.length === 0 ? Promise.resolve([]) : db.getAll(...counterpartyIds.map((id) => counterpartiesCol(db, orgId).doc(id))),
+    tagIds.length === 0 ? Promise.resolve([]) : db.getAll(...tagIds.map((id) => tagsCol(db, orgId).doc(id))),
   ])
   const categories = new Map<string, RuleType>()
   for (const s of categorySnaps) {
@@ -34,7 +35,9 @@ export async function readTargets(db: Firestore, orgId: string, rules: readonly 
   }
   const counterparties = new Map<string, { archived: boolean }>()
   for (const s of counterpartySnaps) if (s.exists) counterparties.set(s.id, { archived: s.get('archived') === true })
-  return { categories, counterparties }
+  const tags = new Map<string, { archived: boolean }>()
+  for (const s of tagSnaps) if (s.exists) tags.set(s.id, { archived: s.get('archived') === true })
+  return { categories, counterparties, tags }
 }
 
 /** `GET /rules`: every rule in order, with the actions that cannot work now. */

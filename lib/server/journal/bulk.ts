@@ -1,12 +1,16 @@
 import type { BulkOutcome, BulkRequest } from '@/lib/domain/journal/bulk-input'
+import { isTagPatch } from '@/lib/domain/journal/selection'
 import type { TransactionPatch } from '@/lib/domain/ledger/input'
+import type { TagChange } from '@/lib/domain/tags/assign'
 import { HttpError } from '@/lib/server/http-error'
 import { toHttpError } from '@/lib/server/ledger/http'
 
-/** The two ledger calls a bulk change is made of (the production `ledger` object has them). */
+/** The ledger calls a bulk change is made of (the production `ledger` object has them). */
 export interface BulkLedger {
   updateTransaction(orgId: string, uid: string, txId: string, patch: TransactionPatch): Promise<unknown>
   deleteTransaction(orgId: string, uid: string, txId: string): Promise<unknown>
+  /** Adds and takes off tags (S10t): the new list is computed from the operation as it is stored. */
+  retagTransaction(orgId: string, uid: string, txId: string, change: TagChange): Promise<unknown>
 }
 
 /**
@@ -20,6 +24,7 @@ export async function runBulk(ledger: BulkLedger, orgId: string, uid: string, re
   for (const id of req.ids) {
     try {
       if (req.action === 'delete') await ledger.deleteTransaction(orgId, uid, id)
+      else if (isTagPatch(req.patch)) await ledger.retagTransaction(orgId, uid, id, { add: req.patch.addTagIds ?? [], remove: req.patch.removeTagIds ?? [] })
       else await ledger.updateTransaction(orgId, uid, id, req.patch as TransactionPatch)
       out.push({ id, ok: true })
     } catch (e) {

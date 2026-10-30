@@ -69,6 +69,7 @@ export interface LedgerTransaction {
   description?: string
   isRecurring: boolean
   projectId?: string
+  /** Ids of the company's tags (S10t): at most 10, none twice. */
   tags: string[]
   fileUrls: string[]
   /** Only actual income/expense in a currency other than the company's. */
@@ -77,6 +78,12 @@ export interface LedgerTransaction {
   bank?: BankInfo
   /** The rules that filled the category or the counterparty (S10). A person's change of either removes it. */
   autoRules?: AutoRuleRef[]
+  /**
+   * True when at least one of the tags has «Не враховувати в аналітиці» (S10t): the rollups of the operation go to the
+   * `x_` documents, its balance effects stay. Set by the ledger at every write, never taken from a request; absent means
+   * false (operations written before S10t).
+   */
+  excluded?: boolean
 }
 
 export interface LedgerAccount {

@@ -1,5 +1,7 @@
 import { isId } from '@/lib/domain/ledger/guards'
 import { isMinor } from '@/lib/domain/ledger/money'
+import { tagIdsOf } from '@/lib/domain/tags/assign'
+import { MAX_RULE_TAGS } from '@/lib/domain/tags/types'
 import {
   MAX_CONDITIONS,
   RULE_TYPES,
@@ -38,9 +40,10 @@ function conditionToDoc(c: RuleCondition): Record<string, unknown> {
 
 /** The stored fields of a rule (no id, no timestamps, no orgId: the writer adds those). Never contains `undefined`. */
 export function ruleToDoc(rule: Rule): Record<string, unknown> {
-  const actions: Record<string, string> = {}
+  const actions: Record<string, unknown> = {}
   if (rule.actions.categoryId !== undefined) actions.categoryId = rule.actions.categoryId
   if (rule.actions.counterpartyId !== undefined) actions.counterpartyId = rule.actions.counterpartyId
+  if (rule.actions.tagIds !== undefined && rule.actions.tagIds.length > 0) actions.tagIds = [...rule.actions.tagIds]
   return {
     schemaVersion: RULE_SCHEMA_VERSION,
     name: rule.name,
@@ -90,7 +93,12 @@ function parseActions(v: unknown): RuleActions | null {
     if (!isId(value)) return null
     out[key] = value
   }
-  return out.categoryId === undefined && out.counterpartyId === undefined ? null : out
+  if (v.tagIds !== undefined) {
+    const tagIds = tagIdsOf(v.tagIds, MAX_RULE_TAGS)
+    if (tagIds === null || tagIds.length === 0) return null
+    out.tagIds = tagIds
+  }
+  return out.categoryId === undefined && out.counterpartyId === undefined && out.tagIds === undefined ? null : out
 }
 
 /** Milliseconds of a Firestore Timestamp (anything with a `toMillis` method), 0 otherwise. */

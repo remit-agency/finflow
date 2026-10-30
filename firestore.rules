@@ -11,9 +11,9 @@ rules_version = '2';
 //
 // Data shape:
 //   organizations/{orgId} { name, currency, ownerId, plan, trialEndsAt, createdAt }
-//   organizations/{orgId}/{accounts|categories|transactions|rollups|audit|bankConnections|bankAccounts|bankSeen|ledger|counterparties|counterpartyKeys|rules}/{docId}
-// Accounts, transactions, rollups, audit, ledger, counterparties, rules (S10) and the bank collections (bankConnections, bankAccounts,
-// bankSeen: S09) are written by the server only (S05, S06, S09). counterpartyKeys (uniqueness keys), bankAccounts and bankSeen
+//   organizations/{orgId}/{accounts|categories|transactions|rollups|audit|bankConnections|bankAccounts|bankSeen|ledger|counterparties|counterpartyKeys|rules|tags|tagKeys}/{docId}
+// Accounts, transactions, rollups, audit, ledger, counterparties, rules (S10), tags (S10t) and the bank collections (bankConnections, bankAccounts,
+// bankSeen: S09) are written by the server only (S05, S06, S09). counterpartyKeys and tagKeys (uniqueness keys), bankAccounts and bankSeen
 // (bank sync state) and the root rateLimits are not readable or writable by clients at all.
 //
 // The name `members` is reserved for memberships: the collection-group rule below applies to
@@ -56,7 +56,7 @@ service cloud.firestore {
 
       match /{subcollection}/{docId} {
         // bankAccounts and bankSeen match no rule below: closed to clients for reads and writes (deny by default).
-        allow read: if (subcollection in ['accounts', 'categories', 'transactions', 'rollups', 'counterparties', 'rules']
+        allow read: if (subcollection in ['accounts', 'categories', 'transactions', 'rollups', 'counterparties', 'rules', 'tags']
             && hasRole(orgId, ['owner', 'accountant', 'viewer']))
           || (subcollection in ['bankConnections', 'audit'] && hasRole(orgId, ['owner']));
 

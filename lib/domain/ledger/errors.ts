@@ -13,6 +13,8 @@ export type LedgerErrorCode =
   | 'ledger_busy'
   | 'conflict'
   | 'bank_locked'
+  | 'tag_not_found'
+  | 'tag_archived'
 
 /** An expected failure of a ledger operation. `field` names the offending input field, if any. */
 export class LedgerError extends Error {

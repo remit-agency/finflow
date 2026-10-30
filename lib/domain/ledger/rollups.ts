@@ -13,6 +13,10 @@ export type RollupDocs = Map<string, RollupFlat>
 export const cashDocId = (accountId: string, day: string) => `cash_${accountId}_${day}`
 export const cashCatDocId = (month: string) => `cashcat_${month}`
 export const plDocId = (month: string) => `pl_${month}`
+/** The prefix of the twins of the rollup documents that hold the operations excluded from analytics (S10t). */
+export const EXCLUDED_PREFIX = 'x_'
+/** `x_cash_…`, `x_cashcat_…`, `x_pl_…`: the same fields as the analytics document `id`, for the excluded operations. */
+export const excludedDocId = (id: string) => `${EXCLUDED_PREFIX}${id}`
 
 function bump(docs: RollupDocs, id: string, field: string, delta: number): void {
   if (delta === 0) return
@@ -36,15 +40,18 @@ export function addInto(target: RollupDocs, source: RollupDocs): void {
  *  - cash_{account}_{paymentDay}: in/out in the account currency and in the company currency; transfer in/out;
  *  - cashcat_{paymentMonth}: per category, company currency;
  *  - pl_{accrualMonth}: per category, company currency, a period spread over its months.
+ * An operation excluded from analytics (S10t: one of its tags has the flag) adds the same fields to the `x_` twins of
+ * those documents instead, so the analytics leave it out; its balance effects (`balanceEffects`) never look at the flag.
  * Planned operations contribute nothing. Throws when an operation in another currency has no base amounts.
  */
 export function contributions(tx: LedgerTransaction, baseCurrency: string, sign: 1 | -1 = 1): RollupDocs {
   const docs: RollupDocs = new Map()
   if (tx.status !== 'actual') return docs
+  const doc = (id: string): string => (tx.excluded === true ? excludedDocId(id) : id)
 
   if (tx.type === 'transfer') {
-    bump(docs, cashDocId(tx.accountId, tx.paymentDate), 'transferOutMinor', sign * tx.amountMinor)
-    bump(docs, cashDocId(tx.toAccountId as string, tx.paymentDate), 'transferInMinor', sign * (tx.toAmountMinor as number))
+    bump(docs, doc(cashDocId(tx.accountId, tx.paymentDate)), 'transferOutMinor', sign * tx.amountMinor)
+    bump(docs, doc(cashDocId(tx.toAccountId as string, tx.paymentDate)), 'transferInMinor', sign * (tx.toAmountMinor as number))
     return docs
   }
 
@@ -54,16 +61,16 @@ export function contributions(tx: LedgerTransaction, baseCurrency: string, sign:
   const category = tx.categoryId ?? NO_CATEGORY
   const field = `categories.${category}.${income ? 'incomeBase' : 'expenseBase'}`
 
-  const cash = cashDocId(tx.accountId, tx.paymentDate)
+  const cash = doc(cashDocId(tx.accountId, tx.paymentDate))
   bump(docs, cash, income ? 'inMinor' : 'outMinor', sign * tx.amountMinor)
   bump(docs, cash, income ? 'inBase' : 'outBase', sign * base.payment)
-  bump(docs, cashCatDocId(monthOf(tx.paymentDate)), field, sign * base.payment)
+  bump(docs, doc(cashCatDocId(monthOf(tx.paymentDate))), field, sign * base.payment)
 
   const parts: Array<[string, number]> =
     tx.accrual.mode === 'date'
       ? [[monthOf(tx.accrual.date), base.accrual]]
       : allocatePeriod(base.accrual, tx.accrual.from, tx.accrual.to)
-  for (const [month, value] of parts) bump(docs, plDocId(month), field, sign * value)
+  for (const [month, value] of parts) bump(docs, doc(plDocId(month)), field, sign * value)
   return docs
 }
 

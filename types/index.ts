@@ -60,10 +60,13 @@ export interface Transaction {
   description?: string
   isRecurring: boolean
   projectId?: string
+  /** Ids of the company's tags (S10t). */
   tags: string[]
   fileUrls: string[]
   /** Set on an operation imported from a bank (S09). */
   bank?: BankInfo
   /** The rules that filled the category or the counterparty (S10). */
   autoRules?: AutoRuleRef[]
+  /** One of the tags keeps the operation out of Cash Flow and P&L (S10t); the balances still count it. */
+  excluded?: boolean
 }

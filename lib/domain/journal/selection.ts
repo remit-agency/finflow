@@ -8,6 +8,15 @@ export interface BulkPatch {
   description?: string | null
   paymentDate?: string
   accrual?: Accrual
+  /** Tags to add (S10t). A tag change never goes together with the fields above. */
+  addTagIds?: string[]
+  /** Tags to take off (S10t). */
+  removeTagIds?: string[]
+}
+
+/** A bulk change of the tags (S10t): the server computes each operation's new list instead of setting a field. */
+export function isTagPatch(patch: BulkPatch): boolean {
+  return patch.addTagIds !== undefined || patch.removeTagIds !== undefined
 }
 
 export type SkipReason = 'transfer' | 'future_actual'

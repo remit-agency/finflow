@@ -62,12 +62,12 @@ describe('rules calls', () => {
 describe('checkExisting', () => {
   it('asks step by step with the cursor until done, adds the counts and leaves the journal alone', async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(json({ scanned: 200, matchOps: 4, categories: 4, counterparties: 1, done: false, cursor: 'c1' }))
-      .mockResolvedValueOnce(json({ scanned: 37, matchOps: 1, categories: 0, counterparties: 1, done: true, cursor: null }))
+      .mockResolvedValueOnce(json({ scanned: 200, matchOps: 4, categories: 4, counterparties: 1, tags: 2, done: false, cursor: 'c1' }))
+      .mockResolvedValueOnce(json({ scanned: 37, matchOps: 1, categories: 0, counterparties: 1, tags: 1, done: true, cursor: null }))
     vi.stubGlobal('fetch', fetchMock)
     const progress: number[] = []
     const totals = await checkExisting('org1', { onProgress: (t) => progress.push(t.scanned) })
-    expect(totals).toEqual({ scanned: 237, matchOps: 5, categories: 4, counterparties: 2, stoppedEarly: false })
+    expect(totals).toEqual({ scanned: 237, matchOps: 5, categories: 4, counterparties: 2, tags: 3, stoppedEarly: false })
     expect(progress).toEqual([200])
     expect(fetchMock.mock.calls[0][0]).toBe('/api/orgs/org1/rules/apply')
     expect(fetchMock.mock.calls.map((c) => JSON.parse(c[1].body))).toEqual([{ mode: 'check' }, { mode: 'check', cursor: 'c1' }])
@@ -75,9 +75,9 @@ describe('checkExisting', () => {
   })
 
   it('reports stoppedEarly when the step cap ends the count before done', async () => {
-    const fetchMock = vi.fn().mockImplementation(async () => json({ scanned: 1, matchOps: 0, categories: 0, counterparties: 0, done: false, cursor: 'c' }))
+    const fetchMock = vi.fn().mockImplementation(async () => json({ scanned: 1, matchOps: 0, categories: 0, counterparties: 0, tags: 0, done: false, cursor: 'c' }))
     vi.stubGlobal('fetch', fetchMock)
-    expect(await checkExisting('org1')).toEqual({ scanned: 2000, matchOps: 0, categories: 0, counterparties: 0, stoppedEarly: true })
+    expect(await checkExisting('org1')).toEqual({ scanned: 2000, matchOps: 0, categories: 0, counterparties: 0, tags: 0, stoppedEarly: true })
     expect(fetchMock).toHaveBeenCalledTimes(2000)
   })
 })

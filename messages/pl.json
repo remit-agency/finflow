@@ -141,7 +141,8 @@
       "counterparties": "Kontrahenci",
       "rules": "Reguły",
       "banks": "Banki",
-      "subscription": "Subskrypcja"
+      "subscription": "Subskrypcja",
+      "tags": "Tagi"
     },
     "nav": {
       "modules": "Moduły",
@@ -255,7 +256,10 @@
       "basisAccrual": "Data transakcji",
       "amountFrom": "Kwota od",
       "amountTo": "do",
-      "counterparties": "Kontrahenci"
+      "counterparties": "Kontrahenci",
+      "tags": "Tagi",
+      "untagged": "Bez tagów",
+      "excludedOnly": "Tylko niewliczane do analityki"
     },
     "list": {
       "emptyTitle": "Nie ma jeszcze operacji",
@@ -298,7 +302,9 @@
       "field_accrual": "Zmień datę transakcji lub okres",
       "selectAllMatching": "Zaznacz wszystkie wg filtra (do 1000)",
       "selecting": "Zaznaczanie operacji wg filtra…",
-      "limitReached": "Zaznaczono pierwsze {limit}. Filtr obejmuje więcej operacji."
+      "limitReached": "Zaznaczono pierwsze {limit}. Filtr obejmuje więcej operacji.",
+      "field_addTags": "Dodaj tag",
+      "field_removeTags": "Zdejmij tag"
     },
     "bulk": {
       "title_category": "Zmiana kategorii",
@@ -341,8 +347,14 @@
         "rate_unavailable": "Kurs waluty jest niedostępny",
         "provider_unavailable": "Kurs NBP jest tymczasowo niedostępny",
         "invalid_input": "Niedozwolone dla tej operacji",
-        "unknown": "Coś poszło nie tak"
-      }
+        "unknown": "Coś poszło nie tak",
+        "tag_not_found": "Nie znaleziono tagu",
+        "tag_archived": "Tag jest w archiwum"
+      },
+      "title_addTags": "Dodawanie tagów",
+      "title_removeTags": "Zdejmowanie tagów",
+      "tagsAddHint": "Tagi dochodzą do istniejących, najwyżej 10 na operację.",
+      "tagsNone": "Wybrane operacje nie mają tagów"
     },
     "delete": {
       "title": "Usunąć {count, plural, one {# operację} few {# operacje} many {# operacji} other {# operacji}}?",
@@ -381,7 +393,8 @@
       "column_amountBase": "Kwota w walucie firmy",
       "column_rate": "Kurs wymiany",
       "column_rateDate": "Data kursu",
-      "column_balanceAfter": "Saldo konta po operacji"
+      "column_balanceAfter": "Saldo konta po operacji",
+      "column_tags": "Tagi"
     }
   },
   "forms": {
@@ -457,8 +470,12 @@
         "bankLocked": "Ta operacja pochodzi z banku: nie można zmienić kwoty, daty płatności ani rachunku",
         "counterpartyArchived": "Kontrahent jest w archiwum. Wybierz innego",
         "counterpartyMissing": "Nie znaleziono kontrahenta",
-        "delete": "Nie udało się usunąć operacji. Spróbuj ponownie."
-      }
+        "delete": "Nie udało się usunąć operacji. Spróbuj ponownie.",
+        "tagArchived": "Tag jest w archiwum. Usuń go z operacji",
+        "tagMissing": "Nie znaleziono tagu",
+        "tagCreate": "Nie udało się utworzyć tagu"
+      },
+      "tags": "Tagi"
     },
     "account": {
       "titleNew": "Nowe konto",
@@ -575,14 +592,14 @@
     },
     "rules": {
       "title": "Reguły",
-      "description": "Kategoria i kontrahent dla nowych operacji z banku według tekstu, rachunku i kwoty. Reguła uzupełnia tylko puste pole.",
+      "description": "Kategoria, kontrahent i tagi dla nowych operacji z banku według tekstu, rachunku i kwoty. Reguła uzupełnia tylko puste pola i tylko dodaje tagi.",
       "add": "Dodaj regułę",
       "applyOpen": "Zastosuj do istniejących",
       "empty": "Nie ma jeszcze reguł",
       "loadError": "Nie udało się wczytać reguł",
       "inactive": "Wyłączona",
       "unusable": "Nie działa",
-      "unusableHint": "Kategoria lub kontrahent zostały usunięte, zarchiwizowane albo kategoria ma inny typ",
+      "unusableHint": "Kategoria, kontrahent lub tag zostały usunięte, zarchiwizowane albo kategoria ma inny typ",
       "active": "Reguła „{name}” jest aktywna",
       "edit": "Edytuj „{name}”",
       "moveUp": "Wyżej: „{name}”",
@@ -603,7 +620,8 @@
         "amountMax": "kwota do {max}",
         "category": "kategoria {name}",
         "counterparty": "kontrahent {name}",
-        "missing": "(usunięto)"
+        "missing": "(usunięto)",
+        "tags": "tagi {names}"
       },
       "editor": {
         "titleNew": "Nowa reguła",
@@ -638,18 +656,20 @@
         "counterparty": "Kontrahent",
         "check": "Sprawdź",
         "checking": "Sprawdzanie…",
-        "checkResult": "Operacje bez kategorii lub kontrahenta: {scanned}, pasuje: {matched}",
+        "checkResult": "Operacje, którym reguła może coś dodać: {scanned}, pasuje: {matched}",
         "checkCapped": "Sprawdzono tylko ostatnie 2000 operacji",
         "saving": "Zapisywanie…",
-        "incomplete": "Aby zapisać, uzupełnij nazwę i wszystkie warunki oraz wybierz kategorię lub kontrahenta",
-        "deleteConfirm": "Usunąć regułę „{name}”? Kategorie, które już przypisała, zostaną."
+        "incomplete": "Aby zapisać, uzupełnij nazwę i wszystkie warunki oraz wybierz kategorię, kontrahenta lub tagi",
+        "deleteConfirm": "Usunąć regułę „{name}”? Kategorie, które już przypisała, zostaną.",
+        "tags": "Dodaj tagi",
+        "tagsHint": "Reguła tylko dodaje te tagi do istniejących, niczego nie zdejmuje."
       },
       "apply": {
         "title": "Zastosuj reguły do istniejących operacji",
-        "note": "Reguły uzupełniają tylko puste pola i nie zmieniają tego, co wybrano ręcznie.",
+        "note": "Reguły uzupełniają tylko puste pola, dodają tagi i nie zmieniają tego, co wybrano ręcznie.",
         "checking": "Liczę operacje… przejrzano: {scanned}",
         "willChange": "Operacje do zmiany: {count}",
-        "breakdown": "Kategoria: {categories}, kontrahent: {counterparties}",
+        "breakdown": "Kategoria: {categories}, kontrahent: {counterparties}, tagi: {tags}",
         "nothing": "Brak operacji, które reguły mogłyby zmienić",
         "confirm": "Zastosuj",
         "running": "Stosuję… zmieniono: {changed}",
@@ -669,7 +689,9 @@
         "gone": "Reguła została już usunięta",
         "conflict": "Lista reguł się zmieniła. Odśwież stronę",
         "save": "Nie udało się zapisać reguły",
-        "check": "Nie udało się sprawdzić reguły"
+        "check": "Nie udało się sprawdzić reguły",
+        "tagMissing": "Nie znaleziono tagu",
+        "tagArchived": "Tag jest w archiwum"
       }
     },
     "banks": {
@@ -782,6 +804,65 @@
       },
       "trialUntil": "Okres próbny do {date}",
       "upgrade": "Przejdź na Pro"
+    },
+    "tags": {
+      "title": "Tagi",
+      "description": "Własne etykiety operacji. Tag z opcją „Nie uwzględniaj w analityce” usuwa operację z Cash Flow i P&L, salda kont się nie zmieniają.",
+      "add": "Dodaj tag",
+      "empty": "Nie ma jeszcze tagów",
+      "archivedTitle": "Archiwum",
+      "excludedBadge": "Nie wliczany do analityki",
+      "archivedBadge": "W archiwum",
+      "recalcPending": "Przeliczanie niezakończone",
+      "recalcContinue": "Kontynuuj",
+      "edit": "Edytuj „{name}”",
+      "saved": "Tag zapisany",
+      "limitHint": "Osiągnięto limit: 100 tagów na firmę",
+      "editor": {
+        "titleNew": "Nowy tag",
+        "titleEdit": "Edycja tagu",
+        "name": "Nazwa",
+        "color": "Kolor",
+        "exclude": "Nie uwzględniaj w analityce",
+        "excludeHint": "Operacje z tym tagiem nie trafią do Cash Flow ani P&L. Salda kont się nie zmienią.",
+        "archive": "Do archiwum",
+        "restore": "Przywróć z archiwum",
+        "archivedNote": "Zarchiwizowany tag zostaje na starych operacjach, ale nie trafia do nowych.",
+        "saving": "Zapisywanie…",
+        "confirmTitle": "Przeliczyć operacje?",
+        "confirmBody": "Operacje do przeliczenia: {count}. Salda kont się nie zmienią.",
+        "confirm": "Przelicz"
+      },
+      "colors": {
+        "slate": "Szary",
+        "sky": "Błękitny",
+        "emerald": "Zielony",
+        "amber": "Bursztynowy",
+        "rose": "Różowy",
+        "violet": "Fioletowy"
+      },
+      "recalc": {
+        "title": "Przeliczanie operacji",
+        "running": "Przeliczam… przejrzano operacji: {scanned}",
+        "done": "Gotowe. Przejrzano operacji: {scanned}",
+        "failed": "Nie udało się dokończyć przeliczania. Kliknij „Kontynuuj” później."
+      },
+      "errors": {
+        "invalid": "Sprawdź nazwę tagu",
+        "duplicate": "Tag o tej nazwie już istnieje",
+        "limit": "Osiągnięto limit: 100 tagów na firmę",
+        "gone": "Ten tag już nie istnieje",
+        "save": "Nie udało się zapisać tagu"
+      },
+      "picker": {
+        "label": "Tagi",
+        "placeholder": "Zacznij wpisywać nazwę tagu",
+        "create": "Utwórz „{name}”",
+        "noMatches": "Nie znaleziono tagów",
+        "remove": "Usuń tag „{name}”",
+        "full": "Nie więcej niż {max} tagów",
+        "excluded": "nie wliczany do analityki"
+      }
     }
   },
   "analytics": {

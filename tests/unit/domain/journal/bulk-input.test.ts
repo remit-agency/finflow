@@ -28,4 +28,23 @@ describe('parseBulkRequest', () => {
     invalid({ action: 'delete', ids: ['a'], patch: { description: 'x' } })
     invalid({ action: 'update', ids: ['a'], patch: { paymentDate: null } })
   })
+
+  it('accepts a tag change (S10t): add, remove or both', () => {
+    expect(parseBulkRequest({ action: 'update', ids: ['a'], patch: { addTagIds: ['vat'] } })).toEqual({ action: 'update', ids: ['a'], patch: { addTagIds: ['vat'] } })
+    expect(parseBulkRequest({ action: 'update', ids: ['a'], patch: { addTagIds: ['vat'], removeTagIds: ['q4'] } })).toEqual({
+      action: 'update',
+      ids: ['a'],
+      patch: { addTagIds: ['vat'], removeTagIds: ['q4'] },
+    })
+  })
+
+  it('refuses a tag change mixed with other fields, empty or oversized lists, repeats and an id in both lists', () => {
+    invalid({ action: 'update', ids: ['a'], patch: { addTagIds: ['vat'], description: 'x' } })
+    invalid({ action: 'update', ids: ['a'], patch: { addTagIds: [] } })
+    invalid({ action: 'update', ids: ['a'], patch: { addTagIds: Array.from({ length: 11 }, (_, i) => `t${i}`) } })
+    invalid({ action: 'update', ids: ['a'], patch: { removeTagIds: ['vat', 'vat'] } })
+    invalid({ action: 'update', ids: ['a'], patch: { addTagIds: ['a/b'] } })
+    invalid({ action: 'update', ids: ['a'], patch: { addTagIds: ['vat'], removeTagIds: ['vat'] } })
+    invalid({ action: 'update', ids: ['a'], patch: { tags: ['vat'] } })
+  })
 })

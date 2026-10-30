@@ -41,6 +41,8 @@ export type RuleCondition = TextCondition | AccountCondition | AmountCondition
 export interface RuleActions {
   categoryId?: string
   counterpartyId?: string
+  /** Tags the rule adds (S10t), 1-5 ids: added to what the operation has, never replacing or removing a tag. */
+  tagIds?: string[]
 }
 
 export interface Rule {
@@ -72,17 +74,24 @@ export interface RuleOperation {
   description?: string
   categoryId?: string
   counterpartyId?: string
+  /** The tags the operation has (S10t). */
+  tagIds?: readonly string[]
 }
 
-/** What the rules give one operation: only empty fields, and only the rules that really filled one. */
+/** What the rules give one operation: only empty fields, tags added to its own, and only the rules that really gave something. */
 export interface RuleOutcome {
   categoryId?: string
   counterpartyId?: string
+  /** The whole new tag list (the operation's own tags first) when the rules add at least one (S10t). */
+  tagIds?: string[]
   applied: AutoRuleRef[]
 }
 
-/** An action that cannot work: the category was deleted or has the other type, the counterparty is gone or archived. */
-export type UnusableAction = 'category' | 'counterparty'
+/**
+ * An action that cannot work: the category was deleted or has the other type, the counterparty is gone or archived,
+ * one of the tags is gone or archived (S10t).
+ */
+export type UnusableAction = 'category' | 'counterparty' | 'tags'
 
 /** What the rules' actions point at, as read from Firestore. */
 export interface ActionTargets {
@@ -90,6 +99,8 @@ export interface ActionTargets {
   categories: ReadonlyMap<string, RuleType>
   /** Existing counterparties by id. */
   counterparties: ReadonlyMap<string, { archived: boolean }>
+  /** Existing tags by id (S10t). */
+  tags: ReadonlyMap<string, { archived: boolean }>
 }
 
 /** A rule as `GET /rules` lists it. */
@@ -101,6 +112,8 @@ export interface CheckStepResult {
   matchOps: number
   categories: number
   counterparties: number
+  /** Operations that would get at least one tag (S10t). */
+  tags: number
   done: boolean
   cursor: string | null
 }

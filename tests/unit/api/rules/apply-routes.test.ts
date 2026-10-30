@@ -15,7 +15,7 @@ vi.mock('@/lib/server/rules', () => ({
 
 const RULE = { name: 'Paliwo', type: 'expense', conditions: [{ kind: 'text', op: 'contains', values: ['orlen'] }], actions: { categoryId: 'k-fuel' } }
 const KEY = { paymentDate: '2026-10-20', createdAtS: 1_790_000_000, createdAtN: 0, id: 't1' }
-const CHECKED = { scanned: 200, matchOps: 3, categories: 3, counterparties: 0, done: false, cursor: 'c1' }
+const CHECKED = { scanned: 200, matchOps: 3, categories: 3, counterparties: 0, tags: 0, done: false, cursor: 'c1' }
 const APPLIED = { scanned: 40, changed: 25, failed: 0, done: false, cursor: 'c2' }
 
 function req(path: string, body: unknown, token: string | null = 'token-alice'): Request {

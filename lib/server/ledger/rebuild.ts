@@ -1,11 +1,12 @@
-import { Timestamp, type WriteBatch } from 'firebase-admin/firestore'
+import { FieldValue, Timestamp, type WriteBatch } from 'firebase-admin/firestore'
 import { computeLedger } from '@/lib/domain/ledger/expected'
 import { nest } from '@/lib/domain/ledger/rollups'
+import { excludedFromTags } from '@/lib/domain/tags/exclude'
 import { auditData } from './audit'
 import type { LedgerDeps } from './deps'
 import { acquireLock, releaseLock, renewLock } from './lock'
-import { accountsCol, auditCol, rollupsCol } from './paths'
-import { buildReport, loadLedger, verifyLedger, type LedgerReport } from './verify'
+import { accountsCol, auditCol, rollupsCol, transactionsCol } from './paths'
+import { buildReport, loadLedger, verifyLedger, withTagFlags, type LedgerReport } from './verify'
 
 const BATCH_SIZE = 400
 
@@ -15,8 +16,9 @@ export interface RebuildResult extends LedgerReport {
 
 /**
  * Dry run (`apply: false`) = verifyLedger. With `apply: true`: takes the ledger lock (writes answer
- * ledger_busy meanwhile), recomputes balances and rollups from the operations, overwrites what differs,
- * deletes stale rollup documents and writes an audit entry. The returned report describes what was found.
+ * ledger_busy meanwhile), recomputes balances and rollups from the operations (their `excluded` taken from the tags as
+ * they are now, S10t), overwrites what differs, sets the stored `excluded` flags again, deletes stale rollup documents
+ * and writes an audit entry. The returned report describes what was found.
  */
 export async function rebuildLedger(
   deps: LedgerDeps,
@@ -30,7 +32,7 @@ export async function rebuildLedger(
   const token = opts.lock ?? (await acquireLock(deps, orgId, uid))
   try {
     const data = await loadLedger(deps, orgId)
-    const expected = computeLedger(data.accounts, data.txs, data.baseCurrency)
+    const expected = computeLedger(data.accounts, withTagFlags(data), data.baseCurrency)
     const report = buildReport(data, expected)
     const ts = Timestamp.fromDate(deps.now())
 
@@ -46,6 +48,13 @@ export async function rebuildLedger(
     for (const [id, flat] of expected.rollups) {
       ops.push((b) => b.set(rollupsCol(deps.db, orgId).doc(id), nest(flat)))
     }
+    // S10t: the stored flag follows the tags again (the rollups above already count it so).
+    for (const tx of data.txs) {
+      const want = excludedFromTags(tx.tags, data.tags)
+      if (want !== (tx.excluded === true)) {
+        ops.push((b) => b.update(transactionsCol(deps.db, orgId).doc(tx.id), { excluded: want ? true : FieldValue.delete() }))
+      }
+    }
     ops.push((b) =>
       b.create(
         auditCol(deps.db, orgId).doc(),
@@ -53,6 +62,7 @@ export async function rebuildLedger(
           balanceDiffs: report.balanceDiffs.length,
           rollupDiffs: report.rollupDiffs.length,
           uncountable: report.uncountable.length,
+          excludedDiffs: report.excludedDiffs.length,
         }),
       ),
     )

@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Plus, Trash2 } from 'lucide-react'
 import { CounterpartyPicker } from '@/components/counterparties/CounterpartyPicker'
+import { TagPicker } from '@/components/tags/TagPicker'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -17,6 +18,7 @@ import { createRule, deleteRule, previewRule, updateRule } from '@/lib/api/rules
 import type { Counterparty } from '@/lib/domain/counterparties/types'
 import { LEDGER_CURRENCIES } from '@/lib/domain/ledger/types'
 import { MAX_CONDITIONS, TEXT_OPS, type ListedRule, type PreviewResult, type TextOp } from '@/lib/domain/rules/types'
+import { MAX_RULE_TAGS, type Tag } from '@/lib/domain/tags/types'
 import type { Locale } from '@/lib/i18n/config'
 import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import type { Account, Category } from '@/types'
@@ -29,6 +31,8 @@ interface Props {
   incomeCategories: Category[]
   expenseCategories: Category[]
   counterparties: Counterparty[]
+  /** The company's tags (S10t). */
+  tags: Tag[]
   /** The company currency: a new amount condition starts in it ('' while the company loads; the server then fills it). */
   currency: string
   onClose: () => void
@@ -39,7 +43,7 @@ interface Props {
 type Busy = 'save' | 'delete' | 'check' | null
 
 /** The rule editor: name, type, conditions, actions and «Перевірити» against the existing operations. */
-export function RuleEditor({ orgId, rule, accounts, incomeCategories, expenseCategories, counterparties, currency, onClose, onSaved }: Props) {
+export function RuleEditor({ orgId, rule, accounts, incomeCategories, expenseCategories, counterparties, tags, currency, onClose, onSaved }: Props) {
   const t = useTranslations('settings.rules')
   const tCommon = useTranslations('common')
   const locale = useLocale() as Locale
@@ -71,6 +75,8 @@ export function RuleEditor({ orgId, rule, accounts, incomeCategories, expenseCat
     if (code === 'category_not_found') return t('errors.category')
     if (code === 'counterparty_not_found') return t('errors.counterpartyMissing')
     if (code === 'counterparty_archived') return t('errors.counterpartyArchived')
+    if (code === 'tag_not_found') return t('errors.tagMissing')
+    if (code === 'tag_archived') return t('errors.tagArchived')
     if (code === 'limit_reached') return t('errors.limit')
     if (code === 'not_found') return t('errors.gone')
     if (code === 'invalid_input') return t('errors.invalid')
@@ -210,6 +216,11 @@ export function RuleEditor({ orgId, rule, accounts, incomeCategories, expenseCat
                 value={draft.counterpartyId}
                 onChange={(id) => change({ counterpartyId: id })}
               />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="rule-tags">{t('editor.tags')}</Label>
+              <TagPicker id="rule-tags" tags={tags} value={draft.tagIds} onChange={(ids) => change({ tagIds: ids })} max={MAX_RULE_TAGS} />
+              <p className="text-xs text-ink-muted">{t('editor.tagsHint')}</p>
             </div>
           </fieldset>
 

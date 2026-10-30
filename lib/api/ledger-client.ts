@@ -1,4 +1,4 @@
-import { fullPatch } from '@/lib/domain/ledger/input'
+import { fullPatch, RESTORE_MARKER } from '@/lib/domain/ledger/input'
 import { toMinor } from '@/lib/domain/ledger/money'
 import { notifyLedgerChanged } from './ledger-events'
 import type { Accrual, AccountType, TxStatus, TxType } from '@/lib/domain/ledger/types'
@@ -105,8 +105,10 @@ export async function createTransaction(orgId: string, draft: TransactionDraft, 
   return out.transaction.id
 }
 
-export async function updateTransaction(orgId: string, txId: string, draft: TransactionDraft): Promise<void> {
-  await call('PATCH', `${org(orgId)}/transactions/${encodeURIComponent(txId)}`, draftToPatch(draft))
+/** `restore`: the write puts a previous state back (the undo), so the server may take back a tag archived since (S10t). */
+export async function updateTransaction(orgId: string, txId: string, draft: TransactionDraft, opts: { restore?: boolean } = {}): Promise<void> {
+  const query = opts.restore === true ? `?${RESTORE_MARKER}=1` : ''
+  await call('PATCH', `${org(orgId)}/transactions/${encodeURIComponent(txId)}${query}`, draftToPatch(draft))
   notifyLedgerChanged()
 }
 

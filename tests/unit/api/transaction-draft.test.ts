@@ -34,14 +34,15 @@ const form = (over: Partial<FormOwnedDraft> = {}): FormOwnedDraft => ({
   amount: 120.5,
   paymentDate: '2026-10-20',
   isRecurring: false,
+  tags: [],
   ...over,
 })
 
 describe('buildEditDraft', () => {
-  it('carries only what the form does not show: project, tags and files', () => {
+  it('carries only what the form does not show: project and files; the tags come from the form (S10t)', () => {
     const tx = stored({ projectId: 'p1', tags: ['q4'], fileUrls: ['https://x/f.pdf'], counterpartyId: 'c-old' })
-    const draft = buildEditDraft(tx, form({ amount: 99 }))
-    expect(draft).toMatchObject({ amount: 99, projectId: 'p1', tags: ['q4'], fileUrls: ['https://x/f.pdf'] })
+    const draft = buildEditDraft(tx, form({ amount: 99, tags: ['vat'] }))
+    expect(draft).toMatchObject({ amount: 99, projectId: 'p1', tags: ['vat'], fileUrls: ['https://x/f.pdf'] })
     // the counterparty and accrual now come from the form, never from the stored operation
     expect(draft.counterpartyId).toBeUndefined()
     expect(draft.accrual).toBeUndefined()
@@ -59,25 +60,23 @@ describe('buildEditDraft', () => {
     })
   })
 
-  it('lets the form clear what it owns (category, description, counterparty)', () => {
-    const tx = stored({ categoryId: 'c1', description: 'x', counterpartyId: 'cp1' })
+  it('lets the form clear what it owns (category, description, counterparty, tags)', () => {
+    const tx = stored({ categoryId: 'c1', description: 'x', counterpartyId: 'cp1', tags: ['q4'] })
     const patch = draftToPatch(buildEditDraft(tx, form({})))
-    expect(patch).toMatchObject({ categoryId: null, description: null, counterpartyId: null })
+    expect(patch).toMatchObject({ categoryId: null, description: null, counterpartyId: null, tags: [] })
   })
 
-  it('does not mutate the stored operation through the carried arrays', () => {
-    const tx = stored({ tags: ['a'], fileUrls: ['u'] })
+  it('does not mutate the stored operation through the carried files', () => {
+    const tx = stored({ fileUrls: ['u'] })
     const draft = buildEditDraft(tx, form({}))
-    draft.tags.push('b')
     draft.fileUrls.push('v')
-    expect(tx.tags).toEqual(['a'])
     expect(tx.fileUrls).toEqual(['u'])
   })
 })
 
 describe('buildCreateDraft', () => {
-  it('starts a new operation with no tags or files', () => {
-    expect(buildCreateDraft(form({ amount: 250 }))).toMatchObject({ amount: 250, tags: [], fileUrls: [] })
+  it('starts a new operation with the tags the form chose and no files', () => {
+    expect(buildCreateDraft(form({ amount: 250, tags: ['vat'] }))).toMatchObject({ amount: 250, tags: ['vat'], fileUrls: [] })
   })
 })
 
@@ -98,7 +97,7 @@ describe('stateToDraft', () => {
     ...over,
   })
 
-  it('an expense: parsed amount, category, counterparty, trimmed description', () => {
+  it('an expense: parsed amount, category, counterparty, trimmed description, no tags', () => {
     expect(
       stateToDraft(state({ categoryId: 'c1', counterpartyId: 'cp1', description: '  Czynsz ' }), {
         today: '2026-10-28',
@@ -111,10 +110,19 @@ describe('stateToDraft', () => {
       amount: 1234.5,
       paymentDate: '2026-10-28',
       isRecurring: false,
+      tags: [],
       categoryId: 'c1',
       counterpartyId: 'cp1',
       description: 'Czynsz',
     })
+  })
+
+  it('sends the chosen tags in their order, for a transfer too, without sharing the array', () => {
+    const tagIds = ['vat', 'q4']
+    const draft = stateToDraft(state({ type: 'transfer', toAccountId: 'a2', tagIds }), { today: '2026-10-28', crossCurrency: false })
+    expect(draft.tags).toEqual(['vat', 'q4'])
+    draft.tags.push('x')
+    expect(tagIds).toEqual(['vat', 'q4'])
   })
 
   it('a future payment date is sent as planned, whatever was chosen', () => {
@@ -149,8 +157,8 @@ describe('stateToDraft', () => {
 })
 
 describe('an unchanged edit', () => {
-  // Saving the form without touching anything must send exactly what undo would restore: the form-owned fields go
-  // through the state and back, the rest (project, tags, files) is carried from the stored operation on both sides.
+  // Saving the form without touching anything must send exactly what undo would restore: the form-owned fields (tags
+  // included) go through the state and back, the rest (project, files) is carried from the stored operation on both sides.
   const options = { today: '2026-10-28', crossCurrency: false }
   const unchanged = (tx: Transaction) =>
     buildEditDraft(
@@ -161,13 +169,13 @@ describe('an unchanged edit', () => {
       ),
     )
 
-  it('an expense with counterparty, period accrual, category and description round-trips', () => {
+  it('an expense with counterparty, period accrual, category, description and tags round-trips', () => {
     const tx = stored({
       categoryId: 'c1',
       counterpartyId: 'cp1',
       description: 'Czynsz',
       projectId: 'p1',
-      tags: ['q4'],
+      tags: ['q4', 'vat'],
       fileUrls: ['https://x/f.pdf'],
       accrual: { mode: 'period', from: '2026-10-01', to: '2026-12-31' },
     })

@@ -4,10 +4,12 @@ import { encodeCursor, type JournalKey } from '@/lib/domain/journal/order'
 import { parseTransaction } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import type { TransactionPatch } from '@/lib/domain/ledger/input'
+import type { LedgerTransaction } from '@/lib/domain/ledger/types'
 import { RuleError } from '@/lib/domain/rules/errors'
 import { withCurrency, type RuleInput } from '@/lib/domain/rules/input'
 import { applyRules, ruleOperationOf } from '@/lib/domain/rules/match'
 import type { ApplyStepResult, CheckStepResult, PreviewResult, Rule } from '@/lib/domain/rules/types'
+import { MAX_TX_TAGS } from '@/lib/domain/tags/types'
 import { FxError } from '@/lib/server/fx/types'
 import { keyOf } from '@/lib/server/journal/read'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
@@ -51,7 +53,7 @@ function finish(docs: number, size: number, last: JournalKey | null, cursor: Jou
 /** One step of `check`: what the rules would fill among the next SCAN_PER_STEP operations. Writes nothing. */
 export async function checkStep(deps: LedgerDeps, orgId: string, cursor: JournalKey | null, limits: StepLimits = {}): Promise<CheckStepResult> {
   const rules = await loadUsableRules(deps.db, orgId)
-  const empty = { scanned: 0, matchOps: 0, categories: 0, counterparties: 0 }
+  const empty = { scanned: 0, matchOps: 0, categories: 0, counterparties: 0, tags: 0 }
   if (rules.length === 0) return { ...empty, done: true, cursor: null }
   const size = limits.scan ?? SCAN_PER_STEP
   const docs = await readChunk(deps, orgId, cursor, size)
@@ -67,6 +69,7 @@ export async function checkStep(deps: LedgerDeps, orgId: string, cursor: Journal
     counts.matchOps++
     if (outcome.categoryId !== undefined) counts.categories++
     if (outcome.counterpartyId !== undefined) counts.counterparties++
+    if (outcome.tagIds !== undefined) counts.tags++
   }
   return { ...counts, ...finish(docs.length, size, last, cursor) }
 }
@@ -101,6 +104,7 @@ export async function applyStep(deps: LedgerDeps, orgId: string, uid: string, cu
     const patch: TransactionPatch = {}
     if (outcome.categoryId !== undefined) patch.categoryId = outcome.categoryId
     if (outcome.counterpartyId !== undefined) patch.counterpartyId = outcome.counterpartyId
+    if (outcome.tagIds !== undefined) patch.tags = outcome.tagIds
     try {
       await updateTransaction(deps, orgId, uid, tx.id, patch, { autoRules: outcome.applied, expectVersion: d.updateTime })
       changed++
@@ -113,10 +117,16 @@ export async function applyStep(deps: LedgerDeps, orgId: string, uid: string, cu
   return { scanned, changed, failed, ...finish(docs.length, size, last, cursor) }
 }
 
+/** An operation the draft rule could give something: an empty category or counterparty, or room for a tag of the rule it lacks (S10t). */
+function couldGive(rule: Rule, tx: LedgerTransaction): boolean {
+  if (tx.categoryId === undefined || tx.counterpartyId === undefined) return true
+  return tx.tags.length < MAX_TX_TAGS && (rule.actions.tagIds ?? []).some((id) => !tx.tags.includes(id))
+}
+
 /**
- * «Перевірити»: reads the latest `cap` operations in one query and counts, among the ones without a category or a
- * counterparty, how many the draft rule would fill. Firestore cannot ask for a missing field, so the cap applies to
- * the operations read; `capped` says the query was full. Writes nothing; the rule's `active` is ignored.
+ * «Перевірити»: reads the latest `cap` operations in one query and counts, among the ones the draft rule could give
+ * something (`couldGive`), how many it would. Firestore cannot ask for a missing field, so the cap applies to the
+ * operations read; `capped` says the query was full. Writes nothing; the rule's `active` is ignored.
  */
 export async function previewRule(deps: LedgerDeps, orgId: string, input: RuleInput, cap = PREVIEW_CAP): Promise<PreviewResult> {
   const org = await orgRef(deps.db, orgId).get()
@@ -136,7 +146,7 @@ export async function previewRule(deps: LedgerDeps, orgId: string, input: RuleIn
   let matched = 0
   for (const d of snap.docs) {
     const tx = parseTransaction(d.id, d.data())
-    if (tx === null || tx.type === 'transfer' || (tx.categoryId !== undefined && tx.counterpartyId !== undefined)) continue
+    if (tx === null || tx.type === 'transfer' || !couldGive(rule, tx)) continue
     scanned++
     if (applyRules([rule], ruleOperationOf(tx)).applied.length > 0) matched++
   }

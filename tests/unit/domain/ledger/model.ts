@@ -73,7 +73,10 @@ export function randomTx(r: () => number, id: string): LedgerTransaction | null 
       baseCurrency: BASE,
     })
     const plan = fxPlan(built, BASE, TODAY)
-    return attachFx(built, plan, plan.map((p) => fakeEvidence(p.from, p.to, p.date)))
+    const tx = attachFx(built, plan, plan.map((p) => fakeEvidence(p.from, p.to, p.date)))
+    // S10t: about one operation in four is excluded from analytics. The ledger computes the flag from the tags; the
+    // model takes it as given, so an update may switch it.
+    return r() < 0.25 ? { ...tx, excluded: true } : tx
   } catch (e) {
     if (e instanceof LedgerError) return null
     throw e

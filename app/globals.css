@@ -78,6 +78,13 @@
   --color-income: #00805c;
   --color-expense: #d02222;
   --color-expense-soft: #fdecec;
+  /* Tag palette (S10t): the dots of TAG_COLORS (lib/ui/tag-colors.ts); marks next to a name, never text. */
+  --color-tag-slate: #64748b;
+  --color-tag-sky: #0284c7;
+  --color-tag-emerald: #059669;
+  --color-tag-amber: #d97706;
+  --color-tag-rose: #e11d48;
+  --color-tag-violet: #7c3aed;
   --radius-control: 8px;
   --radius-field: 10px;
   --radius-panel: 12px;
