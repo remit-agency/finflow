@@ -21,6 +21,7 @@ import { mostFrequentCode, selectionSummary, type BulkPatch } from '@/lib/domain
 import { fromMinor } from '@/lib/domain/ledger/money'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
 import { pairKeyOf } from '@/lib/domain/transfers/dismissed'
+import { bankLinkedIds } from '@/lib/domain/transfers/targets'
 import { convertSourceOf, mergePairOf } from '@/lib/domain/transfers/selection'
 import type { FailedOutcome, MadeOutcome, TransferOutcome, TransferSuggestion } from '@/lib/domain/transfers/types'
 import { toUiTransaction } from '@/lib/firebase/ledger-map'
@@ -29,6 +30,7 @@ import { useJournal } from '@/lib/hooks/useJournal'
 import { useJournalSelection } from '@/lib/hooks/useJournalSelection'
 import { useShell } from '@/lib/hooks/useShell'
 import { useTags } from '@/lib/hooks/useTags'
+import { useBankStatus } from '@/lib/hooks/useBankStatus'
 import { useTransferSuggestions } from '@/lib/hooks/useTransferSuggestions'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { PAGE_CONTAINER } from '@/lib/ui/layout'
@@ -105,6 +107,8 @@ export default function TransactionsPage() {
 
   // «Зробити переказом» and «Об’єднати в переказ» are offered only for a selection the ledger's own rules accept.
   const [convertOpen, setConvertOpen] = useState(false)
+  // The bank links of the company, read only while the dialog is open: the accounts a bank feeds are not offered (owners only).
+  const bankStatus = useBankStatus(orgId, canEdit && convertOpen)
   const convertSource = useMemo(() => convertSourceOf(selectedRows), [selectedRows])
   const mergePair = useMemo(() => mergePairOf(selectedRows), [selectedRows])
   const sourceAccount = convertSource ? (accounts.find((a) => a.id === convertSource.accountId) ?? null) : null
@@ -257,13 +261,13 @@ export default function TransactionsPage() {
 
   // One toast for every transfer action (S10b): what was made, what failed and why, the tags that did not fit. «Скасувати»
   // splits what was made and writes its operations back as they were.
-  const announceTransfers = (results: TransferOutcome[], message: string) => {
+  const announceTransfers = (results: TransferOutcome[], message: string, reasonOf: (failed: FailedOutcome[]) => string = failureReason) => {
     const made = results.filter((r): r is MadeOutcome => r.ok)
     const failed = results.filter((r): r is FailedOutcome => !r.ok)
     const dropped = made.reduce((sum, r) => sum + r.droppedTags, 0)
     const text = [
       message,
-      failed.length > 0 ? tTransfers('partial', { count: failed.length, reason: failureReason(failed) }) : '',
+      failed.length > 0 ? tTransfers('partial', { count: failed.length, reason: reasonOf(failed) }) : '',
       dropped > 0 ? tTransfers('droppedTags', { count: dropped }) : '',
     ]
       .filter(Boolean)
@@ -322,7 +326,9 @@ export default function TransactionsPage() {
     setBusy(true)
     try {
       const results = await convertToTransfers(orgId, selectedRows.map((r) => r.id), toAccountId)
-      announceTransfers(results, tTransfers('converted', { ok: results.filter((r) => r.ok).length, total: results.length }))
+      // The rows offered are bank operations, so a refused conversion is the other account being one a bank feeds.
+      const convertReason = (failed: FailedOutcome[]) => (mostFrequentCode(failed) === 'not_eligible' ? tTransfers('convertNotEligible') : failureReason(failed))
+      announceTransfers(results, tTransfers('converted', { ok: results.filter((r) => r.ok).length, total: results.length }), convertReason)
       clearSelection()
       setConvertOpen(false)
     } catch {
@@ -459,6 +465,7 @@ export default function TransactionsPage() {
         <ConvertTransferDialog
           source={sourceAccount}
           accounts={accounts}
+          linked={bankLinkedIds(bankStatus.status?.accounts)}
           count={selectedRows.length}
           busy={busy}
           onApply={(toAccountId) => void convertSelected(toAccountId)}

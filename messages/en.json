@@ -422,6 +422,7 @@
       "convertTarget": "Account",
       "convertChoose": "Choose an account",
       "convertNoTarget": "There is no other account in {currency}.",
+      "convertNotEligible": "An account linked to a bank cannot be the other side of a transfer. Choose another account.",
       "convertApply": "Make a transfer",
       "convertCancel": "Cancel",
       "converted": "Turned into transfers: {ok} of {total}.",

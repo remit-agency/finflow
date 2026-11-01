@@ -422,6 +422,7 @@
       "convertTarget": "Konto",
       "convertChoose": "Wybierz konto",
       "convertNoTarget": "Brak innego konta w walucie {currency}.",
+      "convertNotEligible": "Konta powiązanego z bankiem nie można wybrać jako drugiej strony przelewu. Wybierz inne konto.",
       "convertApply": "Zamień na przelew",
       "convertCancel": "Anuluj",
       "converted": "Zamieniono na przelewy: {ok} z {total}.",

@@ -422,6 +422,7 @@
       "convertTarget": "Рахунок",
       "convertChoose": "Оберіть рахунок",
       "convertNoTarget": "Немає іншого рахунку у валюті {currency}.",
+      "convertNotEligible": "Рахунок, прив’язаний до банку, не може бути другою стороною переказу. Оберіть інший рахунок.",
       "convertApply": "Зробити переказом",
       "convertCancel": "Скасувати",
       "converted": "Перетворено на перекази: {ok} з {total}.",
