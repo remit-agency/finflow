@@ -23,3 +23,10 @@ export function changeSet(prior: LedgerTransaction | null, next: LedgerTransacti
   if (prior) addInto(rollupDeltas, contributions(prior, baseCurrency, -1))
   return { balanceDeltas, rollupDeltas }
 }
+
+/** Several change sets written by one transaction as one (S10b: a transfer and the operation it absorbed, or split off). */
+export function combineChanges(...parts: ChangeSet[]): ChangeSet {
+  const rollupDeltas: RollupDocs = new Map()
+  for (const part of parts) addInto(rollupDeltas, part.rollupDeltas)
+  return { balanceDeltas: mergeEffects(...parts.map((part) => part.balanceDeltas)), rollupDeltas }
+}

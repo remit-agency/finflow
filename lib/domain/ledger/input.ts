@@ -7,6 +7,8 @@ import { MAX_TX_TAGS } from '@/lib/domain/tags/types'
 
 export const MAX_PERIOD_MONTHS = 36
 export const MIN_DAY = '2000-01-01'
+/** Files one operation keeps at most. */
+export const MAX_FILE_URLS = 10
 
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/
 const RESERVED = /^__.*__$/
@@ -127,7 +129,7 @@ export function parseTransactionInput(body: unknown, opts?: ParseOptions): Trans
     accrual: { mode: 'date', date: paymentDate },
     isRecurring: false,
     tags: tagList(r.tags),
-    fileUrls: stringList(r.fileUrls, 'fileUrls', 10, 2048),
+    fileUrls: stringList(r.fileUrls, 'fileUrls', MAX_FILE_URLS, 2048),
   }
   if (r.clientId !== undefined) out.clientId = r.clientId as string
 
