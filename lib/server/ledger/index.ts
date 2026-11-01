@@ -10,7 +10,7 @@ import { createAccount, deleteAccount, updateAccount } from './accounts'
 import type { LedgerDeps } from './deps'
 import { updateOrganization } from './org'
 import { rebuildLedger } from './rebuild'
-import { makeTransfer, type TransferJob } from './transfer'
+import { makeTransfer, splitTransfer, type TransferJob } from './transfer'
 import { createTransaction, deleteTransaction, retagTransaction, updateTransaction, type WriteExtras } from './write'
 
 export type { LedgerReport } from './verify'
@@ -28,6 +28,7 @@ export const ledger = {
   deleteTransaction: (orgId: string, uid: string, txId: string) => deleteTransaction(ledgerDeps(), orgId, uid, txId),
   retagTransaction: (orgId: string, uid: string, txId: string, change: TagChange) => retagTransaction(ledgerDeps(), orgId, uid, txId, change),
   makeTransfer: (orgId: string, uid: string, job: TransferJob) => makeTransfer(ledgerDeps(), orgId, uid, job),
+  splitTransfer: (orgId: string, uid: string, txId: string) => splitTransfer(ledgerDeps(), orgId, uid, txId),
   createAccount: (orgId: string, uid: string, input: AccountInput) => createAccount(ledgerDeps(), orgId, uid, input),
   updateAccount: (orgId: string, uid: string, accountId: string, patch: AccountPatch) => updateAccount(ledgerDeps(), orgId, uid, accountId, patch),
   deleteAccount: (orgId: string, uid: string, accountId: string) => deleteAccount(ledgerDeps(), orgId, uid, accountId),

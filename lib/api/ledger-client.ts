@@ -98,9 +98,17 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
 
 const org = (orgId: string) => `/api/orgs/${encodeURIComponent(orgId)}`
 
+/** What only the undo of a deleted bank transfer adds to a create (S10b); the server checks both against the bank's marks. */
+export interface BankRestore {
+  /** The arrival day, when the receiving bank booked it on another day than the payment day. */
+  toDate?: string
+  /** The bank key of the incoming side of a transfer that has both bank sides. */
+  bankToKey?: string
+}
+
 /** `clientId` makes a retry or a double click create the operation once. */
-export async function createTransaction(orgId: string, draft: TransactionDraft, clientId?: string): Promise<string> {
-  const out = (await call('POST', `${org(orgId)}/transactions`, draftToBody(draft, clientId))) as { transaction: { id: string } }
+export async function createTransaction(orgId: string, draft: TransactionDraft, clientId?: string, restore: BankRestore = {}): Promise<string> {
+  const out = (await call('POST', `${org(orgId)}/transactions`, { ...draftToBody(draft, clientId), ...restore })) as { transaction: { id: string } }
   notifyLedgerChanged()
   return out.transaction.id
 }

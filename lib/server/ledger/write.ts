@@ -1,12 +1,12 @@
 import { FieldValue, Timestamp, type DocumentSnapshot, type Firestore, type Transaction } from 'firebase-admin/firestore'
 import { attachFx, buildTransaction, fxPlan } from '@/lib/domain/ledger/build'
-import { assertBankUnlocked } from '@/lib/domain/ledger/bank-lock'
+import { assertBankUnlocked, withBankSides } from '@/lib/domain/ledger/bank-lock'
 import { changeSet, type ChangeSet } from '@/lib/domain/ledger/change'
-import { parseAccount, parseTransaction, transactionToDoc } from '@/lib/domain/ledger/doc'
+import { parseAccount, parseBankInfo, parseTransaction, transactionToDoc } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import { applyPatch, BANK_CLIENT_ID_PREFIX, toRawInput, type TransactionInput, type TransactionPatch } from '@/lib/domain/ledger/input'
 import { nest } from '@/lib/domain/ledger/rollups'
-import type { AutoRuleRef, BankInfo, LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
+import type { AutoRuleRef, BankInfo, BankToInfo, LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
 import { mergeTags, sameTags, type TagChange } from '@/lib/domain/tags/assign'
 import { excludedFromTags, tagFlagsOf, withExcluded } from '@/lib/domain/tags/exclude'
 import type { RateSnapshot } from '@/lib/server/fx/types'
@@ -228,37 +228,76 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
-/** The `bank` block of a bank mark, or null when the mark has none (a failed import) or it cannot be read. */
-function readBankBlock(v: unknown): BankInfo | null {
-  if (!isRecord(v) || typeof v.accountRef !== 'string') return null
-  const bank: BankInfo = { accountRef: v.accountRef }
-  if (typeof v.entryReference === 'string') bank.entryReference = v.entryReference
-  if (typeof v.counterpartyName === 'string') bank.counterpartyName = v.counterpartyName
-  if (typeof v.remittance === 'string') bank.remittance = v.remittance
-  return bank
+/** The bank blocks a create under a bank id takes from the bank's own marks (S09; transfers S10b). */
+interface BankSides {
+  bank?: BankInfo
+  bankTo?: BankToInfo
+}
+
+function refuseBankId(): never {
+  throw new LedgerError('invalid_input', 'clientId')
+}
+
+/** The bank's mark of one imported operation: its bank block and the locked fields of the import; null without them (a failed import). */
+async function readMark(deps: LedgerDeps, orgId: string, key: string): Promise<{ bank: BankInfo; snapshot: Record<string, unknown> } | null> {
+  const snap = await orgRef(deps.db, orgId).collection('bankSeen').doc(key).get()
+  const mark = snap.exists ? snap.data() : undefined
+  const bank = parseBankInfo(mark?.bank)
+  return bank !== null && isRecord(mark?.snapshot) ? { bank, snapshot: mark.snapshot } : null
+}
+
+/** The import a mark records was this one: type, account, amount and payment day. */
+function imported(s: Record<string, unknown>, type: string, accountId: string, amountMinor: number, paymentDate: string): boolean {
+  return s.type === type && s.accountId === accountId && s.amountMinor === amountMinor && s.paymentDate === paymentDate
 }
 
 /**
- * The provenance of a create whose id is a bank operation id (`bk_` + key). Only the bank's own mark for that key
- * (`bankSeen/{key}`, written by the sync at import) can say what the operation was. The create must repeat the
- * locked fields of that import (type, account, amount, payment date) and be an actual operation, otherwise it is
- * refused. This is how an undo of a deleted bank operation comes back with its bank block, and how a client cannot
- * make one. Ids without the prefix return undefined (an ordinary create).
+ * A bank side about to come back must not live on already (S10b): neither as its own operation nor as the incoming side of
+ * another transfer. `selfId` is the operation being created; it may hold the key itself (a replay of the same create,
+ * which `commit` answers with the stored operation).
  */
-async function bankProvenanceOf(deps: LedgerDeps, orgId: string, input: TransactionInput): Promise<BankInfo | undefined> {
+async function assertSideFree(deps: LedgerDeps, orgId: string, key: string, selfId: string): Promise<void> {
+  const ownId = `${BANK_CLIENT_ID_PREFIX}${key}`
+  if (ownId !== selfId && (await transactionsCol(deps.db, orgId).doc(ownId).get()).exists) refuseBankId()
+  const holders = await transactionsCol(deps.db, orgId).where('bankTo.key', '==', key).limit(2).get()
+  if (holders.docs.some((d) => d.id !== selfId)) refuseBankId()
+}
+
+/**
+ * The provenance of a create whose id is a bank operation id (`bk_` + key). Only the bank's own marks (`bankSeen/{key}`,
+ * written by the sync at import) can say what the operation was: the create must repeat the locked fields of that import
+ * and be an actual operation, otherwise it is refused (`invalid_input` on `clientId`). This is how an undo of a deleted bank
+ * operation comes back with its bank block, and how a client cannot make one. A transfer (S10b) comes back the same way:
+ * its outgoing side is the expense its own id was imported as, its incoming side the income of `bankToKey` on
+ * `toAccountId` with `toAmountMinor` on `toDate ?? paymentDate` (a deposit, whose only bank side is the incoming one, is the
+ * income its own id was imported as). A side that lives on already is refused, so nothing counts a bank operation twice.
+ * Ids without the prefix return undefined (an ordinary create).
+ */
+async function bankSidesOf(deps: LedgerDeps, orgId: string, input: TransactionInput): Promise<BankSides | undefined> {
   const clientId = input.clientId
   if (clientId === undefined || !clientId.startsWith(BANK_CLIENT_ID_PREFIX)) return undefined
-  const snap = await orgRef(deps.db, orgId).collection('bankSeen').doc(clientId.slice(BANK_CLIENT_ID_PREFIX.length)).get()
-  const mark = snap.exists ? snap.data() : undefined
-  const bank = readBankBlock(mark?.bank)
-  const s = isRecord(mark?.snapshot) ? mark.snapshot : null
-  const sameImport = s !== null
-    && s.type === input.type
-    && s.accountId === input.accountId
-    && s.amountMinor === input.amountMinor
-    && s.paymentDate === input.paymentDate
-  if (bank === null || !sameImport || input.status !== 'actual') throw new LedgerError('invalid_input', 'clientId')
-  return bank
+  if (input.status !== 'actual') refuseBankId()
+  const key = clientId.slice(BANK_CLIENT_ID_PREFIX.length)
+  const own = await readMark(deps, orgId, key)
+  if (own === null) refuseBankId()
+  if (input.type !== 'transfer') {
+    if (!imported(own.snapshot, input.type, input.accountId, input.amountMinor, input.paymentDate)) refuseBankId()
+    await assertSideFree(deps, orgId, key, clientId)
+    return { bank: own.bank }
+  }
+  const toAccountId = input.toAccountId as string
+  // Between accounts of one currency the amount that arrives is the amount itself (buildTransaction).
+  const toAmountMinor = input.toAmountMinor ?? input.amountMinor
+  if (imported(own.snapshot, 'expense', input.accountId, input.amountMinor, input.paymentDate)) {
+    if (input.bankToKey === undefined) return { bank: own.bank }
+    const other = await readMark(deps, orgId, input.bankToKey)
+    if (other === null || !imported(other.snapshot, 'income', toAccountId, toAmountMinor, input.toDate ?? input.paymentDate)) refuseBankId()
+    await assertSideFree(deps, orgId, input.bankToKey, clientId)
+    return { bank: own.bank, bankTo: { key: input.bankToKey, ...other.bank } }
+  }
+  if (input.bankToKey !== undefined || !imported(own.snapshot, 'income', toAccountId, toAmountMinor, input.paymentDate)) refuseBankId()
+  await assertSideFree(deps, orgId, key, clientId)
+  return { bankTo: { key, ...own.bank } }
 }
 
 export async function createTransaction(
@@ -270,9 +309,9 @@ export async function createTransaction(
   extras: WriteExtras = {},
 ): Promise<WriteResult> {
   const txId = input.clientId ?? transactionsCol(deps.db, orgId).doc().id
-  const provenance = bank ?? (await bankProvenanceOf(deps, orgId, input))
+  const sides = bank !== undefined ? { bank } : await bankSidesOf(deps, orgId, input)
   const next = await prepare(deps, orgId, txId, input)
-  if (provenance !== undefined) next.tx = { ...next.tx, bank: provenance }
+  if (sides !== undefined) next.tx = { ...next.tx, ...sides }
   const autoRules = extras.autoRules ?? []
   if (autoRules.length > 0) next.tx = { ...next.tx, autoRules: autoRules.map((r) => ({ id: r.id, name: r.name })) }
   return commit(deps, orgId, uid, { action: 'tx.create', txId, prior: null, next, via: autoRules.length > 0 ? 'rule' : undefined })
@@ -312,10 +351,12 @@ export async function updateTransaction(
   // The rules read the operation at `expectVersion`: anything a person did since then wins (S10).
   if (extras.expectVersion !== undefined && !prior.version.isEqual(extras.expectVersion)) throw new LedgerError('conflict')
   const next = await prepare(deps, orgId, txId, applyPatch(toRawInput(prior.tx), patch))
-  if (prior.tx.bank !== undefined) {
-    assertBankUnlocked(prior.tx, next.tx)
-    // toRawInput never carries `bank`, so an edit keeps the provenance from the prior document.
-    next.tx = { ...next.tx, bank: prior.tx.bank }
+  if (prior.tx.bank !== undefined || prior.tx.bankTo !== undefined) {
+    // toRawInput never carries the bank blocks or the arrival day (S10b): an edit keeps them from the prior document, and
+    // the lock compares what each bank side fixes.
+    const carried = withBankSides(next.tx, prior.tx)
+    assertBankUnlocked(prior.tx, carried)
+    next.tx = carried
   }
   const given = extras.autoRules ?? []
   // toRawInput never carries `autoRules` either: the trace is decided here.
