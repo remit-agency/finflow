@@ -61,7 +61,8 @@ export function TransferSuggestionsDialog({ pairs, accounts, truncated, busy, fa
 
   return (
     <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
+      {/* The one column may not grow to the widest nowrap line of a pair: a long name would run past the frame on a phone. */}
+      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t('dialogTitle')}</DialogTitle>
           <DialogDescription>{t('dialogBody')}</DialogDescription>
@@ -85,7 +86,7 @@ export function TransferSuggestionsDialog({ pairs, accounts, truncated, busy, fa
                     aria-label={t('pick', { from, to, amount: amountOf(p.from), date: dates })}
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium text-ink">{`${from} → ${to}`}</span>
+                    <span className="block break-words font-medium text-ink">{`${from} → ${to}`}</span>
                     <span className="block text-xs tabular-nums text-ink-muted">{dates}</span>
                     {p.from.remittance && <span className="block truncate text-xs text-ink-muted">{p.from.remittance}</span>}
                   </span>
