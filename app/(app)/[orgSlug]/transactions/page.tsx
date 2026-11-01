@@ -305,6 +305,8 @@ export default function TransactionsPage() {
     try {
       const results = await confirmPairs(orgId, chosen)
       announceTransfers(results, tTransfers('done', { count: results.filter((r) => r.ok).length }))
+      // The pairs that went through leave the dialog now: a second confirmation must not send them again.
+      suggestions.settle(results)
       const failures = new Map<string, string>()
       for (const r of results) if (!r.ok) failures.set(pairKeyOf(r.ids[0], r.ids[1]), errorText(r.code))
       setSuggestFailures(failures)

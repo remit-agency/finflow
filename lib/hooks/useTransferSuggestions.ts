@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchTransferSuggestions, onTransfersChanged } from '@/lib/api/transfers-client'
+import { withoutDone } from '@/lib/domain/transfers/done'
 import { pairKey, readDismissed, withDismissed, writeDismissed } from '@/lib/domain/transfers/dismissed'
-import type { SuggestionsResult, TransferSuggestion } from '@/lib/domain/transfers/types'
+import type { SuggestionsResult, TransferOutcome, TransferSuggestion } from '@/lib/domain/transfers/types'
 import { browserLocalStorage } from '@/lib/shell/sidebar-store'
 
 /** Several transfer actions in a row (an undo of many) read the suggestions once. */
@@ -17,6 +18,8 @@ export interface UseTransferSuggestions {
   dismiss: (pairs: readonly TransferSuggestion[]) => void
   /** Reads the suggestions again (the dialog opens). */
   refresh: () => void
+  /** The pairs that went through leave the list at once; the failed ones stay (the read that follows brings the rest). */
+  settle: (outcomes: readonly TransferOutcome[]) => void
 }
 
 /**
@@ -73,6 +76,11 @@ export function useTransferSuggestions(orgId: string | null): UseTransferSuggest
     [orgId],
   )
   const refresh = useCallback(() => setRound((r) => r + 1), [])
+  const settle = useCallback(
+    (outcomes: readonly TransferOutcome[]) =>
+      setLoaded((prev) => (prev && prev.orgId === orgId ? { ...prev, result: { ...prev.result, pairs: withoutDone(prev.result.pairs, outcomes) } } : prev)),
+    [orgId],
+  )
 
-  return { pairs, truncated: result?.truncated ?? false, dismiss, refresh }
+  return { pairs, truncated: result?.truncated ?? false, dismiss, refresh, settle }
 }
