@@ -19,6 +19,7 @@ const LEDGER_STATUS: Record<LedgerErrorCode, number> = {
   bank_locked: 422,
   tag_not_found: 422,
   tag_archived: 422,
+  not_eligible: 422,
 }
 
 const FX_STATUS: Record<FxErrorCode, [number, string]> = {
@@ -36,4 +37,14 @@ export function toHttpError(e: unknown): unknown {
     return new HttpError(status, message)
   }
   return e
+}
+
+/**
+ * The short code of a refused write for a result per operation (bulk changes, transfers): a ledger or rate refusal (a 4xx,
+ * or the 503 of an unavailable rate). Null for anything unexpected, which the caller logs and reports as `unknown`.
+ */
+export function refusalCode(e: unknown): string | null {
+  const mapped = toHttpError(e)
+  // The short code is the error message (`new HttpError(status, code, extra?)`).
+  return mapped instanceof HttpError && (mapped.status < 500 || mapped.status === 503) ? mapped.message : null
 }

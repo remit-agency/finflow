@@ -1,4 +1,4 @@
-import type { Accrual, AutoRuleRef, BankInfo, TxStatus } from '@/lib/domain/ledger/types'
+import type { Accrual, AutoRuleRef, BankInfo, BankToInfo, TxStatus } from '@/lib/domain/ledger/types'
 import type { Role } from '@/lib/shell/permissions'
 
 export interface Organization {
@@ -65,6 +65,10 @@ export interface Transaction {
   fileUrls: string[]
   /** Set on an operation imported from a bank (S09). */
   bank?: BankInfo
+  /** The incoming side of a transfer when it came from a bank (S10b). */
+  bankTo?: BankToInfo
+  /** The day the money arrived on `toAccountId` (`YYYY-MM-DD`), when it differs from the payment day (S10b). */
+  toDate?: string
   /** The rules that filled the category or the counterparty (S10). */
   autoRules?: AutoRuleRef[]
   /** One of the tags keeps the operation out of Cash Flow and P&L (S10t); the balances still count it. */

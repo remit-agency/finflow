@@ -72,6 +72,20 @@ test.describe('API guards', () => {
     }
   })
 
+  // S10b: the transfer routes refuse a request without a session cookie, before they read any data.
+  test('transfer endpoints require a session cookie (401)', async ({ request }) => {
+    const origin = { Origin: 'http://localhost:3000' }
+    const calls: { method: 'GET' | 'POST'; path: string; data?: object }[] = [
+      { method: 'GET', path: '/api/orgs/x/transfers/suggestions' },
+      { method: 'POST', path: '/api/orgs/x/transfers', data: { merge: ['a', 'b'] } },
+      { method: 'POST', path: '/api/orgs/x/transfers/t1/split' },
+    ]
+    for (const { method, path, data } of calls) {
+      const res = await request.fetch(path, { method, headers: origin, data })
+      expect(res.status(), `${method} ${path}`).toBe(401)
+    }
+  })
+
   test('Enable Banking callback rejects a forged state before exchanging the code (400)', async ({ request }) => {
     // The pre-S00 format: unsigned base64url JSON with just an orgId.
     const forged = Buffer.from(JSON.stringify({ orgId: 'victim-org' })).toString('base64url')

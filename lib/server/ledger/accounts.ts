@@ -17,7 +17,7 @@ async function hasOperations(t: Transaction, deps: LedgerDeps, orgId: string, ac
 }
 
 /** True when a bank account (any status, also a disconnected one) is linked to the FinFlow account. S09 writes `bankAccounts`. */
-async function isLinkedToBank(t: Transaction, deps: LedgerDeps, orgId: string, accountId: string): Promise<boolean> {
+export async function isLinkedToBank(t: Transaction, deps: LedgerDeps, orgId: string, accountId: string): Promise<boolean> {
   const linked = await t.get(orgRef(deps.db, orgId).collection('bankAccounts').where('accountId', '==', accountId).limit(1))
   return !linked.empty
 }

@@ -76,3 +76,8 @@ export function toDay(d: Date): string {
 export function fromDay(day: string): Date {
   return new Date(`${day}T00:00:00Z`)
 }
+
+/** Whole days between two days, in either order. */
+export function daysApart(a: string, b: string): number {
+  return Math.abs(daysInRange(a, b) - 1)
+}

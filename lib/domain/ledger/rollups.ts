@@ -1,5 +1,6 @@
 import { monthOf } from './days'
 import { baseOf } from './build'
+import { receivedOn } from './effects'
 import { allocatePeriod } from './period'
 import type { LedgerTransaction } from './types'
 
@@ -37,7 +38,8 @@ export function addInto(target: RollupDocs, source: RollupDocs): void {
 
 /**
  * What one operation adds to the rollups (times `sign`):
- *  - cash_{account}_{paymentDay}: in/out in the account currency and in the company currency; transfer in/out;
+ *  - cash_{account}_{paymentDay}: in/out in the account currency and in the company currency; transfer out, and transfer in
+ *    on the day the money arrived (`toDate ?? paymentDate`, S10b);
  *  - cashcat_{paymentMonth}: per category, company currency;
  *  - pl_{accrualMonth}: per category, company currency, a period spread over its months.
  * An operation excluded from analytics (S10t: one of its tags has the flag) adds the same fields to the `x_` twins of
@@ -51,7 +53,7 @@ export function contributions(tx: LedgerTransaction, baseCurrency: string, sign:
 
   if (tx.type === 'transfer') {
     bump(docs, doc(cashDocId(tx.accountId, tx.paymentDate)), 'transferOutMinor', sign * tx.amountMinor)
-    bump(docs, doc(cashDocId(tx.toAccountId as string, tx.paymentDate)), 'transferInMinor', sign * (tx.toAmountMinor as number))
+    bump(docs, doc(cashDocId(tx.toAccountId as string, receivedOn(tx))), 'transferInMinor', sign * (tx.toAmountMinor as number))
     return docs
   }
 

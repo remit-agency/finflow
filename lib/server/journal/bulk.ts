@@ -2,8 +2,7 @@ import type { BulkOutcome, BulkRequest } from '@/lib/domain/journal/bulk-input'
 import { isTagPatch } from '@/lib/domain/journal/selection'
 import type { TransactionPatch } from '@/lib/domain/ledger/input'
 import type { TagChange } from '@/lib/domain/tags/assign'
-import { HttpError } from '@/lib/server/http-error'
-import { toHttpError } from '@/lib/server/ledger/http'
+import { refusalCode } from '@/lib/server/ledger/http'
 
 /** The ledger calls a bulk change is made of (the production `ledger` object has them). */
 export interface BulkLedger {
@@ -28,15 +27,10 @@ export async function runBulk(ledger: BulkLedger, orgId: string, uid: string, re
       else await ledger.updateTransaction(orgId, uid, id, req.patch as TransactionPatch)
       out.push({ id, ok: true })
     } catch (e) {
-      const mapped = toHttpError(e)
-      if (mapped instanceof HttpError && (mapped.status < 500 || mapped.status === 503)) {
-        // The short code is the error message (`new HttpError(status, code, extra?)`).
-        out.push({ id, ok: false, code: mapped.message })
-      } else {
-        // No request body, tokens or patch in the log: the org, the operation and what went wrong.
-        console.error('[journal.bulk] unexpected error', { orgId, txId: id, error: e instanceof Error ? `${e.name}: ${e.message}` : String(e) })
-        out.push({ id, ok: false, code: 'unknown' })
-      }
+      const code = refusalCode(e)
+      // No request body, tokens or patch in the log: the org, the operation and what went wrong.
+      if (code === null) console.error('[journal.bulk] unexpected error', { orgId, txId: id, error: e instanceof Error ? `${e.name}: ${e.message}` : String(e) })
+      out.push({ id, ok: false, code: code ?? 'unknown' })
     }
   }
   return out

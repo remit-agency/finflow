@@ -9,9 +9,12 @@ export type AuditAction =
   | 'tag.create' | 'tag.update'
   | 'org.update' | 'ledger.rebuild' | 'migration.v2'
 
-/** What made a change when it was not a person's own edit (S10: the rules; S10t: a tag's flag changed). */
+/**
+ * What made a change when it was not a plain edit of the operation: the rules (S10), a tag's flag (S10t), or making or
+ * splitting a transfer (S10b: the operation changed type, went into the transfer, or came back out of it).
+ */
 export interface AuditMeta {
-  via?: 'rule' | 'tag'
+  via?: 'rule' | 'tag' | 'transfer'
 }
 
 /** The audit entry to `create()` in the same transaction as the change it records. */

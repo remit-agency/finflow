@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Trash2, X } from 'lucide-react'
+import { ArrowLeftRight, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { selectionSummary } from '@/lib/domain/journal/selection'
@@ -22,11 +22,16 @@ interface Props {
   /** «Select all matching the filter»: offered while more rows match than are loaded. */
   matching: { offer: boolean; running: boolean; limitReached: boolean; limit: number }
   onSelectMatching: () => void
+  /** «Зробити переказом» (S10b): set while every selected row is a bank operation of one account. */
+  onConvert?: () => void
+  /** «Об’єднати в переказ» (S10b): set while the selection is a bank expense and a bank income that make one transfer. */
+  onMerge?: () => void
 }
 
-/** Appears over the journal while rows are checked: how many, their net amount, «change data» and «delete». */
-export function SelectionBar({ rows, baseCurrency, onEdit, onDelete, onClear, matching, onSelectMatching }: Props) {
+/** Appears over the journal while rows are checked: how many, their net amount, the transfer actions, «change data» and «delete». */
+export function SelectionBar({ rows, baseCurrency, onEdit, onDelete, onClear, matching, onSelectMatching, onConvert, onMerge }: Props) {
   const t = useTranslations('journal.selection')
+  const tTransfers = useTranslations('journal.transfers')
   const { money } = useFormatters()
   const { count, totalBaseMinor } = selectionSummary(rows, baseCurrency)
 
@@ -56,7 +61,19 @@ export function SelectionBar({ rows, baseCurrency, onEdit, onDelete, onClear, ma
           </Button>
         )
       )}
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+        {onMerge && (
+          <Button type="button" variant="secondary" size="sm" onClick={onMerge} className="gap-1">
+            <ArrowLeftRight className="size-3.5" />
+            {tTransfers('merge')}
+          </Button>
+        )}
+        {onConvert && (
+          <Button type="button" variant="secondary" size="sm" onClick={onConvert} className="gap-1">
+            <ArrowLeftRight className="size-3.5" />
+            {tTransfers('convert')}
+          </Button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button type="button" variant="secondary" size="sm" />}>{t('change')}</DropdownMenuTrigger>
           <DropdownMenuContent align="end">

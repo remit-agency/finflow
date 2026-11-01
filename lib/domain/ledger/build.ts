@@ -60,6 +60,7 @@ export function buildTransaction(id: string, input: TransactionInput, ctx: Build
     if (to.id === ctx.account.id) bad('toAccountId')
     tx.toAccountId = to.id
     tx.toCurrency = to.currency
+    if (input.toDate !== undefined) tx.toDate = input.toDate
     if (to.currency === ctx.account.currency) {
       if (input.toAmountMinor !== undefined && input.toAmountMinor !== input.amountMinor) bad('toAmountMinor')
       tx.toAmountMinor = input.amountMinor

@@ -1,4 +1,5 @@
 import { isDay } from './days'
+import { isId } from './guards'
 import { isMinor } from './money'
 import {
   ACCOUNT_TYPES,
@@ -8,6 +9,7 @@ import {
   type AutoRuleRef,
   type Base,
   type BankInfo,
+  type BankToInfo,
   type Fx,
   type LedgerAccount,
   type LedgerTransaction,
@@ -56,6 +58,35 @@ function parseAutoRules(v: unknown): AutoRuleRef[] | undefined {
   return out.length > 0 ? out : undefined
 }
 
+/**
+ * A bank block (`bank` of an operation, `bank` of a bank mark, `bankTo` without its key): `accountRef` and the optional
+ * strings; null when it is not one. The one reader of that shape (S09, S10b).
+ */
+export function parseBankInfo(v: unknown): BankInfo | null {
+  if (!isRecord(v) || typeof v.accountRef !== 'string') return null
+  const bank: BankInfo = { accountRef: v.accountRef }
+  for (const key of ['entryReference', 'counterpartyName', 'remittance'] as const) {
+    const value = v[key]
+    if (typeof value === 'string') bank[key] = value
+  }
+  return bank
+}
+
+function bankInfoToDoc(b: BankInfo): Record<string, string> {
+  const doc: Record<string, string> = { accountRef: b.accountRef }
+  if (b.entryReference !== undefined) doc.entryReference = b.entryReference
+  if (b.counterpartyName !== undefined) doc.counterpartyName = b.counterpartyName
+  if (b.remittance !== undefined) doc.remittance = b.remittance
+  return doc
+}
+
+/** A stored `bankTo` (S10b): a bank block plus the key of the income it was; null when it is not one. */
+function parseBankTo(v: unknown): BankToInfo | null {
+  if (!isRecord(v) || !isId(v.key)) return null
+  const bank = parseBankInfo(v)
+  return bank === null ? null : { key: v.key, ...bank }
+}
+
 /** The stored fields of an operation (no id, no server timestamps). Never contains `undefined`. */
 export function transactionToDoc(tx: LedgerTransaction): Record<string, unknown> {
   const doc: Record<string, unknown> = {
@@ -74,6 +105,7 @@ export function transactionToDoc(tx: LedgerTransaction): Record<string, unknown>
   if (tx.toAccountId !== undefined) doc.toAccountId = tx.toAccountId
   if (tx.toAmountMinor !== undefined) doc.toAmountMinor = tx.toAmountMinor
   if (tx.toCurrency !== undefined) doc.toCurrency = tx.toCurrency
+  if (tx.toDate !== undefined) doc.toDate = tx.toDate
   if (tx.categoryId !== undefined) doc.categoryId = tx.categoryId
   if (tx.counterpartyId !== undefined) doc.counterpartyId = tx.counterpartyId
   if (tx.description !== undefined) doc.description = tx.description
@@ -82,12 +114,9 @@ export function transactionToDoc(tx: LedgerTransaction): Record<string, unknown>
   if (tx.base !== undefined) doc.base = tx.base
   if (tx.bank !== undefined) {
     doc.source = 'bank'
-    const bank: Record<string, string> = { accountRef: tx.bank.accountRef }
-    if (tx.bank.entryReference !== undefined) bank.entryReference = tx.bank.entryReference
-    if (tx.bank.counterpartyName !== undefined) bank.counterpartyName = tx.bank.counterpartyName
-    if (tx.bank.remittance !== undefined) bank.remittance = tx.bank.remittance
-    doc.bank = bank
+    doc.bank = bankInfoToDoc(tx.bank)
   }
+  if (tx.bankTo !== undefined) doc.bankTo = { key: tx.bankTo.key, ...bankInfoToDoc(tx.bankTo) }
   if (tx.autoRules !== undefined && tx.autoRules.length > 0) doc.autoRules = tx.autoRules.map((r) => ({ id: r.id, name: r.name }))
   if (tx.excluded === true) doc.excluded = true
   return doc
@@ -125,7 +154,18 @@ export function parseTransaction(id: string, data: unknown): LedgerTransaction |
     tx.toAccountId = data.toAccountId
     tx.toAmountMinor = data.toAmountMinor
     tx.toCurrency = data.toCurrency
+    // S10b: the arrival day and the incoming bank side. Malformed, they make the document unreadable (as `excluded` does).
+    if (data.toDate !== undefined) {
+      if (!isDay(data.toDate)) return null
+      tx.toDate = data.toDate
+    }
+    if (data.bankTo !== undefined) {
+      const bankTo = parseBankTo(data.bankTo)
+      if (!bankTo) return null
+      tx.bankTo = bankTo
+    }
   } else {
+    if (data.toDate !== undefined || data.bankTo !== undefined) return null
     const counterpartyId = optionalString(data.counterpartyId)
     if (counterpartyId === null) return null
     if (counterpartyId !== undefined) tx.counterpartyId = counterpartyId
@@ -153,13 +193,10 @@ export function parseTransaction(id: string, data: unknown): LedgerTransaction |
     const base: Base = { payment: data.base.payment, accrual: data.base.accrual }
     tx.base = base
   }
-  if (data.source === 'bank' && isRecord(data.bank) && typeof data.bank.accountRef === 'string') {
-    const bank: BankInfo = { accountRef: data.bank.accountRef }
-    for (const key of ['entryReference', 'counterpartyName', 'remittance'] as const) {
-      const value = data.bank[key]
-      if (typeof value === 'string') bank[key] = value
-    }
-    tx.bank = bank
+  if (data.source === 'bank') {
+    // A malformed bank block is left out rather than hiding the operation (S09).
+    const bank = parseBankInfo(data.bank)
+    if (bank) tx.bank = bank
   }
   const autoRules = parseAutoRules(data.autoRules)
   if (autoRules !== undefined) tx.autoRules = autoRules

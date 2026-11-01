@@ -81,6 +81,7 @@ export function TransactionList({
 }: TransactionListProps) {
   const t = useTranslations('journal.list')
   const tJournal = useTranslations('journal')
+  const tTransfers = useTranslations('journal.transfers')
   const tAccountTypes = useTranslations('common.accountTypes')
   const { locale, money, date: formatDate } = useFormatters()
   const categoryLabel = useCategoryName()
@@ -293,12 +294,14 @@ export function TransactionList({
                   const selected = selection.has(tx.id)
                   const balance = balances[tx.id]
                   const accrual = accrualText(tx)
+                  // The money of a transfer arrived on another day than it left (S10b): shown under the date.
+                  const arrival = tx.toDate ? tTransfers('arrival', { date: formatDayShortUtc(new Date(`${tx.toDate}T00:00:00Z`), locale) }) : null
                   const canFill = canEdit && tx.type !== 'transfer'
                   const showFill = !counterparty && canFill
                   // The bank's name for the other party is only a hint: shown muted until a real counterparty is set.
                   const bankName = !counterparty && tx.bank?.counterpartyName ? tx.bank.counterpartyName : null
                   // The counterparty cell has a line when there is a counterparty, a fill chip or a bank operation (its mark).
-                  const counterpartyLine = !!counterparty || showFill || !!tx.bank
+                  const counterpartyLine = !!counterparty || showFill || !!tx.bank || !!tx.bankTo
                   const planned = tx.status === 'planned'
                   const byRule = tx.autoRules && tx.autoRules.length > 0 ? tJournal('byRule', { name: tx.autoRules.map((r) => r.name).join(', ') }) : null
                   // A planned operation has not moved any money: its amount is neutral grey (the sign stays), not green or red.
@@ -337,6 +340,7 @@ export function TransactionList({
                         <span className="block text-ink">{formatDayShortUtc(tx.date, locale)}</span>
                         <span className="block text-xs text-ink-muted">{formatWeekdayShortUtc(tx.date, locale)}</span>
                         {accrual && <span className="block text-xs text-ink-muted">{accrual}</span>}
+                        {arrival && <span data-testid="transfer-arrival" className="block text-xs text-ink-muted">{arrival}</span>}
                       </TableCell>
                       <TableCell className={cn('hidden py-3.5 text-right font-semibold tabular-nums sm:table-cell', amountClass)}>
                         {amountLabel(tx)}
@@ -365,6 +369,8 @@ export function TransactionList({
                           <span className={cn('block max-w-44 truncate sm:max-w-56', planned ? 'text-ink-muted' : 'text-ink')}>{accountLabel}</span>
                         )}
                         {planned && <Badge variant="chip" className="mt-1">{t('planned')}</Badge>}
+                        {/* The date column is hidden on a phone: the arrival day goes under the account there. */}
+                        {arrival && <span data-testid="transfer-arrival-phone" className="block text-xs text-ink-muted sm:hidden">{arrival}</span>}
                         {/* Second line: the category below md (its column is hidden there), the account type above. */}
                         {canEdit && !tx.categoryId && tx.type !== 'transfer' ? (
                           <span className="mt-0.5 block md:hidden">
@@ -425,7 +431,7 @@ export function TransactionList({
                         {/* One line: the bank mark, then the counterparty (or the bank's name for it, muted), then the «вкажіть» chip. */}
                         {counterpartyLine && (
                           <span className="flex max-w-72 items-center gap-2">
-                            {tx.bank && <Badge variant="chip" className="shrink-0">{tJournal('fromBank')}</Badge>}
+                            {(tx.bank || tx.bankTo) && <Badge variant="chip" className="shrink-0">{tJournal('fromBank')}</Badge>}
                             {counterparty ? (
                               <span className="min-w-0 truncate text-ink">{counterparty.name}</span>
                             ) : bankName ? (

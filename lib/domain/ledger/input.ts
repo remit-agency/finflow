@@ -1,12 +1,14 @@
 import { asRecord, bad, isId, onlyKeys } from './guards'
-import { isDay, monthsBetween } from './days'
+import { daysApart, isDay, monthsBetween } from './days'
 import { MAX_MINOR, isMinor } from './money'
-import { TX_STATUSES, TX_TYPES, type Accrual, type LedgerTransaction, type TxStatus, type TxType } from './types'
+import { MAX_ARRIVAL_DAYS, TX_STATUSES, TX_TYPES, type Accrual, type LedgerTransaction, type TxStatus, type TxType } from './types'
 import { tagIdsOf } from '@/lib/domain/tags/assign'
 import { MAX_TX_TAGS } from '@/lib/domain/tags/types'
 
 export const MAX_PERIOD_MONTHS = 36
 export const MIN_DAY = '2000-01-01'
+/** Files one operation keeps at most. */
+export const MAX_FILE_URLS = 10
 
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/
 const RESERVED = /^__.*__$/
@@ -19,8 +21,11 @@ export const BANK_CLIENT_ID_PREFIX = 'bk_'
 const CREATE_KEYS = [
   'clientId', 'type', 'status', 'accountId', 'amountMinor', 'toAccountId', 'toAmountMinor', 'paymentDate',
   'accrual', 'categoryId', 'counterpartyId', 'description', 'isRecurring', 'projectId', 'tags', 'fileUrls',
+  'toDate', 'bankToKey',
 ] as const
-const PATCH_KEYS = CREATE_KEYS.filter((k) => k !== 'clientId')
+/** What only the undo of a deleted bank transfer sends (S10b): never part of an edit. */
+const RESTORE_KEYS: readonly string[] = ['toDate', 'bankToKey']
+const PATCH_KEYS = CREATE_KEYS.filter((k) => k !== 'clientId' && !RESTORE_KEYS.includes(k))
 const NULLABLE = new Set(['toAccountId', 'toAmountMinor', 'accrual', 'categoryId', 'counterpartyId', 'description', 'projectId'])
 
 /** A validated create request (defaults filled). Amounts are minor units. */
@@ -41,6 +46,10 @@ export interface TransactionInput {
   projectId?: string
   tags: string[]
   fileUrls: string[]
+  /** The arrival day of a bank transfer that comes back from a delete (S10b); only with `bankToKey`. */
+  toDate?: string
+  /** The bank key of the incoming side of a bank transfer that comes back from a delete (S10b). */
+  bankToKey?: string
 }
 
 /** The editable fields of an existing operation, before defaults (input of `applyPatch`). */
@@ -127,7 +136,7 @@ export function parseTransactionInput(body: unknown, opts?: ParseOptions): Trans
     accrual: { mode: 'date', date: paymentDate },
     isRecurring: false,
     tags: tagList(r.tags),
-    fileUrls: stringList(r.fileUrls, 'fileUrls', 10, 2048),
+    fileUrls: stringList(r.fileUrls, 'fileUrls', MAX_FILE_URLS, 2048),
   }
   if (r.clientId !== undefined) out.clientId = r.clientId as string
 
@@ -138,9 +147,24 @@ export function parseTransactionInput(body: unknown, opts?: ParseOptions): Trans
     if (r.categoryId !== undefined) bad('categoryId')
     if (r.accrual !== undefined) bad('accrual')
     if (r.counterpartyId !== undefined) bad('counterpartyId')
+    if (r.toDate !== undefined || r.bankToKey !== undefined) {
+      // Only the undo of a deleted bank transfer sends these (S10b): under its bank id, from server code that lets bank ids
+      // through. createTransaction checks both against the bank's marks.
+      const clientId = typeof r.clientId === 'string' && opts?.internal === true ? r.clientId : ''
+      if (!clientId.startsWith(BANK_CLIENT_ID_PREFIX)) bad(r.toDate !== undefined ? 'toDate' : 'bankToKey')
+      if (!isId(r.bankToKey) || r.bankToKey === clientId.slice(BANK_CLIENT_ID_PREFIX.length)) bad('bankToKey')
+      out.bankToKey = r.bankToKey
+      if (r.toDate !== undefined) {
+        const toDate = day(r.toDate, 'toDate')
+        if (toDate === paymentDate || daysApart(toDate, paymentDate) > MAX_ARRIVAL_DAYS) bad('toDate')
+        out.toDate = toDate
+      }
+    }
   } else {
     if (r.toAccountId !== undefined) bad('toAccountId')
     if (r.toAmountMinor !== undefined) bad('toAmountMinor')
+    if (r.toDate !== undefined) bad('toDate')
+    if (r.bankToKey !== undefined) bad('bankToKey')
     if (r.accrual !== undefined) out.accrual = parseAccrual(r.accrual)
     if (r.categoryId !== undefined) {
       if (!isId(r.categoryId)) bad('categoryId')

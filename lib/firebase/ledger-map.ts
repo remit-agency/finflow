@@ -39,6 +39,8 @@ export function toUiTransaction(orgId: string, tx: LedgerTransaction): Transacti
   if (tx.description !== undefined) ui.description = tx.description
   if (tx.projectId !== undefined) ui.projectId = tx.projectId
   if (tx.bank !== undefined) ui.bank = tx.bank
+  if (tx.bankTo !== undefined) ui.bankTo = tx.bankTo
+  if (tx.toDate !== undefined) ui.toDate = tx.toDate
   if (tx.autoRules !== undefined) ui.autoRules = tx.autoRules
   if (tx.excluded === true) ui.excluded = true
   return ui

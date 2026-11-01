@@ -16,6 +16,7 @@
     "seed:counterparties": "node --conditions=react-server --import tsx scripts/seed-counterparties.ts",
     "check:journal": "node --conditions=react-server --import tsx scripts/check-journal-readiness.ts",
     "check:tags": "node --conditions=react-server --import tsx scripts/check-tags.ts",
+    "check:transfers": "node --conditions=react-server --import tsx scripts/check-transfers.ts",
     "spike:eb": "node --conditions=react-server --import tsx scripts/eb-spike.ts",
     "test:e2e": "playwright test",
     "ui:shots": "firebase emulators:exec --only auth,firestore --project demo-finflow \"playwright test --config playwright.shots.config.ts\""

@@ -23,6 +23,7 @@ import { useTags } from '@/lib/hooks/useTags'
 import { LedgerApiError, createTransaction, deleteTransaction, updateTransaction } from '@/lib/api/ledger-client'
 import { buildCreateDraft, buildEditDraft, categoryAfterTypeChange, stateToDraft } from '@/lib/api/transaction-draft'
 import { restoreTransaction, revertTransaction } from '@/lib/api/transaction-undo'
+import { splitTransfer } from '@/lib/api/transfers-client'
 import type { TxType } from '@/lib/domain/ledger/types'
 import { effectiveStatus, isFutureDay, paidDay } from '@/lib/domain/transaction-form/status'
 import { initialFormState, isDirty, validateState, type FormErrors, type FormState } from '@/lib/domain/transaction-form/state'
@@ -64,11 +65,14 @@ export function TransactionForm({
   const t = useTranslations('forms.transaction')
   const tForms = useTranslations('forms')
   const tCommon = useTranslations('common')
+  const tTransfers = useTranslations('journal.transfers')
   const { locale, money } = useFormatters()
   const categoryName = useCategoryName()
   const isEdit = !!transaction
   // An operation imported from a bank keeps its amount, payment date, account and type (the server refuses to change them too).
-  const bankLocked = transaction?.bank !== undefined
+  // A transfer with a bank side (S10b) keeps the whole amount block here; «Розділити переказ» gives the bank operations back.
+  const bankLocked = transaction?.bank !== undefined || transaction?.bankTo !== undefined
+  const bankTransfer = transaction?.type === 'transfer' && bankLocked
   const today = todayDay()
 
   // What the form is compared with to know whether anything was typed: the stored operation, or an empty form.
@@ -83,7 +87,7 @@ export function TransactionForm({
   )
   const [state, setState] = useState<FormState>(baseline)
   const [errors, setErrors] = useState<FormErrors>({})
-  const [busy, setBusy] = useState<'save' | 'delete' | null>(null)
+  const [busy, setBusy] = useState<'save' | 'delete' | 'split' | null>(null)
   const [confirm, setConfirm] = useState<'delete' | 'discard' | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const amountRef = useRef<HTMLInputElement>(null)
@@ -207,6 +211,22 @@ export function TransactionForm({
     }
   }
 
+  const split = async () => {
+    if (!transaction || inFlight.current) return
+    inFlight.current = true
+    setBusy('split')
+    try {
+      await splitTransfer(orgId, transaction.id)
+      toast.success(tTransfers('splitDone'))
+      onClose()
+    } catch {
+      toast.error(tTransfers('splitFailed'))
+    } finally {
+      inFlight.current = false
+      setBusy(null)
+    }
+  }
+
   // Closing a form that holds changes asks first; an untouched form closes at once.
   const requestClose = () => {
     // A question is open: Esc answers that question only, it must not also close the form behind it.
@@ -245,6 +265,11 @@ export function TransactionForm({
           {bankLocked && (
             <p data-testid="bank-locked-hint" className="text-xs text-ink-muted">
               {t('bankLockedHint')}
+            </p>
+          )}
+          {bankTransfer && (
+            <p data-testid="split-hint" className="text-xs text-ink-muted">
+              {tTransfers('splitHint')}
             </p>
           )}
 
@@ -358,6 +383,11 @@ export function TransactionForm({
             {isEdit && (
               <Button type="button" variant="destructive" disabled={busy !== null} onClick={() => setConfirm('delete')} className="sm:mr-auto">
                 {t('delete')}
+              </Button>
+            )}
+            {bankTransfer && (
+              <Button type="button" variant="outline" disabled={busy !== null} onClick={() => void split()} data-testid="split-transfer">
+                {tTransfers('split')}
               </Button>
             )}
             <Button type="button" variant="outline" onClick={requestClose} className={cn(!isEdit && 'sm:mr-auto')}>
