@@ -8,6 +8,9 @@ import {
   NO_TAG,
   normalizeText,
   parseFilters,
+  idList,
+  matchesSelection,
+  MAX_FILTER_IDS,
   type FilterContext,
 } from '@/lib/domain/journal/filter'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
@@ -151,5 +154,29 @@ describe('tags (S10t)', () => {
     const f = { ...EMPTY_FILTERS, excludedOnly: true }
     expect(matchesFilters(tx({ tags: ['vat'], excluded: true }), f, ctx)).toBe(true)
     expect(matchesFilters(tx({ tags: ['q4'] }), f, ctx)).toBe(false)
+  })
+})
+
+describe('matchesSelection (S10f: the journal and the reports share it)', () => {
+  const none = { types: [], categoryIds: [], counterpartyIds: [], accountIds: [], tagIds: [] }
+
+  it('several accounts: any of them, the target of a transfer included', () => {
+    const s = { ...none, accountIds: ['a2', 'a3'] }
+    expect(matchesSelection(tx({ accountId: 'a3' }), s)).toBe(true)
+    expect(matchesSelection(tx({ type: 'transfer', toAccountId: 'a2', toAmountMinor: 12_000, toCurrency: 'PLN' }), s)).toBe(true)
+    expect(matchesSelection(tx(), s)).toBe(false)
+  })
+
+  it('types and categories work together: an operation must fit both', () => {
+    const s = { ...none, types: ['expense' as const], categoryIds: ['rent'] }
+    expect(matchesSelection(tx({ categoryId: 'rent' }), s)).toBe(true)
+    expect(matchesSelection(tx({ type: 'income', categoryId: 'rent' }), s)).toBe(false)
+    expect(matchesSelection(tx(), s)).toBe(false)
+  })
+
+  it('idList drops what is not an id and keeps at most MAX_FILTER_IDS', () => {
+    expect(idList('a1,,a b,__x__,a2')).toEqual(['a1', 'a2'])
+    expect(idList(Array.from({ length: 40 }, (_, i) => `x${i}`).join(','))).toHaveLength(MAX_FILTER_IDS)
+    expect(idList(null)).toEqual([])
   })
 })
