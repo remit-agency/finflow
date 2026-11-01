@@ -613,3 +613,50 @@ CashFlowChart (Recharts), PLTable, CalendarView, BalanceSheet, all 4 analytics p
 - `package.json` не містить скриптів `check:pr`, `check:fast`, `docs:check`, `test:focused`, які згадує `AGENTS.md`; документація й скрипти розходяться (не S10t).
 - `TagPicker` не показує чіпи id, яких немає в живому списку (застарілий id-тег або до завантаження підписки), але вони рахуються в ліміт 10, і Backspace може зняти їх невидимо.
 - `commit` і `refreshExcluded` читають до 10 тегів послідовно всередині транзакції; один пакетний `t.getAll` скоротив би час блокування.
+
+## 2026-11-01 — S10b: перекази між власними рахунками
+
+Спека: `docs/superpowers/specs/2026-11-01-s10b-own-transfers-design.md`. План: `docs/superpowers/plans/2026-11-01-s10b-own-transfers.md`.
+
+**Статус:** реалізовано в гілці `s10b-transfers`, чекає огляду й мерджа; на production нічого не розгорнуто; нових індексів і змін правил Firestore немає. Перед злиттям потрібен `npm run check:transfers -- --project=finflow-e94b5` (лише читання) на production: він має перевірити три нові форми запитів (журнал за днем зарахування, `bankTo.key`, пропозиції), і його ще не запускали; потрібне окреме «ок» власника.
+
+### Зроблено
+- **Поля:** `toDate` (день зарахування, лише коли відрізняється від `paymentDate`, не далі за `MAX_ARRIVAL_DAYS` = 7) і `bankTo` (`BankToInfo`: `key`, `accountRef`, `entryReference?`, `counterpartyName?`, `remittance?`; сума, валюта й день беруться з полів переказу, поправка спеки 4). Некоректний `toDate`/`bankTo` або будь-що з них на доході чи витраті робить документ нечитабельним (`verifyLedger` → `uncountable`; поправка спеки 13).
+- **Один власник руху по днях:** `datedEffects` (`lib/domain/ledger/effects.ts`) каже, який рахунок, коли і на скільки рухається; `balanceEffects` є його сумою по рахунку, `contributions` бере `receivedOn`, `transferInMinor` у денних агрегатах рахує прихід на день зарахування.
+- **Журнал:** `opsOfDay` бере ще операції з `toDate == день` (лише рівності, без нового індексу); залишок після рядка рахує рух дня з `datedEffects`, а `arrivalShift` коригує суми за днем платежу для переказів у межах ±7 днів (наявний індекс `(toAccountId, paymentDate desc, createdAt desc)`; поправка спеки 3).
+- **Блокування банківських сторін:** `bank` блокує `accountId`, `amountMinor`, `paymentDate`; `bankTo` блокує `toAccountId`, `toAmountMinor` і `toDate ?? paymentDate`; `updateTransaction` переносить `bank`, `bankTo`, `toDate` з попереднього документа (`withBankSides`); форма блокує весь блок суми банківського переказу.
+- **Чисті правила** (`lib/domain/ledger/transfer.ts`): `bankSideOf`, `convertToTransfer` (A → A→B; дохід стає переказом B→A з `bankTo`), `mergeToTransfer` (банківна витрата A і банківний дохід B → переказ A→B під id витрати; обидві суми реальні, у одній валюті рівні, сторони не далі за 7 днів; теги до 10, відкинуті рахуються), `splitTransferSides`; `combineChanges` для кількох `changeSet` однієї транзакції.
+- **Запис:** `applyChange` і `storedDoc` винесено в `lib/server/ledger/write.ts` (спільні для `commit` і `refreshExcluded`); `makeTransfer` (`convert` або `pair`, одна Admin-транзакція, аудит `tx.update`/`tx.delete` з `via: 'transfer'`; перетворення відмовляє `not_eligible` для рахунка, прив’язаного до банку (поправка спеки 6); злиття вимагає позначки `bankSeen` вхідної сторони (поправка спеки 1); одна валюта вимагає рівних сум (поправка спеки 7)); `splitTransfer` (курси сторони в іншій валюті читаються до транзакції, транзакція вимагає версію, інакше `conflict`; дохід створюється знову під `bk_<key>`, аудит `tx.create` з `via: 'transfer'`).
+- **Undo видалення:** банківський переказ відновлюється «як є» через маршрут створення: `bankSidesOf` бере обидві банківські сторони лише з позначок `bankSeen`, сторона, що вже «живе», відмовляє; `bankRestoreOf` у `lib/api/transaction-undo.ts` (поправка спеки 2). Внутрішні ключі `toDate`/`bankToKey` є лише в тілі створення під `bk_`-id і не приймаються в PATCH.
+- **Пропозиції:** читання 90 днів за `paymentDate` (до 2000, `select` полів, фільтр у пам’яті); пара: банківна витрата і банківний дохід двох рахунків, та сама сума й валюта, не далі 3 днів, кожна сторона з одним кандидатом; до 50, найновіші перші; версія `<секунди>.<наносекунди>`. Відхилені пари живуть у `localStorage` (`finflow:transfer-dismissed:<org>`, 500 найновіших), усе в `try/catch`.
+- **Маршрути:** `GET /api/orgs/[orgId]/transfers/suggestions` (кожен член), `POST /api/orgs/[orgId]/transfers` (`pairs`, `merge`, `convert`; owner, accountant; 64 КБ), `POST /api/orgs/[orgId]/transfers/[txId]/split`; непридатний id у шляху 404, у тілі 400 (поправка спеки 12). `refusalCode` (`lib/server/ledger/http.ts`) спільний для масових дій і переказів; `not_eligible` 422.
+- **UI:** банер і діалог пропозицій (`TransferSuggestions.tsx`, усі пари позначені, невдалі лишаються з причиною), «Зробити переказом» (`ConvertTransferDialog`), «Об’єднати в переказ» у панелі вибору, рядок переказу з «з банку» і «зарахування <день>», «Розділити переказ» у формі, один тост скасування для всіх дій (розділення, потім повернення операцій у стан «до»); події `finflow:transfers-changed`.
+- **Перевірка:** `check:transfers` (`scripts/check-transfers.ts`, лише читання; без `--project=finflow-e94b5` не читає нічого, production лише з прапорцем).
+- **Відповіді на відкриті питання спеки:** повторна синхронізація лишається «лише додає» (код `syncStep` не змінено; злиття не дає другій стороні жити двічі); undo видалення банківського переказу тепер відновлює переказ з позначок (поправка спеки 2).
+- **Тести:** unit (правила переказу, властивості, поля, вхід, журнал, пропозиції, маршрути, клієнт, undo, `check:transfers`), інтеграційні (`ledger-transfers`, `ledger-transfer-split`, `journal-transfers`, `transfers-read`), e2e `tests/e2e/transfers.spec.ts` (сід `transfer-seed.ts`).
+
+### Підсумок перевірок (2026-11-01, реально виміряно)
+- `npm run typecheck` (`tsc --noEmit`): чисто (exit 0).
+- `npm run lint`: 0 errors / 10 warnings (базово 10; жодне попередження не в файлах S10b).
+- `npm run check:server-imports`: ok (4 модулі).
+- unit (`npx vitest run --config vitest.config.ts`): 176 файлів, 2417 тестів, усі пройшли (базово 162 / 2281; після правок огляду S10t 162 / 2289).
+- rules (`npm run test:rules`, емулятор): 2 файли, 144 тести, усі пройшли (базово 2 / 144; без змін).
+- integration (`vitest.integration.config.ts` на емуляторах auth+firestore): 33 файли, 321 тест, усі пройшли (базово 29 / 289; після S10t 29 / 290). `counterparties-write.test.ts` цього разу не тайм-аутнув, окремий прогін не робився.
+- e2e (`npx firebase emulators:exec --only auth,firestore --project demo-finflow "npm run test:e2e"`): 130 з 130 пройшли, 9.4 хв (базово 126).
+- build (`npm run build`): `Compiled successfully`; маршрути `/api/orgs/[orgId]/transfers`, `/api/orgs/[orgId]/transfers/suggestions`, `/api/orgs/[orgId]/transfers/[txId]/split` є у списку.
+
+### Не перевірено
+- Реальні дані production: `check:transfers` не запускався на production; чи має production індекси для журналу з `toDate`, для `bankTo.key` і для пропозицій, не перевірено.
+- Швидкість читання пропозицій на 2000 операціях production (лише емулятор).
+- Поведінка на телефоні в реальному браузері; скриншоти `tests/ui-shots/transfers.spec.ts` у цьому прогоні не запускались.
+
+### Known follow-ups (S10b)
+- Пропозиції читають до 2000 документів при кожному відкритті журналу й діалогу (індекс `source` + `paymentDate` зменшив би читання).
+- Скасування перетворення чи злиття не повертає слід `autoRules` (як undo S10).
+- Форма блокує весь блок суми банківського переказу, хоча сервер дозволяє змінити небанківський рахунок.
+- Різновалютні пропозиції, злиття з уже введеною вручну операцією, комісії банку й розпізнавання за IBAN лишаються поза обсягом (спека).
+- Залишок після рядка переказу в журналі показує баланс вихідного рахунка навіть у фільтрі за рахунком призначення (як до S10b).
+- Злиття сторін, віддалених більш ніж на 7 днів, відмовляє (`MAX_ARRIVAL_DAYS`).
+- `components/ui/dialog.tsx` дозволяє будь-якому nowrap-нащадку розширювати діалог; виправлено локально лише в діалозі пропозицій (знахідка e2e-агента).
+- Рядки журналу на телефоні обрізають підпис «A → B» переказу після `max-w-44`, а мітка «з банку» на телефонних рядках не з’являється (знахідка e2e-агента).
+- Поле валюти у формі виглядає редагованим для заблокованого банківського переказу; треба перевірити, що сервер його відхиляє (валюта завжди рахунку). Не перевірено в цьому прогоні (знахідка e2e-агента).
