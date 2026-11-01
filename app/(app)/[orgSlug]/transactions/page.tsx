@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { X } from 'lucide-react'
 import { ConfirmDialog } from '@/components/forms/transaction/ConfirmDialog'
 import { BulkEditDialog } from '@/components/transactions/BulkEditDialog'
+import { ConvertTransferDialog } from '@/components/transactions/ConvertTransferDialog'
 import { ExportButton } from '@/components/transactions/ExportButton'
 import { JournalFiltersBar } from '@/components/transactions/JournalFilters'
 import { SelectionBar, type BulkField } from '@/components/transactions/SelectionBar'
@@ -14,12 +15,13 @@ import { TransactionList } from '@/components/transactions/TransactionList'
 import { TransferSuggestionsBanner, TransferSuggestionsDialog } from '@/components/transactions/TransferSuggestions'
 import { bulkChange, bulkDelete, undoBulkChange, undoBulkDelete } from '@/lib/api/journal-actions'
 import { collectMatching, SELECT_ALL_LIMIT } from '@/lib/api/journal-matching'
-import { confirmPairs, undoTransfers } from '@/lib/api/transfers-client'
+import { confirmPairs, convertToTransfers, mergeIntoTransfer, undoTransfers } from '@/lib/api/transfers-client'
 import { hasActiveFilters } from '@/lib/domain/journal/filter'
 import { mostFrequentCode, selectionSummary, type BulkPatch } from '@/lib/domain/journal/selection'
 import { fromMinor } from '@/lib/domain/ledger/money'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
 import { pairKeyOf } from '@/lib/domain/transfers/dismissed'
+import { convertSourceOf, mergePairOf } from '@/lib/domain/transfers/selection'
 import type { FailedOutcome, MadeOutcome, TransferOutcome, TransferSuggestion } from '@/lib/domain/transfers/types'
 import { toUiTransaction } from '@/lib/firebase/ledger-map'
 import { useCounterparties } from '@/lib/hooks/useCounterparties'
@@ -100,6 +102,12 @@ export default function TransactionsPage() {
   const suggestions = useTransferSuggestions(canEdit ? orgId : null)
   const [suggestOpen, setSuggestOpen] = useState(false)
   const [suggestFailures, setSuggestFailures] = useState<ReadonlyMap<string, string>>(new Map())
+
+  // «Зробити переказом» and «Об’єднати в переказ» are offered only for a selection the ledger's own rules accept.
+  const [convertOpen, setConvertOpen] = useState(false)
+  const convertSource = useMemo(() => convertSourceOf(selectedRows), [selectedRows])
+  const mergePair = useMemo(() => mergePairOf(selectedRows), [selectedRows])
+  const sourceAccount = convertSource ? (accounts.find((a) => a.id === convertSource.accountId) ?? null) : null
 
   const matchRun = useRef<AbortController | null>(null)
   const latest = useRef({ scope, selection })
@@ -308,6 +316,34 @@ export default function TransactionsPage() {
     }
   }
 
+  const convertSelected = async (toAccountId: string) => {
+    setBusy(true)
+    try {
+      const results = await convertToTransfers(orgId, selectedRows.map((r) => r.id), toAccountId)
+      announceTransfers(results, tTransfers('converted', { ok: results.filter((r) => r.ok).length, total: results.length }))
+      clearSelection()
+      setConvertOpen(false)
+    } catch {
+      toast.error(tBulk('errors.unknown'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const mergeSelected = async () => {
+    if (!mergePair) return
+    setBusy(true)
+    try {
+      const result = await mergeIntoTransfer(orgId, [mergePair[0].id, mergePair[1].id])
+      announceTransfers([result], result.ok ? tTransfers('merged') : '')
+      if (result.ok) clearSelection()
+    } catch {
+      toast.error(tBulk('errors.unknown'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const summary = selectionSummary(selectedRows, baseCurrency)
 
   return (
@@ -368,6 +404,8 @@ export default function TransactionsPage() {
           onEdit={setEditField}
           onDelete={() => setConfirmDelete(true)}
           onClear={clearSelection}
+          onConvert={convertSource && sourceAccount && !busy ? () => setConvertOpen(true) : undefined}
+          onMerge={mergePair && !busy ? () => void mergeSelected() : undefined}
           matching={{
             offer: hasMore && !matchingNow?.done,
             running: !!matchingNow?.running,
@@ -412,6 +450,17 @@ export default function TransactionsPage() {
           onApply={(patch) => void applyChange(patch)}
           onStop={() => abort?.abort()}
           onClose={() => setEditField(null)}
+        />
+      )}
+
+      {canEdit && convertOpen && sourceAccount && (
+        <ConvertTransferDialog
+          source={sourceAccount}
+          accounts={accounts}
+          count={selectedRows.length}
+          busy={busy}
+          onApply={(toAccountId) => void convertSelected(toAccountId)}
+          onClose={() => setConvertOpen(false)}
         />
       )}
 
