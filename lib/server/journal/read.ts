@@ -1,13 +1,14 @@
 // lib/server/journal/read.ts
 import { AggregateField, FieldPath, Filter, Timestamp, type DocumentSnapshot, type Query } from 'firebase-admin/firestore'
-import { balancesAfter, type DayOps } from '@/lib/domain/journal/balance'
+import { arrivalShiftOf, balancesAfter, type DayOps } from '@/lib/domain/journal/balance'
 import { matchesFilters, type FilterContext, type JournalFilters } from '@/lib/domain/journal/filter'
 import { compareKeys, encodeCursor, type JournalKey } from '@/lib/domain/journal/order'
 import type { JournalPage, JournalRow } from '@/lib/domain/journal/types'
 import { parseAccount, parseTransaction } from '@/lib/domain/ledger/doc'
-import { balanceEffects } from '@/lib/domain/ledger/effects'
+import { addDays } from '@/lib/domain/ledger/days'
+import { datedEffects } from '@/lib/domain/ledger/effects'
 import { cashDocId, excludedDocId } from '@/lib/domain/ledger/rollups'
-import type { LedgerAccount, LedgerTransaction } from '@/lib/domain/ledger/types'
+import { MAX_ARRIVAL_DAYS, type LedgerAccount, type LedgerTransaction } from '@/lib/domain/ledger/types'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import { accountsCol, counterpartiesCol, rollupsCol, transactionsCol } from '@/lib/server/ledger/paths'
 
@@ -161,6 +162,7 @@ const netOf = (d: DayNet): number => (d.inMinor ?? 0) - (d.outMinor ?? 0) + (d.t
  * does not exist), so the daily rollups cannot be aggregated by id. The same totals come from three sum queries over
  * the actual operations themselves: money in (income), money out (expense and transfer out, both `amountMinor`) and
  * transfers into the account (`toAmountMinor`). They are billed by index entries, not by documents read.
+ * A transfer whose money arrived on another day than it left (S10b) is corrected by `arrivalShift`.
  */
 async function netAfterDay(deps: LedgerDeps, orgId: string, accountId: string, day: string, stats: ReadStats): Promise<number> {
   const actualAfter = transactionsCol(deps.db, orgId).where('status', '==', 'actual').where('paymentDate', '>', day)
@@ -169,12 +171,40 @@ async function netAfterDay(deps: LedgerDeps, orgId: string, accountId: string, d
     stats.aggregates++
     return agg.data().total ?? 0
   }
-  const [income, outflow, transferIn] = await Promise.all([
+  const [income, outflow, transferIn, arrivals] = await Promise.all([
     sum(actualAfter.where('accountId', '==', accountId).where('type', '==', 'income'), 'amountMinor'),
     sum(actualAfter.where('accountId', '==', accountId).where('type', 'in', ['expense', 'transfer']), 'amountMinor'),
     sum(actualAfter.where('toAccountId', '==', accountId), 'toAmountMinor'),
+    arrivalShift(deps, orgId, accountId, day, stats),
   ])
-  return income - outflow + transferIn
+  return income - outflow + transferIn + arrivals
+}
+
+/**
+ * The transfers into the account paid within MAX_ARRIVAL_DAYS of `day`: the only ones whose arrival day (S10b) can be on
+ * the other side of `day` than their payment day. The listing query of the journal (index `toAccountId`, `paymentDate`,
+ * `createdAt`), so no index of its own. Exported for the rollout check (scripts/check-transfers.ts).
+ */
+export function arrivalsQuery(deps: Pick<LedgerDeps, 'db'>, orgId: string, accountId: string, day: string): Query {
+  return transactionsCol(deps.db, orgId)
+    .where('toAccountId', '==', accountId)
+    .where('paymentDate', '>=', addDays(day, -MAX_ARRIVAL_DAYS))
+    .where('paymentDate', '<=', addDays(day, MAX_ARRIVAL_DAYS))
+    .orderBy('paymentDate', 'desc')
+    .orderBy('createdAt', 'desc')
+    .orderBy(FieldPath.documentId(), 'desc')
+}
+
+/** The sums by payment day place the money in of a transfer on the day it left; this moves it to the day it arrived. */
+async function arrivalShift(deps: LedgerDeps, orgId: string, accountId: string, day: string, stats: ReadStats): Promise<number> {
+  const snap = await arrivalsQuery(deps, orgId, accountId, day).get()
+  stats.docsRead += snap.size
+  let shift = 0
+  for (const d of snap.docs) {
+    const tx = parseTransaction(d.id, d.data())
+    if (tx) shift += arrivalShiftOf(tx, day)
+  }
+  return shift
 }
 
 /**
@@ -202,19 +232,34 @@ async function netsBetween(deps: LedgerDeps, orgId: string, accountId: string, o
   return out
 }
 
-/** Every actual operation that moves the account on `day`, in listing order, with its effect on the account. */
+/**
+ * Every operation that may move the account on `day`: paid that day from or to it, or a transfer whose money arrived on it
+ * that day (S10b `toDate`). Equality filters only, so no composite index. Exported for the rollout check.
+ */
+export function dayOpsQuery(deps: Pick<LedgerDeps, 'db'>, orgId: string, accountId: string, day: string): Query {
+  return transactionsCol(deps.db, orgId).where(
+    Filter.or(
+      Filter.and(Filter.where('paymentDate', '==', day), Filter.or(Filter.where('accountId', '==', accountId), Filter.where('toAccountId', '==', accountId))),
+      Filter.and(Filter.where('toDate', '==', day), Filter.where('toAccountId', '==', accountId)),
+    ),
+  )
+}
+
+/** Every actual operation that moves the account on `day`, in listing order, with its movement of the account that day. */
 async function opsOfDay(deps: LedgerDeps, orgId: string, accountId: string, day: string, stats: ReadStats): Promise<DayOps['ops']> {
-  const snap = await transactionsCol(deps.db, orgId)
-    .where(Filter.and(Filter.where('paymentDate', '==', day), Filter.or(Filter.where('accountId', '==', accountId), Filter.where('toAccountId', '==', accountId))))
-    .get()
+  const snap = await dayOpsQuery(deps, orgId, accountId, day).get()
   stats.docsRead += snap.size
   const listed: { key: JournalKey; id: string; effect: number }[] = []
   for (const d of snap.docs) {
     const tx = parseTransaction(d.id, d.data())
-    if (!tx || tx.status !== 'actual') continue
-    // An operation without a creation time cannot be listed, but it still moved the balance: keep it, last in its day.
-    const key = keyOf(d) ?? { paymentDate: day, createdAtS: 0, createdAtN: 0, id: d.id }
-    listed.push({ key, id: d.id, effect: balanceEffects(tx)[accountId] ?? 0 })
+    if (!tx) continue
+    // What moves this account on this day (S10b: the money in of a transfer counts on its arrival day; planned moves nothing).
+    const moves = datedEffects(tx).filter((e) => e.accountId === accountId && e.day === day)
+    if (moves.length === 0) continue
+    // An operation without a creation time cannot be listed, but it still moved the balance: keep it, last in its day. Money
+    // that arrived from another payment day sits among the operations of this day by its creation time.
+    const key: JournalKey = { ...(keyOf(d) ?? { createdAtS: 0, createdAtN: 0, id: d.id }), paymentDate: day }
+    listed.push({ key, id: d.id, effect: moves.reduce((sum, e) => sum + e.delta, 0) })
   }
   return listed.sort((a, b) => compareKeys(a.key, b.key)).map(({ id, effect }) => ({ id, effect }))
 }

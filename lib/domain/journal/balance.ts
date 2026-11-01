@@ -1,3 +1,5 @@
+import type { LedgerTransaction } from '@/lib/domain/ledger/types'
+
 export interface DayOps {
   day: string
   /** Every actual operation of the account on that day, in listing order (newest first), with its effect on the account. */
@@ -23,4 +25,17 @@ export function balancesAfter(balanceNow: number, netAfterFirstDay: number, days
     running -= netBetween[i] ?? 0
   })
   return out
+}
+
+/**
+ * What the money in of a transfer adds to «the net movement of its target after `day`» beyond the sums by payment day
+ * (S10b, `toDate`): + the amount when it left on or before `day` but arrived after it, − the amount when it left after
+ * `day` but arrived on or before it; 0 otherwise, and for anything but an actual transfer with an arrival day of its own.
+ */
+export function arrivalShiftOf(tx: LedgerTransaction, day: string): number {
+  if (tx.type !== 'transfer' || tx.status !== 'actual' || tx.toDate === undefined) return 0
+  const amount = tx.toAmountMinor as number
+  if (tx.paymentDate <= day && tx.toDate > day) return amount
+  if (tx.paymentDate > day && tx.toDate <= day) return -amount
+  return 0
 }
