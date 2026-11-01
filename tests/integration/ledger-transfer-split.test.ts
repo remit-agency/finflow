@@ -229,3 +229,20 @@ describe('an edit of a bank transfer', () => {
     expect((await verifyLedger(deps, ORG)).ok).toBe(true)
   })
 })
+
+describe('two restores of one deleted transfer at once', () => {
+  it('lets exactly one of them come back: the income is counted once, the balance moves once and the ledger checks clean', async () => {
+    const { out, inc } = await mergedPair()
+    const pair = (await makeTransfer(deps, ORG, UID, { mode: 'pair', ids: [out.id, inc.id] })).transaction
+    await deleteTransaction(deps, ORG, UID, pair.id)
+    const before = await balanceOf(db, ORG, 'mono')
+    // The undo of the transfer and the undo of its income, sent together: each reads the bank sides before the other writes.
+    const results = await Promise.all([
+      code(createTransaction(deps, ORG, UID, restoreInput(pair))),
+      code(createTransaction(deps, ORG, UID, restoreInput(inc))),
+    ])
+    expect(results.filter((r) => r === 'none')).toHaveLength(1)
+    expect(await balanceOf(db, ORG, 'mono')).toBe(before + 100_000)
+    expect((await verifyLedger(deps, ORG)).ok).toBe(true)
+  })
+})

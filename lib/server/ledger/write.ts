@@ -1,4 +1,4 @@
-import { FieldValue, Timestamp, type DocumentSnapshot, type Firestore, type Transaction } from 'firebase-admin/firestore'
+import { FieldValue, Timestamp, type DocumentSnapshot, type Firestore, type QuerySnapshot, type Transaction } from 'firebase-admin/firestore'
 import { attachFx, buildTransaction, fxPlan } from '@/lib/domain/ledger/build'
 import { assertBankUnlocked, withBankSides } from '@/lib/domain/ledger/bank-lock'
 import { changeSet, type ChangeSet } from '@/lib/domain/ledger/change'
@@ -54,6 +54,8 @@ interface Job {
   via?: 'rule'
   /** Set when the write restores a previous state (WriteExtras.restore): archived tags of the new state are accepted. */
   restore?: boolean
+  /** The bank keys whose sides a create brings back (S10b): each must be free when the create is written. */
+  sideKeys?: string[]
 }
 
 export function evidenceOf(s: RateSnapshot): RateEvidence {
@@ -156,11 +158,25 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
     const nextTags = job.next?.tx.tags ?? []
     const tagSnaps: DocumentSnapshot[] = []
     for (const id of nextTags) tagSnaps.push(await t.get(tagsCol(db, orgId).doc(id)))
+    // A bank side a create brings back must not live on already (S10b): neither as its own operation nor as the incoming
+    // side of another transfer. Read here, not before the transaction, so a concurrent create of the same side conflicts
+    // and retries. The operation being created (`job.txId`) may hold its own key (a replay of the same create).
+    const sideReads: Array<{ own: DocumentSnapshot | null; holders: QuerySnapshot }> = []
+    for (const key of job.sideKeys ?? []) {
+      const ownId = `${BANK_CLIENT_ID_PREFIX}${key}`
+      const own = ownId === job.txId ? null : await t.get(transactionsCol(db, orgId).doc(ownId))
+      const holders = await t.get(transactionsCol(db, orgId).where('bankTo.key', '==', key).limit(2))
+      sideReads.push({ own, holders })
+    }
 
     // ---- checks (nothing is written yet) ----
     if (!orgSnap.exists) throw new LedgerError('not_found', 'org')
     const baseCurrency = orgSnap.get('currency') as string
     if (job.next && job.next.baseCurrency !== baseCurrency) throw new LedgerError('conflict')
+    for (const side of sideReads) {
+      if (side.own?.exists) refuseBankId()
+      if (side.holders.docs.some((d) => d.id !== job.txId)) refuseBankId()
+    }
 
     if (job.prior === null) {
       if (currentSnap.exists) {
@@ -251,16 +267,10 @@ function imported(s: Record<string, unknown>, type: string, accountId: string, a
   return s.type === type && s.accountId === accountId && s.amountMinor === amountMinor && s.paymentDate === paymentDate
 }
 
-/**
- * A bank side about to come back must not live on already (S10b): neither as its own operation nor as the incoming side of
- * another transfer. `selfId` is the operation being created; it may hold the key itself (a replay of the same create,
- * which `commit` answers with the stored operation).
- */
-async function assertSideFree(deps: LedgerDeps, orgId: string, key: string, selfId: string): Promise<void> {
-  const ownId = `${BANK_CLIENT_ID_PREFIX}${key}`
-  if (ownId !== selfId && (await transactionsCol(deps.db, orgId).doc(ownId).get()).exists) refuseBankId()
-  const holders = await transactionsCol(deps.db, orgId).where('bankTo.key', '==', key).limit(2).get()
-  if (holders.docs.some((d) => d.id !== selfId)) refuseBankId()
+/** What a create under a bank id brings back: its bank sides, and the bank keys whose sides must be free (see `commit`). */
+interface BankRestore {
+  sides: BankSides
+  keys: string[]
 }
 
 /**
@@ -270,10 +280,10 @@ async function assertSideFree(deps: LedgerDeps, orgId: string, key: string, self
  * operation comes back with its bank block, and how a client cannot make one. A transfer (S10b) comes back the same way:
  * its outgoing side is the expense its own id was imported as, its incoming side the income of `bankToKey` on
  * `toAccountId` with `toAmountMinor` on `toDate ?? paymentDate` (a deposit, whose only bank side is the incoming one, is the
- * income its own id was imported as). A side that lives on already is refused, so nothing counts a bank operation twice.
- * Ids without the prefix return undefined (an ordinary create).
+ * income its own id was imported as). Ids without the prefix return undefined (an ordinary create).
+ * The sides it brings back must still be free when the create is written: `commit` checks `keys` inside its transaction.
  */
-async function bankSidesOf(deps: LedgerDeps, orgId: string, input: TransactionInput): Promise<BankSides | undefined> {
+async function bankSidesOf(deps: LedgerDeps, orgId: string, input: TransactionInput): Promise<BankRestore | undefined> {
   const clientId = input.clientId
   if (clientId === undefined || !clientId.startsWith(BANK_CLIENT_ID_PREFIX)) return undefined
   if (input.status !== 'actual') refuseBankId()
@@ -282,22 +292,19 @@ async function bankSidesOf(deps: LedgerDeps, orgId: string, input: TransactionIn
   if (own === null) refuseBankId()
   if (input.type !== 'transfer') {
     if (!imported(own.snapshot, input.type, input.accountId, input.amountMinor, input.paymentDate)) refuseBankId()
-    await assertSideFree(deps, orgId, key, clientId)
-    return { bank: own.bank }
+    return { sides: { bank: own.bank }, keys: [key] }
   }
   const toAccountId = input.toAccountId as string
   // Between accounts of one currency the amount that arrives is the amount itself (buildTransaction).
   const toAmountMinor = input.toAmountMinor ?? input.amountMinor
   if (imported(own.snapshot, 'expense', input.accountId, input.amountMinor, input.paymentDate)) {
-    if (input.bankToKey === undefined) return { bank: own.bank }
+    if (input.bankToKey === undefined) return { sides: { bank: own.bank }, keys: [] }
     const other = await readMark(deps, orgId, input.bankToKey)
     if (other === null || !imported(other.snapshot, 'income', toAccountId, toAmountMinor, input.toDate ?? input.paymentDate)) refuseBankId()
-    await assertSideFree(deps, orgId, input.bankToKey, clientId)
-    return { bank: own.bank, bankTo: { key: input.bankToKey, ...other.bank } }
+    return { sides: { bank: own.bank, bankTo: { key: input.bankToKey, ...other.bank } }, keys: [input.bankToKey] }
   }
   if (input.bankToKey !== undefined || !imported(own.snapshot, 'income', toAccountId, toAmountMinor, input.paymentDate)) refuseBankId()
-  await assertSideFree(deps, orgId, key, clientId)
-  return { bankTo: { key, ...own.bank } }
+  return { sides: { bankTo: { key, ...own.bank } }, keys: [key] }
 }
 
 export async function createTransaction(
@@ -309,12 +316,20 @@ export async function createTransaction(
   extras: WriteExtras = {},
 ): Promise<WriteResult> {
   const txId = input.clientId ?? transactionsCol(deps.db, orgId).doc().id
-  const sides = bank !== undefined ? { bank } : await bankSidesOf(deps, orgId, input)
+  const restore = bank !== undefined ? undefined : await bankSidesOf(deps, orgId, input)
   const next = await prepare(deps, orgId, txId, input)
-  if (sides !== undefined) next.tx = { ...next.tx, ...sides }
+  if (bank !== undefined) next.tx = { ...next.tx, bank }
+  else if (restore !== undefined) next.tx = { ...next.tx, ...restore.sides }
   const autoRules = extras.autoRules ?? []
   if (autoRules.length > 0) next.tx = { ...next.tx, autoRules: autoRules.map((r) => ({ id: r.id, name: r.name })) }
-  return commit(deps, orgId, uid, { action: 'tx.create', txId, prior: null, next, via: autoRules.length > 0 ? 'rule' : undefined })
+  return commit(deps, orgId, uid, {
+    action: 'tx.create',
+    txId,
+    prior: null,
+    next,
+    via: autoRules.length > 0 ? 'rule' : undefined,
+    sideKeys: restore?.keys ?? [],
+  })
 }
 
 async function loadPrior(deps: LedgerDeps, orgId: string, txId: string) {
