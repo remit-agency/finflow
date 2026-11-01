@@ -38,3 +38,13 @@ export function toHttpError(e: unknown): unknown {
   }
   return e
 }
+
+/**
+ * The short code of a refused write for a result per operation (bulk changes, transfers): a ledger or rate refusal (a 4xx,
+ * or the 503 of an unavailable rate). Null for anything unexpected, which the caller logs and reports as `unknown`.
+ */
+export function refusalCode(e: unknown): string | null {
+  const mapped = toHttpError(e)
+  // The short code is the error message (`new HttpError(status, code, extra?)`).
+  return mapped instanceof HttpError && (mapped.status < 500 || mapped.status === 503) ? mapped.message : null
+}
