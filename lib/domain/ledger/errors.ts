@@ -15,6 +15,8 @@ export type LedgerErrorCode =
   | 'bank_locked'
   | 'tag_not_found'
   | 'tag_archived'
+  /** The operations cannot become a transfer, or the transfer cannot be split (S10b). */
+  | 'not_eligible'
 
 /** An expected failure of a ledger operation. `field` names the offending input field, if any. */
 export class LedgerError extends Error {

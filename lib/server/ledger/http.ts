@@ -19,6 +19,7 @@ const LEDGER_STATUS: Record<LedgerErrorCode, number> = {
   bank_locked: 422,
   tag_not_found: 422,
   tag_archived: 422,
+  not_eligible: 422,
 }
 
 const FX_STATUS: Record<FxErrorCode, [number, string]> = {
