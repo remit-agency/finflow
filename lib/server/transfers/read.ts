@@ -15,13 +15,15 @@ export interface SuggestionsRead extends SuggestionsResult {
 
 /**
  * The suggested own transfers of a company (S10b), computed on demand, nothing stored. One query: the operations whose
- * payment day is within the last SUGGEST_DAYS, newest first, at most SUGGEST_SCAN, only the fields the finder needs
- * (Firestore cannot pick the bank operations without an index of its own, so they are picked in memory). Each side carries
- * its document version, which a confirmation sends back.
+ * payment day is within the last SUGGEST_DAYS up to today (planned operations, later days, are not transfers yet), newest
+ * first, at most SUGGEST_SCAN, only the fields the finder needs (Firestore cannot pick the bank operations without an index
+ * of its own, so they are picked in memory). Each side carries its document version, which a confirmation sends back.
  */
 export async function readTransferSuggestions(deps: Pick<LedgerDeps, 'db' | 'today'>, orgId: string): Promise<SuggestionsRead> {
+  const today = deps.today()
   const snap = await transactionsCol(deps.db, orgId)
-    .where('paymentDate', '>=', addDays(deps.today(), -SUGGEST_DAYS))
+    .where('paymentDate', '>=', addDays(today, -SUGGEST_DAYS))
+    .where('paymentDate', '<=', today)
     .orderBy('paymentDate', 'desc')
     .select(...CANDIDATE_FIELDS)
     .limit(SUGGEST_SCAN)

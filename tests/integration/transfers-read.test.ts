@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { addDays } from '@/lib/domain/ledger/days'
 import { parseTransactionInput } from '@/lib/domain/ledger/input'
+import { SUGGEST_SCAN } from '@/lib/domain/transfers/types'
 import { makeTransfer, type TransferJob } from '@/lib/server/ledger/transfer'
 import { createTransaction, updateTransaction } from '@/lib/server/ledger/write'
 import { readTransferSuggestions } from '@/lib/server/transfers/read'
@@ -60,5 +62,30 @@ describe('readTransferSuggestions', () => {
     await importBankOp(db, deps, { key: KEY(2), type: 'income', accountId: 'mono', amountMinor: 70_000, paymentDate: '2026-10-20' })
     await importBankOp(db, deps, { key: KEY(3), type: 'income', accountId: 'cash', amountMinor: 70_000, paymentDate: '2026-10-21' })
     expect(await readTransferSuggestions(deps, ORG)).toMatchObject({ pairs: [], total: 0, ambiguous: 1 })
+  })
+
+  it('planned operations later than today do not fill the scan and hide a real pair', async () => {
+    await importBankOp(db, deps, { key: KEY(1), type: 'expense', accountId: 'mil', amountMinor: 50_000, paymentDate: '2026-10-25' })
+    const inc = await importBankOp(db, deps, { key: KEY(2), type: 'income', accountId: 'mono', amountMinor: 50_000, paymentDate: '2026-10-26' })
+    // More planned operations than one read scans, all after today: with no upper bound they are the newest and take the whole scan.
+    const planned = db.collection(`organizations/${ORG}/transactions`)
+    for (let start = 0; start <= SUGGEST_SCAN; start += 500) {
+      const batch = db.batch()
+      for (let i = start; i <= Math.min(start + 499, SUGGEST_SCAN); i++) {
+        batch.set(planned.doc(`plan-${i}`), {
+          type: 'expense',
+          status: 'planned',
+          accountId: 'mil',
+          currency: 'PLN',
+          amountMinor: 1_000,
+          paymentDate: addDays(deps.today(), 1 + (i % 3000)),
+        })
+      }
+      await batch.commit()
+    }
+
+    const read = await readTransferSuggestions(deps, ORG)
+    expect(read).toMatchObject({ total: 1, truncated: false, scanned: 2 })
+    expect(read.pairs.map((p) => p.to.id)).toEqual([inc.id])
   })
 })
