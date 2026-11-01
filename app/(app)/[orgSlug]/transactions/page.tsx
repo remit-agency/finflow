@@ -11,18 +11,23 @@ import { ExportButton } from '@/components/transactions/ExportButton'
 import { JournalFiltersBar } from '@/components/transactions/JournalFilters'
 import { SelectionBar, type BulkField } from '@/components/transactions/SelectionBar'
 import { TransactionList } from '@/components/transactions/TransactionList'
+import { TransferSuggestionsBanner, TransferSuggestionsDialog } from '@/components/transactions/TransferSuggestions'
 import { bulkChange, bulkDelete, undoBulkChange, undoBulkDelete } from '@/lib/api/journal-actions'
 import { collectMatching, SELECT_ALL_LIMIT } from '@/lib/api/journal-matching'
+import { confirmPairs, undoTransfers } from '@/lib/api/transfers-client'
 import { hasActiveFilters } from '@/lib/domain/journal/filter'
 import { mostFrequentCode, selectionSummary, type BulkPatch } from '@/lib/domain/journal/selection'
 import { fromMinor } from '@/lib/domain/ledger/money'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
+import { pairKeyOf } from '@/lib/domain/transfers/dismissed'
+import type { FailedOutcome, MadeOutcome, TransferOutcome, TransferSuggestion } from '@/lib/domain/transfers/types'
 import { toUiTransaction } from '@/lib/firebase/ledger-map'
 import { useCounterparties } from '@/lib/hooks/useCounterparties'
 import { useJournal } from '@/lib/hooks/useJournal'
 import { useJournalSelection } from '@/lib/hooks/useJournalSelection'
 import { useShell } from '@/lib/hooks/useShell'
 import { useTags } from '@/lib/hooks/useTags'
+import { useTransferSuggestions } from '@/lib/hooks/useTransferSuggestions'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { PAGE_CONTAINER } from '@/lib/ui/layout'
 import { undoToast } from '@/lib/ui/undo-toast'
@@ -39,6 +44,7 @@ export default function TransactionsPage() {
   const t = useTranslations('journal')
   const tBulk = useTranslations('journal.bulk')
   const tDelete = useTranslations('journal.delete')
+  const tTransfers = useTranslations('journal.transfers')
   const { money } = useFormatters()
   const { orgId, org, accounts, incomeCategories, expenseCategories, selectedAccountId, selectAccount, can } = useShell()
   const { counterparties } = useCounterparties(orgId)
@@ -89,6 +95,11 @@ export default function TransactionsPage() {
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [abort, setAbort] = useState<AbortController | null>(null)
+
+  // Own transfers (S10b): the suggestions banner and its dialog, for the people who may write.
+  const suggestions = useTransferSuggestions(canEdit ? orgId : null)
+  const [suggestOpen, setSuggestOpen] = useState(false)
+  const [suggestFailures, setSuggestFailures] = useState<ReadonlyMap<string, string>>(new Map())
 
   const matchRun = useRef<AbortController | null>(null)
   const latest = useRef({ scope, selection })
@@ -236,6 +247,67 @@ export default function TransactionsPage() {
     }
   }
 
+  // One toast for every transfer action (S10b): what was made, what failed and why, the tags that did not fit. «Скасувати»
+  // splits what was made and writes its operations back as they were.
+  const announceTransfers = (results: TransferOutcome[], message: string) => {
+    const made = results.filter((r): r is MadeOutcome => r.ok)
+    const failed = results.filter((r): r is FailedOutcome => !r.ok)
+    const dropped = made.reduce((sum, r) => sum + r.droppedTags, 0)
+    const text = [
+      message,
+      failed.length > 0 ? tTransfers('partial', { count: failed.length, reason: failureReason(failed) }) : '',
+      dropped > 0 ? tTransfers('droppedTags', { count: dropped }) : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+    if (made.length === 0) {
+      toast.warning(text)
+      return
+    }
+    undoToast({
+      message: text,
+      actionLabel: tTransfers('undo'),
+      failureMessage: tTransfers('undoFailed'),
+      id: 'journal-transfers',
+      duration: BULK_UNDO_MS,
+      undo: async () => {
+        const out = await undoTransfers(orgId, made)
+        if (out.failed > 0) throw new Error('partial')
+        toast.success(tTransfers('undone', { count: out.done }))
+      },
+    })
+  }
+
+  const openSuggestions = () => {
+    setSuggestFailures(new Map())
+    setSuggestOpen(true)
+    // The dialog shows what the server says now: the operations may have changed since the journal opened.
+    suggestions.refresh()
+  }
+
+  // «Підтвердити вибрані»: the ticked pairs become transfers; the unticked ones are not offered again in this browser. A pair
+  // that fails stays in the dialog with its reason; the dialog closes when every pair went through.
+  const confirmSuggested = async (chosen: TransferSuggestion[], rejected: TransferSuggestion[]) => {
+    suggestions.dismiss(rejected)
+    if (chosen.length === 0) {
+      setSuggestOpen(false)
+      return
+    }
+    setBusy(true)
+    try {
+      const results = await confirmPairs(orgId, chosen)
+      announceTransfers(results, tTransfers('done', { count: results.filter((r) => r.ok).length }))
+      const failures = new Map<string, string>()
+      for (const r of results) if (!r.ok) failures.set(pairKeyOf(r.ids[0], r.ids[1]), errorText(r.code))
+      setSuggestFailures(failures)
+      if (failures.size === 0) setSuggestOpen(false)
+    } catch {
+      toast.error(tBulk('errors.unknown'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const summary = selectionSummary(selectedRows, baseCurrency)
 
   return (
@@ -286,6 +358,8 @@ export default function TransactionsPage() {
           {t('loadError')}
         </p>
       )}
+
+      {canEdit && suggestions.pairs.length > 0 && <TransferSuggestionsBanner count={suggestions.pairs.length} onOpen={openSuggestions} />}
 
       {canEdit && selectedRows.length > 0 && (
         <SelectionBar
@@ -338,6 +412,18 @@ export default function TransactionsPage() {
           onApply={(patch) => void applyChange(patch)}
           onStop={() => abort?.abort()}
           onClose={() => setEditField(null)}
+        />
+      )}
+
+      {canEdit && suggestOpen && (
+        <TransferSuggestionsDialog
+          pairs={suggestions.pairs}
+          accounts={accounts}
+          truncated={suggestions.truncated}
+          busy={busy}
+          failures={suggestFailures}
+          onConfirm={(chosen, rejected) => void confirmSuggested(chosen, rejected)}
+          onClose={() => setSuggestOpen(false)}
         />
       )}
 
