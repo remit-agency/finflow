@@ -1,7 +1,7 @@
-import { FieldValue, Timestamp, type DocumentSnapshot } from 'firebase-admin/firestore'
+import { FieldValue, Timestamp, type DocumentSnapshot, type Firestore, type Transaction } from 'firebase-admin/firestore'
 import { attachFx, buildTransaction, fxPlan } from '@/lib/domain/ledger/build'
 import { assertBankUnlocked } from '@/lib/domain/ledger/bank-lock'
-import { changeSet } from '@/lib/domain/ledger/change'
+import { changeSet, type ChangeSet } from '@/lib/domain/ledger/change'
 import { parseAccount, parseTransaction, transactionToDoc } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import { applyPatch, BANK_CLIENT_ID_PREFIX, toRawInput, type TransactionInput, type TransactionPatch } from '@/lib/domain/ledger/input'
@@ -60,6 +60,33 @@ export function evidenceOf(s: RateSnapshot): RateEvidence {
   // Only final snapshots may be stored for good (S04). The plan never asks for a date after today.
   if (!s.final) throw new Error('refusing to store a non-final rate snapshot')
   return { rate: s.rate, from: s.from, to: s.to, requestedDate: s.requestedDate, rateDate: s.rateDate, tableNo: s.tableNo, source: s.source }
+}
+
+/** Writes the balance and rollup increments of a change set inside `t` (S05: the single write rule, `changeSet`). */
+export function applyChange(t: Transaction, db: Firestore, orgId: string, change: ChangeSet, ts: Timestamp): void {
+  for (const [id, delta] of Object.entries(change.balanceDeltas)) {
+    t.update(accountsCol(db, orgId).doc(id), { balanceMinor: FieldValue.increment(delta), updatedAt: ts })
+  }
+  for (const [id, flat] of change.rollupDeltas) {
+    t.set(rollupsCol(db, orgId).doc(id), nest(flat, (n) => FieldValue.increment(n)), { merge: true })
+  }
+}
+
+/**
+ * The stored document of an operation: its fields plus the server's bookkeeping. `old` is the stored data of the operation
+ * it replaces (absent for a new one): its creation stamp and the S05 migration provenance outlive every edit.
+ */
+export function storedDoc(next: LedgerTransaction, orgId: string, uid: string, ts: Timestamp, old?: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...transactionToDoc(next),
+    ...(old && old.migratedFrom !== undefined ? { migratedFrom: old.migratedFrom } : {}),
+    ...(old && old.legacy !== undefined ? { legacy: old.legacy } : {}),
+    orgId,
+    createdAt: old ? (old.createdAt ?? ts) : ts,
+    createdBy: old ? (old.createdBy ?? uid) : uid,
+    updatedAt: ts,
+    updatedBy: uid,
+  }
 }
 
 async function loadAccount(deps: LedgerDeps, orgId: string, id: string) {
@@ -172,26 +199,10 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
     const next = job.next ? withExcluded(job.next.tx, excludedFromTags(nextTags, tagFlagsOf(tagSnaps))) : null
     const change = changeSet(job.prior?.tx ?? null, next, baseCurrency)
 
-    for (const [id, delta] of Object.entries(change.balanceDeltas)) {
-      t.update(accountsCol(db, orgId).doc(id), { balanceMinor: FieldValue.increment(delta), updatedAt: ts })
-    }
-    for (const [id, flat] of change.rollupDeltas) {
-      t.set(rollupsCol(db, orgId).doc(id), nest(flat, (n) => FieldValue.increment(n)), { merge: true })
-    }
+    applyChange(t, db, orgId, change, ts)
 
     if (next) {
-      const old = currentSnap.data() ?? {}
-      t.set(txRef, {
-        ...transactionToDoc(next),
-        // Provenance of a migrated operation (S05 migration) outlives edits.
-        ...(job.prior && old.migratedFrom !== undefined ? { migratedFrom: old.migratedFrom } : {}),
-        ...(job.prior && old.legacy !== undefined ? { legacy: old.legacy } : {}),
-        orgId,
-        createdAt: job.prior ? (old.createdAt ?? ts) : ts,
-        createdBy: job.prior ? (old.createdBy ?? uid) : uid,
-        updatedAt: ts,
-        updatedBy: uid,
-      })
+      t.set(txRef, storedDoc(next, orgId, uid, ts, job.prior ? (currentSnap.data() ?? {}) : undefined))
     } else {
       t.delete(txRef)
     }
@@ -360,12 +371,7 @@ export async function refreshExcluded(deps: LedgerDeps, orgId: string, uid: stri
     const next = withExcluded(prior, excluded)
     const change = changeSet(prior, next, orgSnap.get('currency') as string)
     const ts = Timestamp.fromDate(deps.now())
-    for (const [id, delta] of Object.entries(change.balanceDeltas)) {
-      t.update(accountsCol(db, orgId).doc(id), { balanceMinor: FieldValue.increment(delta), updatedAt: ts })
-    }
-    for (const [id, flat] of change.rollupDeltas) {
-      t.set(rollupsCol(db, orgId).doc(id), nest(flat, (n) => FieldValue.increment(n)), { merge: true })
-    }
+    applyChange(t, db, orgId, change, ts)
     t.update(txRef, { excluded: excluded ? true : FieldValue.delete(), updatedAt: ts, updatedBy: uid })
     t.create(auditCol(db, orgId).doc(), auditData(deps, 'tx.update', uid, txId, transactionToDoc(prior), transactionToDoc(next), { via: 'tag' }))
     return true
