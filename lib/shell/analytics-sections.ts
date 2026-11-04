@@ -14,6 +14,12 @@ export function analyticsPath(orgId: string, section: AnalyticsSection): string 
   return `/${encodeURIComponent(orgId)}/analytics/${section}`
 }
 
+/** The report URL with a query: the report filters (S10f) ride along when the person switches tabs. */
+export function analyticsHref(orgId: string, section: AnalyticsSection, query: string): string {
+  const path = analyticsPath(orgId, section)
+  return query ? `${path}?${query}` : path
+}
+
 /** The report a pathname belongs to (`/<org>/analytics/<section>/...`), or null (the index too). */
 export function activeAnalyticsSection(pathname: string, orgId: string): AnalyticsSection | null {
   const prefix = `/${encodeURIComponent(orgId)}/analytics/`
