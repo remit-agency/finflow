@@ -169,6 +169,9 @@ test.describe('report filters (emulators)', () => {
     await expect(page.getByTestId('analytics-filters-count')).toHaveText('1')
 
     await tab(page, 'Cash Flow').click()
+    // Wait for the new page: the Balance has a «Фільтри (активних: 1)» button too, and a click on it before the navigation
+    // lands would open a dialog that the Cash Flow page then unmounts.
+    await expect(page).toHaveURL(/\/analytics\/cashflow\?accounts=acc-vat$/)
     dialog = await openFilters(page, 1)
     await dialog.getByRole('button', { name: 'Скинути фільтри' }).click()
     await expect(dialog).toBeHidden()
