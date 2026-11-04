@@ -122,10 +122,10 @@ test.describe('analytics filters shots', () => {
 
         // The tree of the payment types: the groups open, a parent with its child and grandchild, a long category name that wraps.
         await dialog.getByRole('button', { name: m.kinds.all, exact: true }).click()
-        await expect(dialog.getByRole('option', { name: m.kinds.root, exact: true })).toBeVisible()
-        await expect(dialog.getByRole('option', { name: 'Doradztwo podatkowe', exact: true })).toBeVisible()
+        await expect(dialog.getByRole('treeitem', { name: m.kinds.root, exact: true })).toBeVisible()
+        await expect(dialog.getByRole('treeitem', { name: 'Doradztwo podatkowe', exact: true })).toBeVisible()
         // The list scrolls inside its box: bring the long category (under the expense group) into the picture.
-        const longCategory = dialog.getByRole('option', { name: LONG_CATEGORY })
+        const longCategory = dialog.getByRole('treeitem', { name: LONG_CATEGORY })
         await expect(longCategory).toBeVisible()
         await longCategory.scrollIntoViewIfNeeded()
         await dialogFits('kinds')

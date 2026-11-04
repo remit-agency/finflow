@@ -10,9 +10,9 @@ import {
   buildKindTree,
   kindState,
   noCategoryId,
-  parseNoCategoryId,
   rootState,
   toggleKind,
+  topChoices,
   type KindGroupType,
   type KindNode,
   type KindRef,
@@ -66,7 +66,7 @@ export function AnalyticsFiltersDialog({ scope, value, onApply, onClose }: Props
   const tTypes = useTranslations('journal.filters')
   const tTags = useTranslations('settings.tags.picker')
   const categoryName = useCategoryName()
-  const { orgId, accounts, incomeCategories, expenseCategories } = useShell()
+  const { orgId, accounts, incomeCategories, expenseCategories, categoriesLoading } = useShell()
   const operations = scope === 'operations'
   // Counterparties and tags are read only while the dialog is open, and never for the Balance.
   const { counterparties, loading: counterpartiesLoading } = useCounterparties(operations ? orgId : null)
@@ -75,6 +75,8 @@ export function AnalyticsFiltersDialog({ scope, value, onApply, onClose }: Props
   const [openField, setOpenField] = useState<Field | null>(null)
   // The tree's open rows are the ones not listed here: everything opens at first.
   const [closedRows, setClosedRows] = useState<ReadonlySet<string>>(() => new Set())
+  // The last tick on the tree was refused (the 30-id limit): the list says so until a tick is kept.
+  const [refused, setRefused] = useState(false)
   const set = (patch: Partial<AnalyticsFilters>) => setDraft((d) => ({ ...d, ...patch }))
   // One list open at a time.
   const field = (key: Field) => ({ open: openField === key, onOpenChange: (open: boolean) => setOpenField(open ? key : null) })
@@ -115,35 +117,40 @@ export function AnalyticsFiltersDialog({ scope, value, onApply, onClose }: Props
     const uncategorised: KindRef = { kind: 'uncategorised', type }
     refs.set(groupId, group)
     refs.set(noCategoryId(type), uncategorised)
-    kindOptions.push({ id: groupId, label: typeName(type), state: kindState(kinds, tree, group), level: 1, expanded: open, free: true })
+    kindOptions.push({ id: groupId, label: typeName(type), state: kindState(kinds, tree, group), level: 1, expanded: open, strong: true })
     for (const root of tree[type].roots) visit(root, 2, !open)
     kindOptions.push({ id: noCategoryId(type), label: uncategorisedName(type), state: kindState(kinds, tree, uncategorised), level: 2, collapsed: !open })
   }
   const transfer: KindRef = { kind: 'transfer' }
   refs.set(TRANSFER_ROW, transfer)
-  kindOptions.push({ id: TRANSFER_ROW, label: typeName('transfer'), state: kindState(kinds, tree, transfer), level: 1, free: true })
+  kindOptions.push({ id: TRANSFER_ROW, label: typeName('transfer'), state: kindState(kinds, tree, transfer), level: 1, strong: true })
 
-  // The field's closed text: nothing restricted, one group, one category, one uncategorised row, or how many are chosen.
-  const kindSummary = (() => {
-    const { types, categoryIds } = draft
-    if (types.length === 0 && categoryIds.length === 0) return { text: t('kinds.all'), active: false }
-    if (categoryIds.length === 0 && types.length === 1) return { text: typeName(types[0]), active: true }
-    if (types.length === 0 && categoryIds.length === 1) {
-      const only = categoryIds[0]
-      const uncategorised = parseNoCategoryId(only)
-      if (uncategorised) return { text: uncategorisedName(uncategorised), active: true }
-      const node = tree.nodes.get(only)
-      if (node) return { text: categoryName(node.category), active: true }
-    }
-    return { text: t('kinds.summary', { count: types.length + categoryIds.length }), active: true }
-  })()
+  // The name of a row the person sees as chosen; a stored id the company does not have has none.
+  const rowName = (ref: KindRef): string | undefined => {
+    if (ref.kind === 'transfer') return tTypes('type_transfer')
+    if (ref.kind === 'group') return typeName(ref.type)
+    if (ref.kind === 'uncategorised') return uncategorisedName(ref.type)
+    const node = tree.nodes.get(ref.id)
+    return node ? categoryName(node.category) : undefined
+  }
+  // The field's closed text: nothing restricted, the name of the one row chosen, or how many rows are chosen.
+  const chosenRows = topChoices(kinds, tree)
+  const kindSummary =
+    chosenRows.length === 0
+      ? { text: t('kinds.all'), active: false }
+      : { text: (chosenRows.length === 1 && rowName(chosenRows[0])) || t('kinds.summary', { count: chosenRows.length }), active: true }
 
   const onKindToggle = (id: string) => {
     const ref = refs.get(id)
     if (!ref) return
     const result = toggleKind(kinds, tree, ref, kindState(kinds, tree, ref) !== 'checked')
-    // A tick the address cannot keep (more than 30 ids) is refused; the list says so.
-    if (result.ok) set(result.selection)
+    // A tick the address cannot keep (more than 30 ids) is refused, not cut: the list says so, every time, until a tick is kept.
+    if (result.ok) {
+      set(result.selection)
+      setRefused(false)
+    } else {
+      setRefused(true)
+    }
   }
   const onKindExpand = (id: string, expanded: boolean) =>
     setClosedRows((closed) => {
@@ -193,7 +200,9 @@ export function AnalyticsFiltersDialog({ scope, value, onApply, onClose }: Props
                 onChange={() => set({ types: [], categoryIds: [] })}
                 onRowToggle={onKindToggle}
                 onExpand={onKindExpand}
-                full={draft.categoryIds.length >= MAX_FILTER_IDS}
+                refused={refused}
+                // Like the counterparties and tags: nothing is chosen until the company's categories are read.
+                disabled={categoriesLoading}
                 {...field('kinds')}
               />
               <FilterMultiSelect

@@ -10,6 +10,7 @@ import {
   parseNoCategoryId,
   rootState,
   toggleKind,
+  topChoices,
   type KindCategory,
   type KindSelection,
 } from '@/lib/domain/analytics-filter/kinds'
@@ -271,6 +272,42 @@ describe('the row an operation counts in: one rule for the filter and the P&L (S
     const but = sel([], ['exp-fuel', 'exp-fuel-shell', '_none:expense'])
     expect(matchesAnalyticsKinds({ type: 'expense', categoryId: 'exp-deleted' }, but, known)).toBe(true)
     expect(matchesAnalyticsKinds({ type: 'expense', categoryId: 'exp-rent' }, but, known)).toBe(false)
+  })
+})
+
+describe('the rows the user sees as chosen (what the field summary counts)', () => {
+  const rows = (s: KindSelection) => topChoices(s, tree)
+
+  it('nothing chosen has no rows', () => {
+    expect(rows(sel())).toEqual([])
+  })
+
+  it('a whole group is one row', () => {
+    expect(rows(sel(['income']))).toEqual([{ kind: 'group', type: 'income' }])
+  })
+
+  it('a parent with its one child is one row: the child is covered by the tick on its parent', () => {
+    expect(rows(sel([], ['inc-consult', 'inc-consult-tax']))).toEqual([{ kind: 'category', id: 'inc-consult' }])
+  })
+
+  it('a child chosen alone is its own row, its parent not chosen', () => {
+    expect(rows(sel([], ['inc-consult-tax']))).toEqual([{ kind: 'category', id: 'inc-consult-tax' }])
+  })
+
+  it('separate rows are counted once each, the uncategorised row and transfers included', () => {
+    expect(rows(sel(['transfer'], ['exp-rent', '_none:expense']))).toEqual([
+      { kind: 'transfer' },
+      { kind: 'category', id: 'exp-rent' },
+      { kind: 'uncategorised', type: 'expense' },
+    ])
+  })
+
+  it('a stored id the company does not have (deleted) is still one row', () => {
+    expect(rows(sel([], ['gone']))).toEqual([{ kind: 'category', id: 'gone' }])
+  })
+
+  it('a row under a chosen group is not a row of its own', () => {
+    expect(rows(sel(['income'], ['inc-sales', 'exp-rent']))).toEqual([{ kind: 'group', type: 'income' }, { kind: 'category', id: 'exp-rent' }])
   })
 })
 

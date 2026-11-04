@@ -206,6 +206,31 @@ export function toggleKind<C extends KindCategory>(sel: KindSelection, tree: Kin
   return fromKeys(keys, transfer, tree)
 }
 
+/**
+ * The rows the person sees as chosen: each group and transfer chosen, and each category or uncategorised row chosen whose
+ * parent is not (a tick on a parent covers its children, so they are not rows of their own). A stored id the company does not
+ * have (deleted, or from an old link) is one row. What the field's summary counts.
+ */
+export function topChoices<C extends KindCategory>(sel: KindSelection, tree: KindTree<C>): KindRef[] {
+  const refs: KindRef[] = []
+  for (const type of GROUPS) if (sel.types.includes(type)) refs.push({ kind: 'group', type })
+  if (sel.types.includes('transfer')) refs.push({ kind: 'transfer' })
+  const chosen = new Set(sel.categoryIds)
+  const visit = (node: KindNode<C>): void => {
+    if (chosen.has(node.category.id)) refs.push({ kind: 'category', id: node.category.id })
+    else node.children.forEach(visit)
+  }
+  for (const type of GROUPS) {
+    if (sel.types.includes(type)) continue
+    tree[type].roots.forEach(visit)
+    if (chosen.has(noCategoryId(type))) refs.push({ kind: 'uncategorised', type })
+  }
+  for (const id of sel.categoryIds) {
+    if (!tree.nodes.has(id) && parseNoCategoryId(id) === undefined) refs.push({ kind: 'category', id })
+  }
+  return refs
+}
+
 /** The normal form of a choice read from the address (a hand-made link may hold a whole group as ids). Same meaning. */
 export function normaliseKinds<C extends KindCategory>(sel: KindSelection, tree: KindTree<C>): KindSelection {
   const result = fromKeys(coveredKeys(sel, tree), sel.types.includes('transfer'), tree)

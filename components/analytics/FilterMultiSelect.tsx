@@ -9,10 +9,8 @@ import { nameKeyText } from '@/lib/domain/counterparties/normalize'
 import type { TriState } from '@/lib/domain/analytics-filter/kinds'
 import { MAX_FILTER_IDS } from '@/lib/domain/journal/filter'
 import { highlightedRow } from '@/lib/ui/highlight'
+import { arrowExpandTarget, listWindow } from '@/lib/ui/filter-list'
 import { cn } from '@/lib/utils'
-
-/** Rows the open list shows at most; the search narrows the rest. */
-const MAX_ROWS = 100
 
 export interface FilterOption {
   id: string
@@ -31,8 +29,8 @@ export interface FilterOption {
   expanded?: boolean
   /** Hidden while nothing is searched (the rows under a closed row); a search finds them too. */
   collapsed?: boolean
-  /** Not counted against the list limit, shown bold (a group above its rows). */
-  free?: boolean
+  /** Shown bold: a group above its rows. */
+  strong?: boolean
 }
 
 interface Props {
@@ -56,8 +54,10 @@ interface Props {
   onExpand?: (id: string, expanded: boolean) => void
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** No more ids may be added (the 30-id limit of the address): rows not chosen yet, except `free` ones, are disabled. */
+  /** No more ids may be added (the 30-id limit of the address): the rows not chosen yet are disabled (a flat list). */
   full?: boolean
+  /** A tree's owner refused the last tick (the 30-id limit): the list says so until the next tick that is kept. */
+  refused?: boolean
   disabled?: boolean
 }
 
@@ -84,6 +84,7 @@ export function FilterMultiSelect({
   open,
   onOpenChange,
   full = false,
+  refused = false,
   disabled,
 }: Props) {
   const t = useTranslations('analytics.filters')
@@ -105,8 +106,9 @@ export function FilterMultiSelect({
   const matching = q === '' ? shown : shown.filter((o) => nameKeyText(o.label).includes(q))
   // While searching there is no «Усі …» row, so the first match (highlighted by typing) is never «clear the choice».
   const head: Row[] = q === '' ? [{ kind: 'all' }] : []
-  const rows: Row[] = [...head, ...matching.slice(0, MAX_ROWS).map((option): Row => ({ kind: 'option', option }))]
-  const hidden = Math.max(0, matching.length - MAX_ROWS)
+  const windowed = listWindow(matching, tree)
+  const rows: Row[] = [...head, ...windowed.shown.map((option): Row => ({ kind: 'option', option }))]
+  const hidden = windowed.hidden
   const highlighted = highlightedRow(rows.length, q, moved)
   const chosen = new Set(value)
   const count = value.length
@@ -129,7 +131,7 @@ export function FilterMultiSelect({
     return row.option.state ?? (chosen.has(row.option.id) ? 'checked' : 'unchecked')
   }
   // The list's own limit applies to the flat lists only; a tree's owner refuses what it cannot keep.
-  const blocked = (row: Row): boolean => row.kind === 'option' && !onRowToggle && full && !chosen.has(row.option.id) && row.option.free !== true
+  const blocked = (row: Row): boolean => row.kind === 'option' && !onRowToggle && full && !chosen.has(row.option.id)
   const toggle = (row: Row) => {
     if (row.kind === 'all') onChange([])
     else if (onRowToggle) onRowToggle(row.option.id)
@@ -145,12 +147,12 @@ export function FilterMultiSelect({
       e.preventDefault()
       if (rows.length > 0) setMoved(Math.max(highlighted - 1, 0))
     } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-      // A tree row opens or closes; in any other row the arrows move the caret as usual.
+      // A tree row opens or closes while nothing is typed; with a search typed, the arrows move the caret as usual.
       const row = highlighted >= 0 ? rows[highlighted] : undefined
-      const wantOpen = e.key === 'ArrowRight'
-      if (row?.kind === 'option' && row.option.expanded !== undefined && row.option.expanded !== wantOpen && onExpand) {
+      const target = row?.kind === 'option' ? arrowExpandTarget(e.key, query, row.option.expanded) : undefined
+      if (row?.kind === 'option' && target !== undefined && onExpand) {
         e.preventDefault()
-        onExpand(row.option.id, wantOpen)
+        onExpand(row.option.id, target)
       }
     } else if (e.key === 'Enter') {
       // Enter never submits and never ticks a row nobody highlighted.
@@ -171,7 +173,7 @@ export function FilterMultiSelect({
         type="button"
         disabled={disabled}
         aria-expanded={open}
-        aria-haspopup="listbox"
+        aria-haspopup={tree ? 'tree' : 'listbox'}
         aria-controls={open ? listId : undefined}
         onClick={() => {
           if (open) {
@@ -197,6 +199,7 @@ export function FilterMultiSelect({
             role="combobox"
             aria-expanded
             aria-controls={listId}
+            aria-haspopup={tree ? 'tree' : undefined}
             aria-autocomplete="list"
             aria-activedescendant={highlighted >= 0 ? `${listId}-${highlighted}` : undefined}
             aria-label={searchLabel}
@@ -210,19 +213,26 @@ export function FilterMultiSelect({
             onKeyDown={onKeyDown}
             className="h-9 rounded-control border-line bg-surface"
           />
-          <ul ref={listRef} id={listId} role="listbox" aria-multiselectable="true" aria-label={label} className="max-h-64 overflow-y-auto">
+          <ul ref={listRef} id={listId} role={tree ? 'tree' : 'listbox'} aria-multiselectable="true" aria-label={label} className="max-h-64 overflow-y-auto">
             {rows.map((row, index) => {
               const state = stateOf(row)
               const off = blocked(row)
               const level = row.kind === 'option' ? (row.option.level ?? 0) : 0
+              // A tree row is a treeitem (the option role has no level and no expanded state); a partly chosen one says so in its name.
+              const itemId = `${listId}-${index}`
+              const labelId = `${itemId}-label`
+              const partlyId = `${itemId}-partly`
               return (
                 <li
                   key={row.kind === 'all' ? 'all' : `o:${row.option.id}`}
-                  id={`${listId}-${index}`}
-                  role="option"
-                  aria-selected={state === 'checked'}
+                  id={itemId}
+                  role={tree ? 'treeitem' : 'option'}
+                  aria-selected={tree ? undefined : state === 'checked'}
+                  aria-checked={tree ? state === 'checked' : undefined}
+                  aria-level={tree ? level + 1 : undefined}
+                  aria-expanded={tree && row.kind === 'option' ? row.option.expanded : undefined}
+                  aria-labelledby={state === 'mixed' ? `${labelId} ${partlyId}` : undefined}
                   aria-disabled={off || undefined}
-                  aria-description={state === 'mixed' ? t('partly') : undefined}
                   data-state={state}
                   // mousedown keeps the focus in the search field; the click ticks the row.
                   onMouseDown={(e) => e.preventDefault()}
@@ -270,11 +280,13 @@ export function FilterMultiSelect({
                     {state === 'mixed' && <MinusIcon className="size-3" strokeWidth={3} />}
                   </span>
                   {row.kind === 'all' ? (
-                    <span className="min-w-0 flex-1 break-words font-medium">{allLabel}</span>
+                    <span id={labelId} className="min-w-0 flex-1 break-words font-medium">
+                      {allLabel}
+                    </span>
                   ) : (
                     <>
                       {row.option.marker && <span className="mt-1.5 flex shrink-0">{row.option.marker}</span>}
-                      <span className={cn('min-w-0 flex-1 break-words', row.option.muted && 'text-ink-muted', row.option.free && 'font-medium')}>
+                      <span id={labelId} className={cn('min-w-0 flex-1 break-words', row.option.muted && 'text-ink-muted', row.option.strong && 'font-medium')}>
                         {row.option.label}
                         {row.option.note && (
                           <>
@@ -284,6 +296,11 @@ export function FilterMultiSelect({
                         )}
                       </span>
                     </>
+                  )}
+                  {state === 'mixed' && (
+                    <span id={partlyId} className="sr-only">
+                      {t('partly')}
+                    </span>
                   )}
                 </li>
               )
@@ -296,6 +313,11 @@ export function FilterMultiSelect({
           </ul>
           {hidden > 0 && <p className="px-2 text-xs text-ink-muted">{t('more', { count: hidden })}</p>}
           {full && <p className="px-2 text-xs text-ink-muted">{t('full', { max: MAX_FILTER_IDS })}</p>}
+          {refused && (
+            <p role="status" className="px-2 text-xs text-ink-muted">
+              {t('refused', { max: MAX_FILTER_IDS })}
+            </p>
+          )}
           <div className="flex justify-end">
             <Button type="button" size="sm" onClick={close}>
               {t('choose')}

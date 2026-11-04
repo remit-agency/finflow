@@ -962,6 +962,7 @@
       "noMatches": "Nothing found",
       "more": "{count} more: narrow the search",
       "full": "At most {max} in the list",
+      "refused": "This choice does not fit: at most {max} in the list",
       "kinds": {
         "label": "Payment types and categories",
         "all": "All types and categories",

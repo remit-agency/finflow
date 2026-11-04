@@ -962,6 +962,7 @@
       "noMatches": "Nic nie znaleziono",
       "more": "Jeszcze {count}: zawęź wyszukiwanie",
       "full": "Nie więcej niż {max} na liście",
+      "refused": "Ten wybór się nie mieści: nie więcej niż {max} na liście",
       "kinds": {
         "label": "Rodzaje płatności i kategorie",
         "all": "Wszystkie rodzaje i kategorie",
