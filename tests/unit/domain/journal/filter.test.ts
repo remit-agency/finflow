@@ -157,7 +157,7 @@ describe('tags (S10t)', () => {
   })
 })
 
-describe('matchesSelection (S10f: the journal and the reports share it)', () => {
+describe('matchesSelection (the journal: a type and a category must both match; the shared choices are one rule)', () => {
   const none = { types: [], categoryIds: [], counterpartyIds: [], accountIds: [], tagIds: [] }
 
   it('several accounts: any of them, the target of a transfer included', () => {

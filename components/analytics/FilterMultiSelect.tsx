@@ -315,7 +315,7 @@ export function FilterMultiSelect({
           {full && <p className="px-2 text-xs text-ink-muted">{t('full', { max: MAX_FILTER_IDS })}</p>}
           {refused && (
             <p role="status" className="px-2 text-xs text-ink-muted">
-              {t('refused', { max: MAX_FILTER_IDS })}
+              {t('full', { max: MAX_FILTER_IDS })}
             </p>
           )}
           <div className="flex justify-end">

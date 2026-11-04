@@ -87,6 +87,38 @@ async function seedTree(request: APIRequestContext, orgId: string): Promise<void
 }
 
 /** Opens «Фільтри» on the current report; `active` is the number the button shows (0: none). */
+/** A parent with 31 children: ticking the parent is 32 ids, more than the address keeps. */
+async function seedWideParent(request: APIRequestContext, orgId: string): Promise<void> {
+  const createdAt = new Date()
+  const base = { type: 'expense', color: '#64748b', orgId, createdAt } as const
+  await seedDoc(request, `organizations/${orgId}/categories`, 'cat-wide', { ...base, name: 'Велика категорія' })
+  await Promise.all(
+    Array.from({ length: 31 }, (_, i) =>
+      seedDoc(request, `organizations/${orgId}/categories`, `cat-wide-${i + 1}`, {
+        ...base,
+        name: `Підкатегорія ${String(i + 1).padStart(2, '0')}`,
+        parentId: 'cat-wide',
+      }),
+    ),
+  )
+}
+
+/** More expense categories than the tree's rows the old list kept (100): the last rows must still show. */
+async function seedLongList(request: APIRequestContext, orgId: string): Promise<void> {
+  const createdAt = new Date()
+  await Promise.all(
+    Array.from({ length: 105 }, (_, i) =>
+      seedDoc(request, `organizations/${orgId}/categories`, `cat-long-${i + 1}`, {
+        name: `Категорія ${String(i + 1).padStart(3, '0')}`,
+        type: 'expense',
+        color: '#64748b',
+        orgId,
+        createdAt,
+      }),
+    ),
+  )
+}
+
 async function openFilters(page: Page, active = 0): Promise<Locator> {
   await page.getByRole('button', { name: active > 0 ? `Фільтри (активних: ${active})` : 'Фільтри', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Фільтри' })
@@ -309,5 +341,40 @@ test.describe('report filters (emulators)', () => {
     await expect(page).toHaveURL(/\/analytics\/cashflow\?cat=cat-services$/)
     await expect(income(page)).toHaveText('0')
     await expect(expense(page)).toHaveText('0')
+  })
+
+  test('the tree: a tick the 30-id limit cannot keep is refused, and the list says so on every refused tick until a tick is kept', async ({ page, request }) => {
+    const user = await setup(page, request, 'af-lim')
+    await seedWideParent(request, user.orgId)
+    await page.goto(`/${user.orgId}/analytics/cashflow`)
+    await waitForShell(page, user.companyName)
+
+    const dialog = await openFilters(page)
+    await dialog.getByRole('button', { name: 'Усі види і категорії', exact: true }).click()
+    const wide = dialog.getByRole('treeitem', { name: /^Велика категорія/ })
+    await wide.click()
+    await expect(dialog.getByRole('status')).toHaveText('Не більше 30 у списку')
+    await expect(wide).toHaveAttribute('data-state', 'unchecked')
+    // Refused again: the message stays and the row does not move.
+    await wide.click()
+    await expect(dialog.getByRole('status')).toHaveText('Не більше 30 у списку')
+    await expect(wide).toHaveAttribute('data-state', 'unchecked')
+    // A tick that is kept clears the message.
+    await dialog.getByRole('treeitem', { name: 'Без категорії витрат', exact: true }).click()
+    await expect(dialog.getByRole('status')).toHaveCount(0)
+  })
+
+  test('the tree: a list of more than 100 categories keeps its last rows in view', async ({ page, request }) => {
+    const user = await setup(page, request, 'af-long')
+    await seedLongList(request, user.orgId)
+    await page.goto(`/${user.orgId}/analytics/cashflow`)
+    await waitForShell(page, user.companyName)
+
+    const dialog = await openFilters(page)
+    await dialog.getByRole('button', { name: 'Усі види і категорії', exact: true }).click()
+    const lastRow = dialog.getByRole('treeitem', { name: 'Переказ', exact: true })
+    await lastRow.scrollIntoViewIfNeeded()
+    await expect(lastRow).toBeVisible()
+    await expect(dialog.getByRole('treeitem', { name: 'Без категорії витрат', exact: true })).toBeVisible()
   })
 })
