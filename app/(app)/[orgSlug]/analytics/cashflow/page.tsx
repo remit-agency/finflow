@@ -38,7 +38,7 @@ export default function CashFlowPage() {
   const selection = useMemo(() => filterForAnalytics(transactions, filters), [transactions, filters])
 
   const report = useMemo(
-    () => buildCashFlow(selection.operations, resolvePeriod(period, now), locale, { includeExcluded: selection.includeExcluded }),
+    () => buildCashFlow(selection, resolvePeriod(period, now), locale),
     [selection, period, now, locale]
   )
   const { granularity, buckets: data } = report

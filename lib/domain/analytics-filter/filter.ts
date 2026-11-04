@@ -53,10 +53,16 @@ export function activeAnalyticsFilterCount(f: AnalyticsFilters, scope: Analytics
   return fields.filter((list) => list.length > 0).length
 }
 
+/** The operations the reports are built from, and whether the ones excluded from analytics are among them. */
 export interface AnalyticsSelection<T> {
   operations: T[]
   /** A concrete tag is chosen: the reports count the operations excluded from analytics too (Finmap's rule). */
   includeExcluded: boolean
+}
+
+/** The one rule of the reports: an operation excluded from analytics counts only when the selection includes them (S10f). */
+export function countsInAnalytics(tx: { excluded?: boolean }, includeExcluded: boolean): boolean {
+  return tx.excluded !== true || includeExcluded
 }
 
 /** The operations the reports are built from, by the journal's rule (`matchesSelection`); without a choice the same array. */

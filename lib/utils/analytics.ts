@@ -8,6 +8,7 @@ import {
   startOfDayUtc,
   type YearMonth,
 } from '@/lib/utils/calendar-grid'
+import { countsInAnalytics, type AnalyticsSelection } from '@/lib/domain/analytics-filter/filter'
 import type { PeriodRange } from '@/lib/utils/period'
 import { formatDate } from '@/lib/i18n/format'
 import type { Locale } from '@/lib/i18n/config'
@@ -65,17 +66,6 @@ export interface DayData {
   expense: number
   balance: number     // running end-of-day balance
   hasTransactions: boolean
-}
-
-/** How a report treats the operations excluded from analytics by their tags (S10t). */
-export interface ReportOptions {
-  /** Count them too: a concrete tag is chosen in the report filters (S10f, Finmap's rule). Default false. */
-  includeExcluded?: boolean
-}
-
-/** The one rule of the reports: an operation excluded from analytics counts only when the filters ask for it (S10f). */
-export function countsInAnalytics(tx: Pick<Transaction, 'excluded'>, opts: ReportOptions = {}): boolean {
-  return tx.excluded !== true || opts.includeExcluded === true
 }
 
 function formatMonthKey(year: number, month: number): string {
@@ -161,11 +151,12 @@ function daysOf(range: { start: Date; end: Date }): number {
 /**
  * Cash Flow over a resolved period (`resolvePeriod`): transactions outside the range are left
  * out; buckets are UTC months when the range is longer than 31 days and UTC days otherwise.
- * Transfers do not count, nor do operations excluded from analytics by their tags (S10t) unless `opts.includeExcluded`
+ * Transfers do not count, nor do operations excluded from analytics by their tags (S10t) unless the selection includes them (`includeExcluded`)
  * (S10f). `balance` is the running total of `net` from the start of the range.
  * `locale` (the UI language) only decides the bucket labels.
  */
-export function buildCashFlow(transactions: Transaction[], range: PeriodRange, locale: Locale, opts: ReportOptions = {}): CashFlowReport {
+export function buildCashFlow(selection: AnalyticsSelection<Transaction>, range: PeriodRange, locale: Locale): CashFlowReport {
+  const { operations: transactions, includeExcluded } = selection
   const bounded = reportRange(range, transactions)
   if (!bounded) return { granularity: 'month', buckets: [], excludedCounted: false }
   let excludedCounted = false
@@ -188,7 +179,7 @@ export function buildCashFlow(transactions: Transaction[], range: PeriodRange, l
   const byKey = new Map(buckets.map((b) => [b.key, b]))
   const keyOf = granularity === 'month' ? monthKeyUtc : dayKeyUtc
   for (const tx of transactions) {
-    if (!countsInAnalytics(tx, opts) || !inRange(tx, bounded)) continue
+    if (!countsInAnalytics(tx, includeExcluded) || !inRange(tx, bounded)) continue
     const entry = byKey.get(keyOf(txDate(tx)))
     if (!entry) continue
     if (tx.type === 'income') entry.income += tx.amount
@@ -211,18 +202,18 @@ export function buildCashFlow(transactions: Transaction[], range: PeriodRange, l
 /**
  * P&L over a resolved period: income and expense by category for the transactions inside the
  * range, split by the UTC months the range touches (the table's columns) with a total per row.
- * Transfers do not count, nor do operations excluded from analytics (S10t) unless `opts.includeExcluded` (S10f); transactions without a known category go to two rows (income and
+ * Transfers do not count, nor do operations excluded from analytics (S10t) unless the selection includes them (`includeExcluded`) (S10f); transactions without a known category go to two rows (income and
  * expense) named `uncategorizedName` (the translated «Без категорії»). `nameOf` is the label of a
  * category row (the UI passes the localized name); it defaults to the stored name.
  */
 export function buildPL(
-  transactions: Transaction[],
+  selection: AnalyticsSelection<Transaction>,
   categories: Category[],
   range: PeriodRange,
   uncategorizedName: string,
-  nameOf: (category: Category) => string = (category) => category.name,
-  opts: ReportOptions = {}
+  nameOf: (category: Category) => string = (category) => category.name
 ): PLReport {
+  const { operations: transactions, includeExcluded } = selection
   const bounded = reportRange(range, transactions)
   if (!bounded) return { monthKeys: [], rows: [], excludedCounted: false }
   let excludedCounted = false
@@ -261,7 +252,7 @@ export function buildPL(
 
   // Aggregate
   for (const tx of transactions) {
-    if (tx.type === 'transfer' || !countsInAnalytics(tx, opts)) continue
+    if (tx.type === 'transfer' || !countsInAnalytics(tx, includeExcluded)) continue
     if (!inRange(tx, bounded)) continue
     const key = monthKeyUtc(txDate(tx))
 
@@ -288,15 +279,11 @@ export function buildPL(
 
 /**
  * The days of a month (`month` 0-based) with their income, expense and running balance. Transfers do not count, nor do
- * operations excluded from analytics unless `opts.includeExcluded` (S10f closes the gap S10t left here): neither in the days
+ * operations excluded from analytics unless the selection includes them (`includeExcluded`) (S10f closes the gap S10t left here): neither in the days
  * nor in the balance carried in from before the month.
  */
-export function buildCalendar(
-  transactions: Transaction[],
-  year: number,
-  month: number,
-  opts: ReportOptions = {}
-): CalendarReport {
+export function buildCalendar(selection: AnalyticsSelection<Transaction>, year: number, month: number): CalendarReport {
+  const { operations: transactions, includeExcluded } = selection
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const result: DayData[] = []
   let excludedCounted = false
@@ -304,7 +291,7 @@ export function buildCalendar(
   // Get running balance up to start of month
   let startingBalance = 0
   for (const tx of transactions) {
-    if (!countsInAnalytics(tx, opts)) continue
+    if (!countsInAnalytics(tx, includeExcluded)) continue
     const date = tx.date instanceof Date ? tx.date : new Date(tx.date)
     if (date.getFullYear() < year || (date.getFullYear() === year && date.getMonth() < month)) {
       if (tx.type === 'income') startingBalance += tx.amount
@@ -322,7 +309,7 @@ export function buildCalendar(
     let expense = 0
 
     for (const tx of transactions) {
-      if (!countsInAnalytics(tx, opts)) continue
+      if (!countsInAnalytics(tx, includeExcluded)) continue
       const date = tx.date instanceof Date ? tx.date : new Date(tx.date)
       const txDateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
       if (txDateStr === dateStr) {

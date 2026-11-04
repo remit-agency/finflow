@@ -32,7 +32,7 @@ export default function CalendarPage() {
   const [month, setMonth] = useState(today.getUTCMonth())
 
   const calendar = useMemo(
-    () => buildCalendar(selection.operations, year, month, { includeExcluded: selection.includeExcluded }),
+    () => buildCalendar(selection, year, month),
     [selection, year, month]
   )
 
@@ -61,9 +61,8 @@ export default function CalendarPage() {
       </div>
 
       <CalendarView
-        transactions={selection.operations}
+        selection={selection}
         days={calendar.days}
-        includeExcluded={selection.includeExcluded}
         year={year}
         month={month}
         onNavigate={handleNavigate}

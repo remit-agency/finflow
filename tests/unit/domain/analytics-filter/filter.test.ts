@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   activeAnalyticsFilterCount,
   analyticsFiltersToParams,
+  countsInAnalytics,
   EMPTY_ANALYTICS_FILTERS,
   filterAccounts,
   filterForAnalytics,
@@ -126,6 +127,15 @@ describe('filterForAnalytics', () => {
       const journal = rows.filter((tx) => matchesFilters(tx, { ...EMPTY_FILTERS, ...rest, accountId: accountIds[0] }, ctx))
       expect(ids(filterForAnalytics(ui, choice).operations), JSON.stringify(choice)).toEqual(ids(journal))
     }
+  })
+})
+
+describe('countsInAnalytics', () => {
+  it('an operation excluded from analytics counts only when the selection includes them', () => {
+    expect(countsInAnalytics({}, false)).toBe(true)
+    expect(countsInAnalytics({ excluded: false }, false)).toBe(true)
+    expect(countsInAnalytics({ excluded: true }, false)).toBe(false)
+    expect(countsInAnalytics({ excluded: true }, true)).toBe(true)
   })
 })
 

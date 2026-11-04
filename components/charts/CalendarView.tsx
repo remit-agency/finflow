@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { Transaction } from '@/types'
-import { countsInAnalytics, DayData } from '@/lib/utils/analytics'
+import { countsInAnalytics, type AnalyticsSelection } from '@/lib/domain/analytics-filter/filter'
+import { DayData } from '@/lib/utils/analytics'
 import { ChevronLeft, ChevronRight, ChevronRight as ExpandIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -13,8 +14,9 @@ import { TOKEN_COLORS } from '@/lib/ui/colors'
 import { todayUtcDay } from '@/lib/utils/today'
 
 interface CalendarViewProps {
-  transactions: Transaction[]
-  /** The days of the month shown (`buildCalendar` over the same operations). */
+  /** The operations the Calendar was built from (`buildCalendar`), and whether the excluded ones are among them. */
+  selection: AnalyticsSelection<Transaction>
+  /** The days of the month shown (`buildCalendar` over the same selection). */
   days: DayData[]
   year: number
   month: number
@@ -22,8 +24,6 @@ interface CalendarViewProps {
   /** The company currency, used for the day and month totals. */
   currency: string
   loading?: boolean
-  /** A concrete tag is chosen in the report filters (S10f): the operations excluded from analytics count too. */
-  includeExcluded?: boolean
 }
 
 /** «жовтень» -> «Жовтень»: month and weekday names start a label, so they get a capital. */
@@ -156,14 +156,14 @@ function DayRow({ day, dayNum, year, month, transactions, currency }: DayRowProp
   )
 }
 
-export default function CalendarView({ transactions, days, year, month, onNavigate, currency, loading, includeExcluded = false }: CalendarViewProps) {
+export default function CalendarView({ selection, days, year, month, onNavigate, currency, loading }: CalendarViewProps) {
   const { orgSlug } = useParams<{ orgSlug: string }>()
   const { can } = useShell()
   const t = useTranslations('charts.calendar')
   const tCharts = useTranslations('charts')
   const { money, date } = useFormatters()
   // The list under an opened day shows what the day's totals count (transfers stay listed, as before).
-  const counted = transactions.filter((tx) => countsInAnalytics(tx, { includeExcluded }))
+  const counted = selection.operations.filter((tx) => countsInAnalytics(tx, selection.includeExcluded))
   const totalIncome = days.reduce((s, d) => s + d.income, 0)
   const totalExpense = days.reduce((s, d) => s + d.expense, 0)
 

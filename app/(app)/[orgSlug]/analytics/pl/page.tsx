@@ -39,7 +39,7 @@ export default function PLPage() {
   const selection = useMemo(() => filterForAnalytics(transactions, filters), [transactions, filters])
 
   const report = useMemo(
-    () => buildPL(selection.operations, categories, resolvePeriod(period, now), noCategory, categoryName, { includeExcluded: selection.includeExcluded }),
+    () => buildPL(selection, categories, resolvePeriod(period, now), noCategory, categoryName),
     [selection, categories, period, now, noCategory, categoryName]
   )
   const { monthKeys, rows } = report
