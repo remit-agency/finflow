@@ -80,6 +80,8 @@ test.describe('report filters (emulators)', () => {
 
     const dialog = await openFilters(page)
     await dialog.getByRole('button', { name: 'Теги', exact: true }).click()
+    // The field opens a listbox (the search and the rows are its popup).
+    await expect(dialog.getByRole('button', { name: 'Теги', exact: true })).toHaveAttribute('aria-haspopup', 'listbox')
     const search = dialog.getByRole('combobox', { name: 'Пошук тегів' })
     await expect(search).toBeFocused()
     await expect(dialog.getByRole('option', { name: 'Усі теги' })).toHaveAttribute('aria-selected', 'true')

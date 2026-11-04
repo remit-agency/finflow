@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { CheckIcon, ChevronDownIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -59,6 +59,7 @@ export function FilterMultiSelect({ label, allLabel, searchLabel, options, value
   const panelId = useId()
   const listId = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
   const [query, setQuery] = useState('')
   // The row the person moved the highlight to; null until they do.
   const [moved, setMoved] = useState<number | null>(null)
@@ -74,6 +75,11 @@ export function FilterMultiSelect({ label, allLabel, searchLabel, options, value
   const highlighted = highlightedRow(rows.length, q, moved)
   const chosen = new Set(value)
   const count = value.length
+
+  // The highlighted row stays in view while the arrow keys move it (the list scrolls, the page does not).
+  useEffect(() => {
+    if (open && highlighted >= 0) listRef.current?.children[highlighted]?.scrollIntoView?.({ block: 'nearest' })
+  }, [open, highlighted])
 
   const close = () => {
     onOpenChange(false)
@@ -115,7 +121,8 @@ export function FilterMultiSelect({ label, allLabel, searchLabel, options, value
         type="button"
         disabled={disabled}
         aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
+        aria-haspopup="listbox"
+        aria-controls={open ? listId : undefined}
         onClick={() => {
           if (open) {
             close()
@@ -153,7 +160,7 @@ export function FilterMultiSelect({ label, allLabel, searchLabel, options, value
             onKeyDown={onKeyDown}
             className="h-9 rounded-control border-line bg-surface"
           />
-          <ul id={listId} role="listbox" aria-multiselectable="true" aria-label={label} className="max-h-64 overflow-y-auto">
+          <ul ref={listRef} id={listId} role="listbox" aria-multiselectable="true" aria-label={label} className="max-h-64 overflow-y-auto">
             {rows.map((row, index) => {
               const checked = row.kind === 'all' ? count === 0 : chosen.has(row.option.id)
               const off = blocked(row)
