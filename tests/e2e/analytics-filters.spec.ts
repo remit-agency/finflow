@@ -182,4 +182,20 @@ test.describe('report filters (emulators)', () => {
     await expect(expense(page)).toHaveText('175')
     await expect(page.getByRole('button', { name: 'Фільтри', exact: true })).toBeVisible()
   })
+
+  test('an id of a deleted account, tag or category in the address is ignored: the report and the field show no choice', async ({ page, request }) => {
+    const user = await setup(page, request, 'af-gone')
+    await page.goto(`/${user.orgId}/analytics/cashflow?accounts=acc-deleted&tg=tag-deleted&cat=cat-deleted&cp=cp-deleted`)
+    await waitForShell(page, user.companyName)
+    await expect(income(page)).toHaveText('500')
+    await expect(expense(page)).toHaveText('175')
+    await expect(hint(page)).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Фільтри', exact: true })).toBeVisible()
+
+    await page.goto(`/${user.orgId}/analytics/balance?accounts=acc-deleted`)
+    await waitForShell(page, user.companyName)
+    await expect(page.getByRole('main').getByText('Konto główne')).toBeVisible()
+    await expect(page.getByRole('main').getByText('Rachunek VAT')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Фільтри', exact: true })).toBeVisible()
+  })
 })
