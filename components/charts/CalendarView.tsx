@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Transaction } from '@/types'
-import { buildCalendar, DayData } from '@/lib/utils/analytics'
+import { buildCalendar, countsInAnalytics, DayData } from '@/lib/utils/analytics'
 import { ChevronLeft, ChevronRight, ChevronRight as ExpandIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -20,6 +20,8 @@ interface CalendarViewProps {
   /** The company currency, used for the day and month totals. */
   currency: string
   loading?: boolean
+  /** A concrete tag is chosen in the report filters (S10f): the operations excluded from analytics count too. */
+  includeExcluded?: boolean
 }
 
 /** «жовтень» -> «Жовтень»: month and weekday names start a label, so they get a capital. */
@@ -152,13 +154,15 @@ function DayRow({ day, dayNum, year, month, transactions, currency }: DayRowProp
   )
 }
 
-export default function CalendarView({ transactions, year, month, onNavigate, currency, loading }: CalendarViewProps) {
+export default function CalendarView({ transactions, year, month, onNavigate, currency, loading, includeExcluded = false }: CalendarViewProps) {
   const { orgSlug } = useParams<{ orgSlug: string }>()
   const { can } = useShell()
   const t = useTranslations('charts.calendar')
   const tCharts = useTranslations('charts')
   const { money, date } = useFormatters()
-  const days = buildCalendar(transactions, year, month)
+  const days = buildCalendar(transactions, year, month, { includeExcluded })
+  // The list under an opened day shows what the day's totals count (transfers stay listed, as before).
+  const counted = transactions.filter((tx) => countsInAnalytics(tx, { includeExcluded }))
   const totalIncome = days.reduce((s, d) => s + d.income, 0)
   const totalExpense = days.reduce((s, d) => s + d.expense, 0)
 
@@ -228,7 +232,7 @@ export default function CalendarView({ transactions, year, month, onNavigate, cu
               dayNum={i + 1}
               year={year}
               month={month}
-              transactions={transactions}
+              transactions={counted}
               currency={currency}
             />
           ))}
