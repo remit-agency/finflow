@@ -178,5 +178,8 @@ describe('matchesSelection (S10f: the journal and the reports share it)', () => 
     expect(idList('a1,,a b,__x__,a2')).toEqual(['a1', 'a2'])
     expect(idList(Array.from({ length: 40 }, (_, i) => `x${i}`).join(','))).toHaveLength(MAX_FILTER_IDS)
     expect(idList(null)).toEqual([])
+    // A repeat is dropped before the cap: it does not use up one of the 30 places.
+    expect(idList([...Array.from({ length: 31 }, () => 'a0'), ...Array.from({ length: 30 }, (_, i) => `x${i}`)].join(',')).length).toBe(MAX_FILTER_IDS)
+    expect(idList('a1,a1,a2,a1')).toEqual(['a1', 'a2'])
   })
 })

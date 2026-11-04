@@ -44,18 +44,19 @@ export function normalizeText(s: string): string {
     .toLowerCase()
 }
 
-/** A comma-separated list of ids from the address: what is not an id is dropped, at most `MAX_FILTER_IDS` stay. */
+/**
+ * A comma-separated list of ids from the address: what is not an id is dropped, a repeat is dropped, and only then at most
+ * `MAX_FILTER_IDS` stay (a repeat does not use up a place).
+ */
 export function idList(raw: string | null): string[] {
   if (!raw) return []
-  return raw
-    .split(',')
-    .filter((s) => isId(s))
-    .slice(0, MAX_FILTER_IDS)
+  return [...new Set(raw.split(',').filter((s) => isId(s)))].slice(0, MAX_FILTER_IDS)
 }
 
-/** A comma-separated list of operation types from the address; anything else is dropped. */
+/** A comma-separated list of operation types from the address; anything else is dropped, a repeat too. */
 export function typeList(raw: string | null): TxType[] {
-  return (raw ?? '').split(',').filter((t): t is TxType => (TX_TYPES as readonly string[]).includes(t))
+  const types = (raw ?? '').split(',').filter((t): t is TxType => (TX_TYPES as readonly string[]).includes(t))
+  return [...new Set(types)]
 }
 
 function minor(raw: string | null): number | undefined {

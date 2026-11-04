@@ -37,6 +37,15 @@ describe('the address', () => {
     expect(parseAnalyticsFilters(p)).toEqual(f({ types: ['income'], categoryIds: ['c1'], tagIds: ['vat'], accountIds: ['a1'] }))
   })
 
+  it('removes the repeats first, then keeps 30 ids: a repeat does not use up a place', () => {
+    const repeated = [...Array.from({ length: 20 }, () => 'a0'), ...Array.from({ length: 35 }, (_, i) => `b${i}`)].join(',')
+    const expected = ['a0', ...Array.from({ length: 29 }, (_, i) => `b${i}`)]
+    const parsed = parseAnalyticsFilters(new URLSearchParams({ accounts: repeated, tg: repeated }))
+    expect(parsed.accountIds).toEqual(expected)
+    expect(parsed.tagIds).toEqual(expected)
+    expect(parseAnalyticsFilters(new URLSearchParams({ types: 'income,income,expense' })).types).toEqual(['income', 'expense'])
+  })
+
   it('keeps at most 30 ids per list, as the journal', () => {
     const many = Array.from({ length: 40 }, (_, i) => `a${i}`).join(',')
     const parsed = parseAnalyticsFilters(new URLSearchParams({ accounts: many, tg: many }))

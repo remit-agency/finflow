@@ -19,21 +19,18 @@ export const EMPTY_ANALYTICS_FILTERS: AnalyticsFilters = { types: [], categoryId
 /** Which fields a report offers: the Balance is made of accounts, the other reports of operations. */
 export type AnalyticsScope = 'operations' | 'accounts'
 
-function unique<T>(list: T[]): T[] {
-  return [...new Set(list)]
-}
-
 /**
  * Lenient, like the journal's `parseFilters` and with its names (`types`, `cat`, `cp`, `tg`; the accounts in `accounts`):
- * a bad value or a repeat is dropped, at most 30 ids a list stay, other parameters are not read.
+ * a bad value or a repeat is dropped (the journal's list readers do that), at most 30 ids a list stay, other parameters are
+ * not read.
  */
 export function parseAnalyticsFilters(p: Pick<URLSearchParams, 'get'>): AnalyticsFilters {
   return {
-    types: unique(typeList(p.get('types'))),
-    categoryIds: unique(idList(p.get('cat'))),
-    counterpartyIds: unique(idList(p.get('cp'))),
-    tagIds: unique(idList(p.get('tg'))),
-    accountIds: unique(idList(p.get('accounts'))),
+    types: typeList(p.get('types')),
+    categoryIds: idList(p.get('cat')),
+    counterpartyIds: idList(p.get('cp')),
+    tagIds: idList(p.get('tg')),
+    accountIds: idList(p.get('accounts')),
   }
 }
 
