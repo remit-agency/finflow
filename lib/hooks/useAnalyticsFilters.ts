@@ -11,7 +11,7 @@ import {
   type AnalyticsScope,
   type KnownAnalyticsIds,
 } from '@/lib/domain/analytics-filter/filter'
-import { buildKindTree } from '@/lib/domain/analytics-filter/kinds'
+import { buildKindTree, categoryTypesOf, type CategoryTypes } from '@/lib/domain/analytics-filter/kinds'
 import { useCounterparties } from '@/lib/hooks/useCounterparties'
 import { useShell } from '@/lib/hooks/useShell'
 import { useTags } from '@/lib/hooks/useTags'
@@ -21,6 +21,8 @@ export interface UseAnalyticsFiltersResult {
   filters: AnalyticsFilters
   /** Writes the filters into the address (replace, no scroll), as the journal does with its view. */
   setFilters: (next: AnalyticsFilters) => void
+  /** The company's categories as the report rule reads them (`categoryTypesOf`); `undefined` while they load. */
+  categoryTypes: CategoryTypes | undefined
 }
 
 /**
@@ -39,14 +41,19 @@ export function useAnalyticsFilters(scope: AnalyticsScope): UseAnalyticsFiltersR
   const { tags, loading: tagsLoading } = useTags(operations ? orgId : null)
   // Parsed once per address, so the pages' memos see the same object until the address changes.
   const parsed = useMemo(() => parseAnalyticsFilters(new URLSearchParams(query)), [query])
+  // The categories are read once here: the tree, the category types and the known ids all come from this one list.
+  const categoryTypes = useMemo(
+    () => (categoriesLoading ? undefined : categoryTypesOf([...incomeCategories, ...expenseCategories])),
+    [incomeCategories, expenseCategories, categoriesLoading]
+  )
   const known = useMemo<KnownAnalyticsIds>(
     () => ({
       accountIds: accountsLoading ? undefined : new Set(accounts.map((a) => a.id)),
-      categoryIds: categoriesLoading ? undefined : new Set([...incomeCategories, ...expenseCategories].map((c) => c.id)),
+      categoryIds: categoryTypes === undefined ? undefined : new Set(categoryTypes.keys()),
       counterpartyIds: operations && !counterpartiesLoading ? new Set(counterparties.map((c) => c.id)) : undefined,
       tagIds: operations && !tagsLoading ? new Set(tags.map((t) => t.id)) : undefined,
     }),
-    [operations, accounts, accountsLoading, incomeCategories, expenseCategories, categoriesLoading, counterparties, counterpartiesLoading, tags, tagsLoading]
+    [operations, accounts, accountsLoading, categoryTypes, counterparties, counterpartiesLoading, tags, tagsLoading]
   )
   const tree = useMemo(() => buildKindTree([...incomeCategories, ...expenseCategories]), [incomeCategories, expenseCategories])
   const filters = useMemo(() => {
@@ -58,5 +65,5 @@ export function useAnalyticsFilters(scope: AnalyticsScope): UseAnalyticsFiltersR
     const params = analyticsFiltersToParams(next).toString()
     router.replace(params ? `${pathname}?${params}` : pathname, { scroll: false })
   }
-  return { filters, setFilters }
+  return { filters, setFilters, categoryTypes }
 }

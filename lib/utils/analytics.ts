@@ -9,6 +9,7 @@ import {
   type YearMonth,
 } from '@/lib/utils/calendar-grid'
 import { countsInAnalytics, type AnalyticsSelection } from '@/lib/domain/analytics-filter/filter'
+import { categoryTypesOf, kindRowOf } from '@/lib/domain/analytics-filter/kinds'
 import type { PeriodRange } from '@/lib/utils/period'
 import { formatDate } from '@/lib/i18n/format'
 import type { Locale } from '@/lib/i18n/config'
@@ -203,8 +204,10 @@ export function buildCashFlow(selection: AnalyticsSelection<Transaction>, range:
  * P&L over a resolved period: income and expense by category for the transactions inside the
  * range, split by the UTC months the range touches (the table's columns) with a total per row.
  * Transfers do not count, nor do operations excluded from analytics (S10t) unless the selection includes them (`includeExcluded`) (S10f); transactions without a known category go to two rows (income and
- * expense) named `uncategorizedName` (the translated «Без категорії»). `nameOf` is the label of a
- * category row (the UI passes the localized name); it defaults to the stored name.
+ * expense) named `uncategorizedName` (the translated «Без категорії»). An operation counts in its category's row only while
+ * the company has that category with its own type (`kindRowOf`): a deleted category and a category of the other type count as
+ * uncategorised, as the report filter counts them. `nameOf` is the label of a category row (the UI passes the localized
+ * name); it defaults to the stored name.
  */
 export function buildPL(
   selection: AnalyticsSelection<Transaction>,
@@ -250,16 +253,18 @@ export function buildPL(
     total: 0,
   }
 
-  // Aggregate
+  // Aggregate: an operation counts in the row `kindRowOf` gives it, the same rule the report filter uses.
+  const types = categoryTypesOf(categories)
   for (const tx of transactions) {
     if (tx.type === 'transfer' || !countsInAnalytics(tx, includeExcluded)) continue
     if (!inRange(tx, bounded)) continue
     const key = monthKeyUtc(txDate(tx))
 
-    if (tx.categoryId && rowMap.has(tx.categoryId)) {
-      const row = rowMap.get(tx.categoryId)!
-      row.months[key] = (row.months[key] || 0) + tx.amount
-      row.total += tx.amount
+    const row = kindRowOf(tx, types)
+    const target = row === undefined ? undefined : rowMap.get(row)
+    if (target) {
+      target.months[key] = (target.months[key] || 0) + tx.amount
+      target.total += tx.amount
     } else {
       const bucket = tx.type === 'income' ? uncatIncome : uncatExpense
       bucket.months[key] = (bucket.months[key] || 0) + tx.amount

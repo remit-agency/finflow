@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EMPTY_ANALYTICS_FILTERS, filterForAnalytics, type AnalyticsFilters, type AnalyticsSelection } from '@/lib/domain/analytics-filter/filter'
+import { categoryTypesOf } from '@/lib/domain/analytics-filter/kinds'
 import { NO_TAG } from '@/lib/domain/journal/filter'
 import { buildCalendar, buildCashFlow, buildPL, type CashFlowReport } from '@/lib/utils/analytics'
 import { resolvePeriod } from '@/lib/utils/period'
@@ -264,6 +265,26 @@ describe('report filters (S10f)', () => {
     expect(all[30].balance).toBe(560)
   })
 
+  it('the uncategorised row of a type takes the P&L bucket of that type: a deleted category and a category of the other type included', () => {
+    const txs = [
+      tx('expense', 10, '2026-10-05T10:00:00Z', 'cat-gone'),
+      tx('expense', 20, '2026-10-06T10:00:00Z', 'cat-in'),
+      tx('expense', 30, '2026-10-07T10:00:00Z', 'cat-ex'),
+      tx('expense', 40, '2026-10-08T10:00:00Z'),
+      tx('income', 50, '2026-10-09T10:00:00Z', 'cat-gone-in'),
+    ]
+    const cats = [category('cat-in', 'income', 'Sprzedaż'), category('cat-ex', 'expense', 'Koszty')]
+    const chosen = filterForAnalytics(txs, { ...EMPTY_ANALYTICS_FILTERS, categoryIds: ['_none:expense'] }, categoryTypesOf(cats))
+    expect(chosen.operations.map((t) => t.amount)).toEqual([10, 20, 40])
+    const pl = buildPL(chosen, cats, period, NONE)
+    expect(pl.rows.find((r) => r.categoryId === '__uncategorized_expense')?.total).toBe(70)
+    expect(pl.rows.find((r) => r.categoryId === 'cat-ex')).toBeUndefined()
+    expect(pl.rows.find((r) => r.categoryId === '__uncategorized_income')).toBeUndefined()
+    const all = buildPL(sel(txs), cats, period, NONE)
+    expect(all.rows.find((r) => r.categoryId === '__uncategorized_expense')?.total).toBe(70)
+    expect(all.rows.find((r) => r.categoryId === '__uncategorized_income')?.total).toBe(50)
+  })
+
   it('with a filter the totals are the sums of the operations it chose (the data of the e2e)', () => {
     const at = (t: Transaction, over: Partial<Transaction>): Transaction => ({ ...t, ...over })
     const txs = [
@@ -286,7 +307,7 @@ describe('report filters (S10f)', () => {
       [{ types: ['income'], categoryIds: ['cat-ex'] }, [500, 175]],
     ]
     for (const [choice, expected] of cases) {
-      const selection = filterForAnalytics(txs, { ...EMPTY_ANALYTICS_FILTERS, ...choice })
+      const selection = filterForAnalytics(txs, { ...EMPTY_ANALYTICS_FILTERS, ...choice }, categoryTypesOf(cats))
       const counted = selection.operations.filter((t) => t.type !== 'transfer' && (selection.includeExcluded || t.excluded !== true))
       const sum = (type: 'income' | 'expense') => counted.filter((t) => t.type === type).reduce((s, t) => s + t.amount, 0)
       const label = JSON.stringify(choice)

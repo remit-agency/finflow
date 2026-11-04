@@ -34,8 +34,8 @@ export default function CashFlowPage() {
   const [now] = useState(() => todayUtcDay())
 
   // The report filters live in the address (S10f); a concrete tag brings the operations excluded from analytics in.
-  const { filters, setFilters } = useAnalyticsFilters('operations')
-  const selection = useMemo(() => filterForAnalytics(transactions, filters), [transactions, filters])
+  const { filters, setFilters, categoryTypes } = useAnalyticsFilters('operations')
+  const selection = useMemo(() => filterForAnalytics(transactions, filters, categoryTypes), [transactions, filters, categoryTypes])
 
   const report = useMemo(
     () => buildCashFlow(selection, resolvePeriod(period, now), locale),

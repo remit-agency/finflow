@@ -1,13 +1,14 @@
 import { isId } from '@/lib/domain/ledger/guards'
-import { TX_TYPES, type TxType } from '@/lib/domain/ledger/types'
+import type { TxType } from '@/lib/domain/ledger/types'
 import { MAX_FILTER_IDS } from '@/lib/domain/journal/filter'
 
 /**
  * The payment types and categories of the reports (S10f, Finmap's tree). The owner of this file is the one place that knows
  * what a stored choice means: `types` holds whole groups (`income`, `expense`, `transfer`), `categoryIds` the other ids: a
  * category, or the uncategorised row of a payment type (`_none:income`, `_none:expense`). An operation matches when its type
- * is a chosen group, or its category is a chosen id, or it is uncategorised and its type's uncategorised row is chosen.
- * Nothing chosen is no restriction. The journal keeps its own AND rule (`matchesJournalKinds`).
+ * is a chosen group, or its row is a chosen id; its row is `kindRowOf`: its category while the company has it with the
+ * operation's type, else the uncategorised row of its type. Nothing chosen is no restriction. The journal keeps its own AND
+ * rule (`matchesJournalKinds`).
  */
 
 /** The payment types that have categories; `transfer` is a row of its own. */
@@ -54,7 +55,10 @@ export interface KindNode<C extends KindCategory> {
 
 export interface KindGroup<C extends KindCategory> {
   roots: KindNode<C>[]
-  /** Every category of the type, at any depth, in the caller's order. */
+  /**
+   * Every category of the type, at any depth, in the caller's order: the order the stored ids are written in. The dialog and the
+   * hook read the same list, so they write and normalise to one order and a normal form is never rewritten for its order alone.
+   */
   members: readonly string[]
 }
 
@@ -66,13 +70,18 @@ export interface KindTree<C extends KindCategory> {
 }
 
 /**
- * The tree of a company's categories, one group per payment type. A category whose parent is missing (deleted, or of another
- * type) is a root; a loop of parents keeps its categories as roots, so none is hidden. `order` sorts the siblings.
+ * The tree of a company's categories, one group per payment type. A category whose parent is missing (deleted) or of the other
+ * type is a root of its group: a parent of another type is not its parent. A loop of parents keeps its categories as roots, so
+ * none is hidden. `order` sorts the siblings.
  */
 export function buildKindTree<C extends KindCategory>(categories: readonly C[], order: (a: C, b: C) => number = () => 0): KindTree<C> {
   const nodes = new Map<string, KindNode<C>>()
   for (const c of categories) nodes.set(c.id, { category: c, children: [] })
-  const parentOf = (c: C): string | undefined => (c.parentId !== undefined && c.parentId !== c.id && nodes.has(c.parentId) ? c.parentId : undefined)
+  const parentOf = (c: C): string | undefined => {
+    if (c.parentId === undefined || c.parentId === c.id) return undefined
+    const parent = nodes.get(c.parentId)
+    return parent !== undefined && parent.category.type === c.type ? c.parentId : undefined
+  }
   // A category is a root when walking up its parents comes back to it (a loop).
   const inLoop = (c: C): boolean => {
     const seen = new Set<string>()
@@ -85,9 +94,9 @@ export function buildKindTree<C extends KindCategory>(categories: readonly C[], 
     return false
   }
   const group = (type: KindGroupType): KindGroup<C> => {
-    const list = categories.filter((c) => c.type === type).sort(order)
+    const list = categories.filter((c) => c.type === type)
     const roots: KindNode<C>[] = []
-    for (const c of list) {
+    for (const c of [...list].sort(order)) {
       const node = nodes.get(c.id)!
       const parent = parentOf(c)
       if (parent !== undefined && !inLoop(c)) nodes.get(parent)!.children.push(node)
@@ -140,19 +149,24 @@ export function kindState<C extends KindCategory>(sel: KindSelection, tree: Kind
 
 export type KindToggle = { ok: true; selection: KindSelection } | { ok: false; reason: 'limit' }
 
-/** The normal form of a set of covered keys: a group that is whole becomes its type; the rest stays as ids. */
+/**
+ * The normal form of a set of covered keys. A group is stored as its type only when it has at least one category and every one
+ * of them, and its uncategorised row, is covered. A group with no categories never collapses: its uncategorised row alone would
+ * stand for the whole type, and a category created later would be taken in by a choice that never named it. When every group
+ * and the transfers are covered there is no restriction at all. The rest stays as ids.
+ */
 function fromKeys<C extends KindCategory>(keys: Set<string>, transfer: boolean, tree: KindTree<C>): KindToggle {
+  const covered = (type: KindGroupType): boolean => memberKeys(tree, type).every((k) => keys.has(k))
+  if (transfer && GROUPS.every(covered)) return { ok: true, selection: { types: [], categoryIds: [] } }
   const types: TxType[] = []
   const rest = new Set(keys)
   for (const type of GROUPS) {
-    const members = memberKeys(tree, type)
-    if (members.every((k) => keys.has(k))) {
+    if (tree[type].members.length > 0 && covered(type)) {
       types.push(type)
-      for (const k of members) rest.delete(k)
+      for (const k of memberKeys(tree, type)) rest.delete(k)
     }
   }
   if (transfer) types.push('transfer')
-  if (TX_TYPES.every((t) => types.includes(t))) return { ok: true, selection: { types: [], categoryIds: [] } }
   // The ids in the tree's order (income, then expense, the uncategorised row last), the ones the tree does not know after.
   const order = [...memberKeys(tree, 'income'), ...memberKeys(tree, 'expense')]
   const ordered = order.filter((k) => rest.has(k))
@@ -199,13 +213,33 @@ export function normaliseKinds<C extends KindCategory>(sel: KindSelection, tree:
   return result.ok ? result.selection : sel
 }
 
+/** The company's categories as the rules read them: each id with its payment type. */
+export type CategoryTypes = ReadonlyMap<string, KindGroupType>
+
+export function categoryTypesOf(categories: readonly KindCategory[]): CategoryTypes {
+  return new Map(categories.map((c) => [c.id, c.type]))
+}
+
 /**
- * The union rule of the reports: an operation matches when its type is a chosen group (or transfers), or its category is a
- * chosen id, or it has no category and its type's uncategorised row is chosen. Nothing chosen matches everything.
+ * The row an operation counts in: the one rule of the reports, shared by the filter and the P&L (S10f). Its category while the
+ * company has that category with the operation's own type. Otherwise its type's uncategorised row: a deleted category (it
+ * leaves its id on the operation) and a category of the other type both count as uncategorised. A transfer has no row. While
+ * the categories are not loaded (`types` is `undefined`) the stored id stands: unknown is not absent.
  */
-export function matchesAnalyticsKinds(tx: { type: TxType; categoryId?: string }, sel: KindSelection): boolean {
+export function kindRowOf(tx: { type: TxType; categoryId?: string }, types: CategoryTypes | undefined): string | undefined {
+  if (tx.type === 'transfer') return undefined
+  if (tx.categoryId === undefined) return noCategoryId(tx.type)
+  if (types === undefined) return tx.categoryId
+  return types.get(tx.categoryId) === tx.type ? tx.categoryId : noCategoryId(tx.type)
+}
+
+/**
+ * The union rule of the reports: an operation matches when its type is a chosen group (or transfers), or its row (`kindRowOf`)
+ * is a chosen id. Nothing chosen matches everything.
+ */
+export function matchesAnalyticsKinds(tx: { type: TxType; categoryId?: string }, sel: KindSelection, types: CategoryTypes | undefined): boolean {
   if (sel.types.length === 0 && sel.categoryIds.length === 0) return true
   if (sel.types.includes(tx.type)) return true
-  const key = tx.categoryId ?? (tx.type === 'transfer' ? undefined : noCategoryId(tx.type))
-  return key !== undefined && sel.categoryIds.includes(key)
+  const row = kindRowOf(tx, types)
+  return row !== undefined && sel.categoryIds.includes(row)
 }

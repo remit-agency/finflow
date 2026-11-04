@@ -3,6 +3,7 @@ import {
   matchesAnalyticsKinds,
   normaliseKinds,
   parseNoCategoryId,
+  type CategoryTypes,
   type KindCategory,
   type KindSelection,
   type KindTree,
@@ -75,16 +76,23 @@ export function countsInAnalytics(tx: { excluded?: boolean }, includeExcluded: b
 
 /**
  * The report's rule for an operation: the payment types and categories by their union (`matchesAnalyticsKinds`), the other
- * choices by the rule the journal shares (`matchesSharedChoices`).
+ * choices by the rule the journal shares (`matchesSharedChoices`). `types` is the company's categories (`categoryTypesOf`).
  */
-export function matchesAnalyticsSelection(tx: SelectionFacts, f: AnalyticsFilters): boolean {
-  return matchesAnalyticsKinds(tx, f) && matchesSharedChoices(tx, f)
+export function matchesAnalyticsSelection(tx: SelectionFacts, f: AnalyticsFilters, types: CategoryTypes | undefined): boolean {
+  return matchesAnalyticsKinds(tx, f, types) && matchesSharedChoices(tx, f)
 }
 
-/** The operations the reports are built from; without a choice the same array. */
-export function filterForAnalytics<T extends SelectionFacts & { excluded?: boolean }>(operations: T[], f: AnalyticsFilters): AnalyticsSelection<T> {
+/**
+ * The operations the reports are built from; without a choice the same array. `types` is the company's categories
+ * (`categoryTypesOf`), or `undefined` while they are loading.
+ */
+export function filterForAnalytics<T extends SelectionFacts & { excluded?: boolean }>(
+  operations: T[],
+  f: AnalyticsFilters,
+  types: CategoryTypes | undefined,
+): AnalyticsSelection<T> {
   const includeExcluded = f.tagIds.some((id) => id !== NO_TAG)
-  const chosen = activeAnalyticsFilterCount(f, 'operations') === 0 ? operations : operations.filter((tx) => matchesAnalyticsSelection(tx, f))
+  const chosen = activeAnalyticsFilterCount(f, 'operations') === 0 ? operations : operations.filter((tx) => matchesAnalyticsSelection(tx, f, types))
   return { operations: chosen, includeExcluded }
 }
 

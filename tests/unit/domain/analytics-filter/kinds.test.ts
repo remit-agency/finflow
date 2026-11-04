@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildKindTree,
+  categoryTypesOf,
+  kindRowOf,
   kindState,
   matchesAnalyticsKinds,
   noCategoryId,
@@ -43,7 +45,8 @@ const ops: Op[] = [
   { id: 'unc-exp', type: 'expense' },
   { id: 'move', type: 'transfer' },
 ]
-const matching = (s: KindSelection): string[] => ops.filter((op) => matchesAnalyticsKinds(op, s)).map((op) => op.id)
+const types = categoryTypesOf(categories)
+const matching = (s: KindSelection): string[] => ops.filter((op) => matchesAnalyticsKinds(op, s, types)).map((op) => op.id)
 
 describe('the uncategorised sentinel in the address', () => {
   it('is one id per payment type with a colon, read back by exact match only', () => {
@@ -66,9 +69,16 @@ describe('the tree of payment types and categories', () => {
     expect(services.children[0].children.map((n) => n.category.id)).toEqual(['inc-consult-tax'])
   })
 
-  it('a category whose parent is missing (deleted, or of another type) is a root of its group', () => {
-    const t = buildKindTree([cat('a', 'income', 'gone'), cat('b', 'income', 'exp-x'), cat('x', 'expense')])
+  it('a category whose parent is missing (deleted) is a root of its group', () => {
+    const t = buildKindTree([cat('exp-rent', 'expense'), cat('a', 'income', 'gone'), cat('b', 'income', 'exp-rent')])
     expect(t.income.roots.map((n) => n.category.id)).toEqual(['a', 'b'])
+  })
+
+  it('a category whose parent has the other type is a root too: a parent of another group is not its parent', () => {
+    const t = buildKindTree([cat('exp-rent', 'expense'), cat('inc-b', 'income', 'exp-rent')])
+    expect(t.income.roots.map((n) => n.category.id)).toEqual(['inc-b'])
+    expect(t.expense.roots.map((n) => n.category.id)).toEqual(['exp-rent'])
+    expect(t.expense.roots[0].children).toEqual([])
   })
 
   it('a loop of parents hides none of its categories', () => {
@@ -203,6 +213,13 @@ describe('toggling a row of the tree', () => {
     )
   })
 
+  it('a tick writes the ids in the order the normal form reads them, so reading the choice back changes nothing', () => {
+    const r = toggleKind(sel([], ['exp-rent']), tree, { kind: 'category', id: 'inc-sales' }, true)
+    if (!r.ok) throw new Error('limit')
+    expect(r.selection.categoryIds).toEqual(['inc-sales', 'exp-rent'])
+    expect(normaliseKinds(r.selection, tree)).toEqual(r.selection)
+  })
+
   it('unticking a ticked group clears it', () => {
     expect(ok(toggleKind(sel(['income']), tree, { kind: 'group', type: 'income' }, false))).toEqual(sel())
   })
@@ -218,6 +235,45 @@ describe('toggling a row of the tree', () => {
   })
 })
 
+describe('the row an operation counts in: one rule for the filter and the P&L (S10f)', () => {
+  const known = categoryTypesOf(categories)
+
+  it('a category of the own type of the operation is its row', () => {
+    expect(kindRowOf({ type: 'expense', categoryId: 'exp-rent' }, known)).toBe('exp-rent')
+  })
+
+  it('a deleted category leaves the operation uncategorised of its type, as the P&L shows it', () => {
+    expect(kindRowOf({ type: 'expense', categoryId: 'exp-deleted' }, known)).toBe('_none:expense')
+  })
+
+  it('a category of the other type is not the category of the operation (the ledger refuses it; old data may hold it)', () => {
+    expect(kindRowOf({ type: 'expense', categoryId: 'inc-sales' }, known)).toBe('_none:expense')
+  })
+
+  it('no category is uncategorised of its type; a transfer has no row', () => {
+    expect(kindRowOf({ type: 'income' }, known)).toBe('_none:income')
+    expect(kindRowOf({ type: 'transfer' }, known)).toBeUndefined()
+    expect(kindRowOf({ type: 'transfer', categoryId: 'exp-rent' }, known)).toBeUndefined()
+  })
+
+  it('while the categories are not loaded the stored id stands: unknown is not absent', () => {
+    expect(kindRowOf({ type: 'expense', categoryId: 'exp-deleted' }, undefined)).toBe('exp-deleted')
+  })
+
+  it('a deleted category is found through its uncategorised row, never through its old id', () => {
+    const gone = { type: 'expense' as const, categoryId: 'exp-deleted' }
+    expect(matchesAnalyticsKinds(gone, sel([], ['_none:expense']), known)).toBe(true)
+    expect(matchesAnalyticsKinds(gone, sel([], ['exp-deleted']), known)).toBe(false)
+    expect(matchesAnalyticsKinds(gone, sel([], ['exp-rent']), known)).toBe(false)
+  })
+
+  it('all expenses but one keeps the operations of a deleted category: they are uncategorised expenses now', () => {
+    const but = sel([], ['exp-fuel', 'exp-fuel-shell', '_none:expense'])
+    expect(matchesAnalyticsKinds({ type: 'expense', categoryId: 'exp-deleted' }, but, known)).toBe(true)
+    expect(matchesAnalyticsKinds({ type: 'expense', categoryId: 'exp-rent' }, but, known)).toBe(false)
+  })
+})
+
 describe('normalising the stored choice (once, on read and on write)', () => {
   it('a group whose every category and uncategorised row are stored becomes the group', () => {
     const stored = sel([], ['inc-sales', 'inc-services', 'inc-consult', 'inc-consult-tax', '_none:income'])
@@ -230,6 +286,24 @@ describe('normalising the stored choice (once, on read and on write)', () => {
 
   it('every payment type and transfers chosen is no restriction', () => {
     expect(normaliseKinds(sel(['income', 'expense', 'transfer'], ['exp-rent']), tree)).toEqual(sel())
+  })
+
+  it('a group with no categories is never collapsed: its uncategorised row stays an id, a later category is not taken in', () => {
+    const none = buildKindTree([cat('exp-rent', 'expense')])
+    expect(normaliseKinds(sel([], ['_none:income']), none)).toEqual(sel([], ['_none:income']))
+    expect(toggleKind(sel(), none, { kind: 'uncategorised', type: 'income' }, true)).toEqual({ ok: true, selection: sel([], ['_none:income']) })
+    expect(toggleKind(sel(), none, { kind: 'group', type: 'income' }, true)).toEqual({ ok: true, selection: sel([], ['_none:income']) })
+  })
+
+  it('a group with one category collapses once that category and its uncategorised row are chosen (the rule needs at least one category)', () => {
+    const one = buildKindTree([cat('inc-a', 'income')])
+    expect(normaliseKinds(sel([], ['inc-a', '_none:income']), one)).toEqual(sel(['income']))
+    expect(normaliseKinds(sel([], ['inc-a']), one)).toEqual(sel([], ['inc-a']))
+  })
+
+  it('every type chosen is no restriction, also when a group without categories is held as its uncategorised row', () => {
+    const none = buildKindTree([cat('exp-rent', 'expense')])
+    expect(normaliseKinds(sel(['expense', 'transfer'], ['_none:income']), none)).toEqual(sel())
   })
 
   it('a choice already in normal form comes back unchanged', () => {
