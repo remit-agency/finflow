@@ -965,6 +965,12 @@
       "kinds": {
         "label": "Rodzaje płatności i kategorie",
         "all": "Wszystkie rodzaje i kategorie",
+        "root": "Wszystkie rodzaje płatności i kategorie",
+        "groupIncome": "Wszystkie wpływy",
+        "groupExpense": "Wszystkie wydatki",
+        "uncategorisedIncome": "Bez kategorii wpływów",
+        "uncategorisedExpense": "Bez kategorii wydatków",
+        "summary": "Wybrano: {count}",
         "search": "Szukaj kategorii"
       },
       "counterparties": {
@@ -982,7 +988,8 @@
         "label": "Konta",
         "all": "Wszystkie konta",
         "search": "Szukaj kont"
-      }
+      },
+      "partly": "częściowo wybrane"
     }
   },
   "periods": {

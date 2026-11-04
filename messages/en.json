@@ -965,6 +965,12 @@
       "kinds": {
         "label": "Payment types and categories",
         "all": "All types and categories",
+        "root": "All payment types and categories",
+        "groupIncome": "All income",
+        "groupExpense": "All expenses",
+        "uncategorisedIncome": "Uncategorised income",
+        "uncategorisedExpense": "Uncategorised expenses",
+        "summary": "Selected: {count}",
         "search": "Search categories"
       },
       "counterparties": {
@@ -982,7 +988,8 @@
         "label": "Accounts",
         "all": "All accounts",
         "search": "Search accounts"
-      }
+      },
+      "partly": "partly selected"
     }
   },
   "periods": {
