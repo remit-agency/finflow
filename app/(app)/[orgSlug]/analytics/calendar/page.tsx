@@ -1,11 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useShell } from '@/lib/hooks/useShell'
 import { useTransactions } from '@/lib/hooks/useTransactions'
 import CalendarView from '@/components/charts/CalendarView'
+import { AnalyticsFiltersButton, ExcludedHint } from '@/components/analytics/AnalyticsFilters'
+import { filterForAnalytics } from '@/lib/domain/analytics-filter/filter'
+import { useAnalyticsFilters } from '@/lib/hooks/useAnalyticsFilters'
+import { buildCalendar } from '@/lib/utils/analytics'
 import { todayUtcDay } from '@/lib/utils/today'
 
 export default function CalendarPage() {
@@ -18,11 +22,19 @@ export default function CalendarPage() {
   // Totals are shown in the company currency, so wait for the org as well.
   const { org } = useShell()
   const loading = txLoading || !org
+  // The report filters live in the address (S10f); a concrete tag brings the operations excluded from analytics in.
+  const { filters, setFilters, categoryTypes } = useAnalyticsFilters('operations')
+  const selection = useMemo(() => filterForAnalytics(transactions, filters, categoryTypes), [transactions, filters, categoryTypes])
 
   // Warsaw's date: the month shown first is the one Poland is in.
   const [today] = useState(() => todayUtcDay())
   const [year, setYear] = useState(today.getUTCFullYear())
   const [month, setMonth] = useState(today.getUTCMonth())
+
+  const calendar = useMemo(
+    () => buildCalendar(selection, year, month),
+    [selection, year, month]
+  )
 
   const handleNavigate = (dir: 'prev' | 'next') => {
     if (dir === 'prev') {
@@ -43,8 +55,14 @@ export default function CalendarPage() {
         <p className="text-sm text-ink-muted">{t('calendar.subtitle')}</p>
       </div>
 
+      <div className="space-y-4">
+        <AnalyticsFiltersButton scope="operations" value={filters} onChange={setFilters} />
+        {calendar.excludedCounted && <ExcludedHint />}
+      </div>
+
       <CalendarView
-        transactions={transactions}
+        selection={selection}
+        days={calendar.days}
         year={year}
         month={month}
         onNavigate={handleNavigate}

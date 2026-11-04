@@ -31,7 +31,8 @@ export interface JournalFilters {
 
 export const EMPTY_FILTERS: JournalFilters = { basis: 'payment', counterpartyIds: [], types: [], categoryIds: [], tagIds: [], excludedOnly: false }
 
-const MAX_LIST = 30
+/** Ids one list filter keeps (`cp`, `cat`, `tg`; the reports' `accounts` too, S10f); the rest of a hand-made link is dropped. */
+export const MAX_FILTER_IDS = 30
 const MAX_QUERY = 100
 
 /** Lower case, no diacritics; `ł` has no decomposition, so it is mapped by hand. */
@@ -43,12 +44,19 @@ export function normalizeText(s: string): string {
     .toLowerCase()
 }
 
-function ids(raw: string | null): string[] {
+/**
+ * A comma-separated list of ids from the address: what is not an id is dropped, a repeat is dropped, and only then at most
+ * `MAX_FILTER_IDS` stay (a repeat does not use up a place).
+ */
+export function idList(raw: string | null, accept: (s: string) => boolean = isId): string[] {
   if (!raw) return []
-  return raw
-    .split(',')
-    .filter((s) => isId(s))
-    .slice(0, MAX_LIST)
+  return [...new Set(raw.split(',').filter(accept))].slice(0, MAX_FILTER_IDS)
+}
+
+/** A comma-separated list of operation types from the address; anything else is dropped, a repeat too. */
+export function typeList(raw: string | null): TxType[] {
+  const types = (raw ?? '').split(',').filter((t): t is TxType => (TX_TYPES as readonly string[]).includes(t))
+  return [...new Set(types)]
 }
 
 function minor(raw: string | null): number | undefined {
@@ -61,9 +69,9 @@ function minor(raw: string | null): number | undefined {
 export function parseFilters(p: URLSearchParams): JournalFilters {
   const f: JournalFilters = {
     ...EMPTY_FILTERS,
-    counterpartyIds: ids(p.get('cp')),
-    categoryIds: ids(p.get('cat')),
-    tagIds: ids(p.get('tg')),
+    counterpartyIds: idList(p.get('cp')),
+    categoryIds: idList(p.get('cat')),
+    tagIds: idList(p.get('tg')),
     excludedOnly: p.get('ex') === '1',
   }
   const from = p.get('from')
@@ -77,9 +85,7 @@ export function parseFilters(p: URLSearchParams): JournalFilters {
   const max = minor(p.get('max'))
   if (min !== undefined) f.minMinor = min
   if (max !== undefined) f.maxMinor = max
-  f.types = (p.get('types') ?? '')
-    .split(',')
-    .filter((t): t is TxType => (TX_TYPES as readonly string[]).includes(t))
+  f.types = typeList(p.get('types'))
   const status = p.get('status')
   if (status !== null && (TX_STATUSES as readonly string[]).includes(status)) f.status = status as TxStatus
   const account = p.get('account')
@@ -133,19 +139,55 @@ function accrualBounds(tx: LedgerTransaction): { from: string; to: string } {
   return tx.accrual.mode === 'date' ? { from: tx.accrual.date, to: tx.accrual.date } : { from: tx.accrual.from, to: tx.accrual.to }
 }
 
+/** What the choice filters read from an operation: the journal's ledger rows and the reports' operations (S10f) both have it. */
+export type SelectionFacts = Pick<LedgerTransaction, 'type' | 'accountId' | 'toAccountId' | 'categoryId' | 'counterpartyId' | 'tags'>
+
+/** The choice part of a filter, one definition for the journal and the reports (S10f). */
+export interface Selection {
+  types: readonly TxType[]
+  categoryIds: readonly string[]
+  counterpartyIds: readonly string[]
+  /** The operation's account, or the target account of a transfer, is one of these. */
+  accountIds: readonly string[]
+  /** Any of these tags; `NO_TAG` matches an operation without tags. */
+  tagIds: readonly string[]
+}
+
+/**
+ * The journal's kind rule (S08): a non-empty type list and a non-empty category list both have to match, so the journal
+ * shows the operations that fit both. The reports use their own union rule (`matchesAnalyticsKinds`, S10f).
+ */
+export function matchesJournalKinds(tx: SelectionFacts, s: Pick<Selection, 'types' | 'categoryIds'>): boolean {
+  if (s.types.length && !s.types.includes(tx.type)) return false
+  if (s.categoryIds.length && (tx.categoryId === undefined || !s.categoryIds.includes(tx.categoryId))) return false
+  return true
+}
+
+/**
+ * The choice parts the journal and the reports share: counterparties, accounts and tags mean «any of the chosen»; a
+ * non-empty list must match, and an operation without a tag matches `NO_TAG`.
+ */
+export function matchesSharedChoices(tx: SelectionFacts, s: Pick<Selection, 'counterpartyIds' | 'accountIds' | 'tagIds'>): boolean {
+  if (s.counterpartyIds.length && (tx.counterpartyId === undefined || !s.counterpartyIds.includes(tx.counterpartyId))) return false
+  if (s.accountIds.length && !s.accountIds.includes(tx.accountId) && (tx.toAccountId === undefined || !s.accountIds.includes(tx.toAccountId))) return false
+  if (s.tagIds.length) {
+    const untagged = tx.tags.length === 0 && s.tagIds.includes(NO_TAG)
+    if (!untagged && !tx.tags.some((id) => s.tagIds.includes(id))) return false
+  }
+  return true
+}
+
+/** The journal's whole choice: its kind rule and the shared choices. */
+export function matchesSelection(tx: SelectionFacts, s: Selection): boolean {
+  return matchesJournalKinds(tx, s) && matchesSharedChoices(tx, s)
+}
+
 /** The whole predicate, so the in-memory part of a page read and the tests use one definition. */
 export function matchesFilters(tx: LedgerTransaction, f: JournalFilters, ctx: FilterContext): boolean {
-  if (f.types.length && !f.types.includes(tx.type)) return false
+  if (!matchesSelection(tx, { ...f, accountIds: f.accountId ? [f.accountId] : [] })) return false
   if (f.status && tx.status !== f.status) return false
   if (f.minMinor !== undefined && tx.amountMinor < f.minMinor) return false
   if (f.maxMinor !== undefined && tx.amountMinor > f.maxMinor) return false
-  if (f.categoryIds.length && (tx.categoryId === undefined || !f.categoryIds.includes(tx.categoryId))) return false
-  if (f.counterpartyIds.length && (tx.counterpartyId === undefined || !f.counterpartyIds.includes(tx.counterpartyId))) return false
-  if (f.accountId && tx.accountId !== f.accountId && tx.toAccountId !== f.accountId) return false
-  if (f.tagIds.length) {
-    const untagged = tx.tags.length === 0 && f.tagIds.includes(NO_TAG)
-    if (!untagged && !tx.tags.some((id) => f.tagIds.includes(id))) return false
-  }
   if (f.excludedOnly && tx.excluded !== true) return false
 
   if (f.from !== undefined || f.to !== undefined) {

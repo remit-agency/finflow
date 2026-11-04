@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { filterForAnalytics } from '@/lib/domain/analytics-filter/filter'
+import { useAnalyticsFilters } from '@/lib/hooks/useAnalyticsFilters'
 import { useTransactions } from '@/lib/hooks/useTransactions'
 import { useShell } from '@/lib/hooks/useShell'
 import { useCategoryName } from '@/lib/i18n/useCategoryName'
@@ -12,6 +14,7 @@ import { DEFAULT_REPORT_PERIOD, periodSlug, resolvePeriod, type PeriodSelection 
 import { todayUtcDay } from '@/lib/utils/today'
 import PLTable from '@/components/charts/PLTable'
 import PLSummaryCharts from '@/components/charts/PLSummaryCharts'
+import { ExcludedHint } from '@/components/analytics/AnalyticsFilters'
 import { ReportToolbar } from '@/components/analytics/ReportToolbar'
 
 export default function PLPage() {
@@ -31,10 +34,15 @@ export default function PLPage() {
 
   const loading = txLoading || catLoading
 
-  const { monthKeys, rows } = useMemo(
-    () => buildPL(transactions, categories, resolvePeriod(period, now), noCategory, categoryName),
-    [transactions, categories, period, now, noCategory, categoryName]
+  // The report filters live in the address (S10f); a concrete tag brings the operations excluded from analytics in.
+  const { filters, setFilters, categoryTypes } = useAnalyticsFilters('operations')
+  const selection = useMemo(() => filterForAnalytics(transactions, filters, categoryTypes), [transactions, filters, categoryTypes])
+
+  const report = useMemo(
+    () => buildPL(selection, categories, resolvePeriod(period, now), noCategory, categoryName),
+    [selection, categories, period, now, noCategory, categoryName]
   )
+  const { monthKeys, rows } = report
 
   const handleExport = () => {
     exportToCSV(
@@ -57,7 +65,8 @@ export default function PLPage() {
             <h1 className="font-display text-xl font-semibold text-ink">{t('pl.title')}</h1>
             <p className="text-sm text-ink-muted">{t('pl.subtitle')}</p>
           </div>
-          <ReportToolbar period={period} onPeriodChange={setPeriod} onExport={handleExport} />
+          <ReportToolbar period={period} onPeriodChange={setPeriod} filters={filters} onFiltersChange={setFilters} onExport={handleExport} />
+          {report.excludedCounted && <ExcludedHint />}
         </div>
 
         {/* Summary + pie charts */}

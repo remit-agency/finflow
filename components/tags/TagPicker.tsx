@@ -7,6 +7,7 @@ import { TagDot } from '@/components/tags/TagDot'
 import { Input } from '@/components/ui/input'
 import { pickableTags, tagByName } from '@/lib/domain/tags/search'
 import { MAX_TX_TAGS, type Tag } from '@/lib/domain/tags/types'
+import { highlightedRow } from '@/lib/ui/highlight'
 import { cn } from '@/lib/utils'
 
 const MAX_OPTIONS = 50
@@ -30,18 +31,6 @@ interface Props {
 }
 
 type Row = { kind: 'tag'; tag: Tag } | { kind: 'create'; name: string }
-
-/**
- * The highlighted row of the open list, or -1 for none. `moved` is the row the person moved the highlight to (arrows or
- * a real pointer move), or null while they have not. With a typed query the first row is highlighted; without one
- * nothing is, so Enter right after Tab (the list opens on focus) cannot choose a tag by accident. A moved highlight is
- * clamped, because a narrower query can shorten the list under it.
- */
-function highlightedRow(count: number, query: string, moved: number | null): number {
-  if (count === 0) return -1
-  if (moved !== null) return Math.min(moved, count - 1)
-  return query !== '' ? 0 : -1
-}
 
 /** A multiple choice of tags: the chosen ones as chips, a searchable list, and «Створити «…»» when allowed. */
 export function TagPicker({ id, tags, value, onChange, max = MAX_TX_TAGS, includeArchived = false, only, onCreate, disabled }: Props) {

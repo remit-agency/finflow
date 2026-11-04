@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { Transaction } from '@/types'
-import { buildCalendar, DayData } from '@/lib/utils/analytics'
+import { countsInAnalytics, type AnalyticsSelection } from '@/lib/domain/analytics-filter/filter'
+import { DayData } from '@/lib/utils/analytics'
 import { ChevronLeft, ChevronRight, ChevronRight as ExpandIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -13,7 +14,10 @@ import { TOKEN_COLORS } from '@/lib/ui/colors'
 import { todayUtcDay } from '@/lib/utils/today'
 
 interface CalendarViewProps {
-  transactions: Transaction[]
+  /** The operations the Calendar was built from (`buildCalendar`), and whether the excluded ones are among them. */
+  selection: AnalyticsSelection<Transaction>
+  /** The days of the month shown (`buildCalendar` over the same selection). */
+  days: DayData[]
   year: number
   month: number
   onNavigate: (dir: 'prev' | 'next') => void
@@ -152,13 +156,14 @@ function DayRow({ day, dayNum, year, month, transactions, currency }: DayRowProp
   )
 }
 
-export default function CalendarView({ transactions, year, month, onNavigate, currency, loading }: CalendarViewProps) {
+export default function CalendarView({ selection, days, year, month, onNavigate, currency, loading }: CalendarViewProps) {
   const { orgSlug } = useParams<{ orgSlug: string }>()
   const { can } = useShell()
   const t = useTranslations('charts.calendar')
   const tCharts = useTranslations('charts')
   const { money, date } = useFormatters()
-  const days = buildCalendar(transactions, year, month)
+  // The list under an opened day shows what the day's totals count (transfers stay listed, as before).
+  const counted = selection.operations.filter((tx) => countsInAnalytics(tx, selection.includeExcluded))
   const totalIncome = days.reduce((s, d) => s + d.income, 0)
   const totalExpense = days.reduce((s, d) => s + d.expense, 0)
 
@@ -228,7 +233,7 @@ export default function CalendarView({ transactions, year, month, onNavigate, cu
               dayNum={i + 1}
               year={year}
               month={month}
-              transactions={transactions}
+              transactions={counted}
               currency={currency}
             />
           ))}

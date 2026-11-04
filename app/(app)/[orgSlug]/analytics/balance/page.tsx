@@ -1,8 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { AnalyticsFiltersButton } from '@/components/analytics/AnalyticsFilters'
 import { NativeSelect } from '@/components/ui/native-select'
+import { filterAccounts } from '@/lib/domain/analytics-filter/filter'
+import { useAnalyticsFilters } from '@/lib/hooks/useAnalyticsFilters'
 import { useShell } from '@/lib/hooks/useShell'
 import { exportToCSV } from '@/lib/utils/export'
 import BalanceSheet from '@/components/charts/BalanceSheet'
@@ -20,9 +23,13 @@ export default function BalancePage() {
   const loading = accountsLoading || !org
   const [selectedPeriod, setSelectedPeriod] = useState<(typeof PERIODS)[number]>(PERIODS[0])
 
+  // The Balance is made of accounts: of the report filters (S10f) only the accounts apply; the rest stay in the address for the other tabs.
+  const { filters, setFilters } = useAnalyticsFilters('accounts')
+  const shown = useMemo(() => filterAccounts(accounts, filters), [accounts, filters])
+
   const handleExport = () => {
     exportToCSV(
-      accounts.map((acc) => ({
+      shown.map((acc) => ({
         [t('columns.account')]: acc.name,
         [t('columns.type')]: acc.type,
         [t('columns.balance')]: acc.balance,
@@ -54,8 +61,8 @@ export default function BalancePage() {
           </button>
         </div>
 
-        {/* Period dropdown */}
-        <div className="flex items-center gap-3">
+        {/* Period dropdown and the account filter (S10f) */}
+        <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm text-ink-muted">{t('balance.asOf')}</span>
           <NativeSelect
             value={selectedPeriod}
@@ -67,11 +74,12 @@ export default function BalancePage() {
               <option key={p} value={p}>{t(`balance.periods.${p}`)}</option>
             ))}
           </NativeSelect>
+          <AnalyticsFiltersButton scope="accounts" value={filters} onChange={setFilters} />
         </div>
 
         {/* Balance sheet */}
         <BalanceSheet
-          accounts={accounts}
+          accounts={shown}
           orgId={orgId ?? 'default'}
           currency={org?.currency ?? 'UAH'}
           loading={loading}
