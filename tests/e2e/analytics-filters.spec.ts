@@ -59,6 +59,33 @@ async function setup(page: Page, request: APIRequestContext, prefix: string): Pr
   return user
 }
 
+/**
+ * The tree of «Види платежів і категорії» (S10f, Finmap): an income category «Консалтинг» with the child «Консультації», and an
+ * income operation of 300 in the child. With `setup` the Cash Flow shows income 800 (500 uncategorised + 300) and expense 175
+ * (all uncategorised).
+ */
+async function seedTree(request: APIRequestContext, orgId: string): Promise<void> {
+  const createdAt = new Date()
+  await seedDoc(request, `organizations/${orgId}/categories`, 'cat-services', { name: 'Консалтинг', type: 'income', color: '#6366f1', orgId, createdAt })
+  await seedDoc(request, `organizations/${orgId}/categories`, 'cat-consult', {
+    name: 'Консультації',
+    type: 'income',
+    color: '#10b981',
+    parentId: 'cat-services',
+    orgId,
+    createdAt,
+  })
+  await seedLedgerOperation(request, orgId, 'op-consult', {
+    accountId: 'acc-main',
+    currency: 'PLN',
+    date: todayDay(),
+    type: 'income',
+    amount: 300,
+    description: 'Konsultacja',
+    categoryId: 'cat-consult',
+  })
+}
+
 /** Opens «Фільтри» on the current report; `active` is the number the button shows (0: none). */
 async function openFilters(page: Page, active = 0): Promise<Locator> {
   await page.getByRole('button', { name: active > 0 ? `Фільтри (активних: ${active})` : 'Фільтри', exact: true }).click()
@@ -197,5 +224,89 @@ test.describe('report filters (emulators)', () => {
     await expect(page.getByRole('main').getByText('Konto główne')).toBeVisible()
     await expect(page.getByRole('main').getByText('Rachunek VAT')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Фільтри', exact: true })).toBeVisible()
+  })
+
+  test('the tree: a whole group takes all its operations and no other group; the group is stored as its type', async ({ page, request }) => {
+    const user = await setup(page, request, 'af-grp')
+    await seedTree(request, user.orgId)
+    await page.goto(`/${user.orgId}/analytics/cashflow`)
+    await waitForShell(page, user.companyName)
+    await expect(income(page)).toHaveText('800')
+    await expect(expense(page)).toHaveText('175')
+
+    const dialog = await openFilters(page)
+    await dialog.getByRole('button', { name: 'Усі види і категорії', exact: true }).click()
+    await expect(dialog.getByRole('option', { name: 'Усі види платежів і категорії', exact: true })).toHaveAttribute('data-state', 'checked')
+    await dialog.getByRole('option', { name: 'Усі надходження', exact: true }).click()
+    // The whole income group is ticked; the root is dashed (some of the types are chosen).
+    await expect(dialog.getByRole('option', { name: 'Усі надходження', exact: true })).toHaveAttribute('data-state', 'checked')
+    await expect(dialog.getByRole('option', { name: 'Консультації', exact: true })).toHaveAttribute('data-state', 'checked')
+    await expect(dialog.getByRole('option', { name: 'Усі види платежів і категорії', exact: true })).toHaveAttribute('data-state', 'mixed')
+    await dialog.getByRole('button', { name: 'Вибрати' }).click()
+    await expect(dialog.getByRole('button', { name: 'Усі надходження', exact: true })).toBeVisible()
+    await dialog.getByRole('button', { name: 'Готово' }).click()
+
+    await expect(page).toHaveURL(/\/analytics\/cashflow\?types=income$/)
+    await expect(income(page)).toHaveText('800')
+    await expect(expense(page)).toHaveText('0')
+    await expect(page.getByTestId('analytics-filters-count')).toHaveText('1')
+  })
+
+  test('the tree: one subcategory alone, its parent dashed; the uncategorised row of expenses added to it', async ({ page, request }) => {
+    const user = await setup(page, request, 'af-sub')
+    await seedTree(request, user.orgId)
+    await page.goto(`/${user.orgId}/analytics/cashflow`)
+    await waitForShell(page, user.companyName)
+
+    let dialog = await openFilters(page)
+    await dialog.getByRole('button', { name: 'Усі види і категорії', exact: true }).click()
+    await dialog.getByRole('option', { name: 'Консультації', exact: true }).click()
+    await expect(dialog.getByRole('option', { name: 'Консультації', exact: true })).toHaveAttribute('data-state', 'checked')
+    await expect(dialog.getByRole('option', { name: 'Консалтинг', exact: true })).toHaveAttribute('data-state', 'mixed')
+    await expect(dialog.getByRole('option', { name: 'Усі надходження', exact: true })).toHaveAttribute('data-state', 'mixed')
+    await dialog.getByRole('button', { name: 'Вибрати' }).click()
+    await dialog.getByRole('button', { name: 'Готово' }).click()
+    await expect(page).toHaveURL(/\/analytics\/cashflow\?cat=cat-consult$/)
+    await expect(income(page)).toHaveText('300')
+    await expect(expense(page)).toHaveText('0')
+
+    dialog = await openFilters(page, 1)
+    await dialog.getByRole('button', { name: 'Консультації', exact: true }).click()
+    await dialog.getByRole('option', { name: 'Без категорії витрат', exact: true }).click()
+    await expect(dialog.getByRole('option', { name: 'Без категорії витрат', exact: true })).toHaveAttribute('data-state', 'checked')
+    await dialog.getByRole('button', { name: 'Вибрати' }).click()
+    await expect(dialog.getByRole('button', { name: 'Вибрано: 2', exact: true })).toBeVisible()
+    await dialog.getByRole('button', { name: 'Готово' }).click()
+    await expect(income(page)).toHaveText('300')
+    await expect(expense(page)).toHaveText('175')
+  })
+
+  test('the tree: a parent ticked takes its child; unticking the child leaves the parent dashed', async ({ page, request }) => {
+    const user = await setup(page, request, 'af-par')
+    await seedTree(request, user.orgId)
+    await page.goto(`/${user.orgId}/analytics/cashflow`)
+    await waitForShell(page, user.companyName)
+
+    const dialog = await openFilters(page)
+    await dialog.getByRole('button', { name: 'Усі види і категорії', exact: true }).click()
+    await dialog.getByRole('option', { name: 'Консалтинг', exact: true }).click()
+    await expect(dialog.getByRole('option', { name: 'Консультації', exact: true })).toHaveAttribute('data-state', 'checked')
+    await expect(dialog.getByRole('option', { name: 'Консалтинг', exact: true })).toHaveAttribute('data-state', 'checked')
+    await dialog.getByRole('button', { name: 'Вибрати' }).click()
+    await dialog.getByRole('button', { name: 'Готово' }).click()
+    await expect(income(page)).toHaveText('300')
+    await expect(expense(page)).toHaveText('0')
+
+    const again = await openFilters(page, 1)
+    await again.getByRole('button', { name: 'Вибрано: 2', exact: true }).click()
+    await again.getByRole('option', { name: 'Консультації', exact: true }).click()
+    await expect(again.getByRole('option', { name: 'Консалтинг', exact: true })).toHaveAttribute('data-state', 'mixed')
+    await expect(again.getByRole('option', { name: 'Консультації', exact: true })).toHaveAttribute('data-state', 'unchecked')
+    await again.getByRole('button', { name: 'Вибрати' }).click()
+    await again.getByRole('button', { name: 'Готово' }).click()
+    // Only the parent itself stays chosen: the operations of the child are left out, the parent's own are none here.
+    await expect(page).toHaveURL(/\/analytics\/cashflow\?cat=cat-services$/)
+    await expect(income(page)).toHaveText('0')
+    await expect(expense(page)).toHaveText('0')
   })
 })

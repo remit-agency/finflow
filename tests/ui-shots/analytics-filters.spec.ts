@@ -63,6 +63,10 @@ test.describe('analytics filters shots', () => {
       await seedLedgerAccount(request, org, 'acc-main', { name: 'Konto główne Millennium', balance: 25000, currency: 'PLN' })
       await seedLedgerAccount(request, org, 'acc-vat', { name: 'Rachunek VAT', balance: 1200, currency: 'PLN' })
       await seedDoc(request, `organizations/${org}/categories`, 'cat-fees', { name: LONG_CATEGORY, type: 'expense', color: '#6366f1', orgId: org, createdAt: new Date() })
+      // An income category with a child and a grandchild: the tree shows a parent with children, indented one step deeper.
+      await seedDoc(request, `organizations/${org}/categories`, 'cat-consult', { name: 'Konsulting', type: 'income', color: '#10b981', orgId: org, createdAt: new Date() })
+      await seedDoc(request, `organizations/${org}/categories`, 'cat-tax', { name: 'Doradztwo podatkowe', type: 'income', color: '#34d399', orgId: org, parentId: 'cat-consult', createdAt: new Date() })
+      await seedDoc(request, `organizations/${org}/categories`, 'cat-vat', { name: 'Rozliczenia VAT', type: 'income', color: '#6ee7b7', orgId: org, parentId: 'cat-tax', createdAt: new Date() })
       await seedDoc(request, `organizations/${org}/tags`, 'tag-vat', tagDoc(org, 'ПДВ', 'rose', { excludeFromAnalytics: true }))
       await seedDoc(request, `organizations/${org}/tags`, 'tag-long', tagDoc(org, LONG_TAG, 'violet'))
       await seedDoc(request, `organizations/${org}/tags`, 'tag-old', tagDoc(org, 'Stare', 'slate', { archived: true }))
@@ -116,9 +120,11 @@ test.describe('analytics filters shots', () => {
         await shot('tags')
         await dialog.getByRole('button', { name: m.choose }).click()
 
-        // The payment types with their categories (a long category name that wraps).
-        await dialog.getByRole('button', { name: m.kinds.label, exact: true }).click()
-        // The list scrolls inside its box: bring the long category (under «Витрата» or «Wydatek») into the picture.
+        // The tree of the payment types: the groups open, a parent with its child and grandchild, a long category name that wraps.
+        await dialog.getByRole('button', { name: m.kinds.all, exact: true }).click()
+        await expect(dialog.getByRole('option', { name: m.kinds.root, exact: true })).toBeVisible()
+        await expect(dialog.getByRole('option', { name: 'Doradztwo podatkowe', exact: true })).toBeVisible()
+        // The list scrolls inside its box: bring the long category (under the expense group) into the picture.
         const longCategory = dialog.getByRole('option', { name: LONG_CATEGORY })
         await expect(longCategory).toBeVisible()
         await longCategory.scrollIntoViewIfNeeded()
