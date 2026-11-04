@@ -118,7 +118,10 @@ test.describe('analytics filters shots', () => {
 
         // The payment types with their categories (a long category name that wraps).
         await dialog.getByRole('button', { name: m.kinds.label, exact: true }).click()
-        await expect(dialog.getByRole('option', { name: LONG_CATEGORY })).toBeVisible()
+        // The list scrolls inside its box: bring the long category (under «Витрата» or «Wydatek») into the picture.
+        const longCategory = dialog.getByRole('option', { name: LONG_CATEGORY })
+        await expect(longCategory).toBeVisible()
+        await longCategory.scrollIntoViewIfNeeded()
         await dialogFits('kinds')
         await shot('kinds')
         await page.keyboard.press('Escape')
