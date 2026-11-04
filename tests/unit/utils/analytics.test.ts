@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { buildCashFlow, buildPL } from '@/lib/utils/analytics'
+import { EMPTY_ANALYTICS_FILTERS, filterForAnalytics, type AnalyticsFilters } from '@/lib/domain/analytics-filter/filter'
+import { NO_TAG } from '@/lib/domain/journal/filter'
+import { buildCalendar, buildCashFlow, buildPL, type CashFlowReport } from '@/lib/utils/analytics'
 import { resolvePeriod } from '@/lib/utils/period'
 import type { Category, Transaction } from '@/types'
 import { makeTx } from '../helpers/fixtures'
@@ -220,5 +222,83 @@ describe('operations excluded from analytics (S10t)', () => {
     expect(flow.buckets.reduce((sum, b) => sum + b.expense, 0)).toBe(0)
     const pl = buildPL([vatIn, vatOut, sale], [category('cat-in', 'income', 'Sprzedaż'), category('cat-ex', 'expense', 'Koszty')], period, 'Bez kategorii')
     expect(pl.rows.map((r) => [r.categoryId, r.total])).toEqual([['cat-in', 1000]])
+  })
+})
+
+describe('report filters (S10f)', () => {
+  const period = resolvePeriod({ preset: 'currentMonth' }, NOW)
+  const NONE = 'Bez kategorii'
+  const totals = (report: CashFlowReport): [number, number] => [
+    report.buckets.reduce((s, b) => s + b.income, 0),
+    report.buckets.reduce((s, b) => s + b.expense, 0),
+  ]
+  const excluded = (t: Transaction): Transaction => ({ ...t, tags: ['vat'], excluded: true })
+
+  it('Cash Flow and P&L count the excluded operations only with includeExcluded', () => {
+    const txs = [
+      excluded(tx('income', 230, '2026-10-20T10:00:00Z')),
+      excluded(tx('expense', 230, '2026-10-20T11:00:00Z')),
+      tx('income', 1000, '2026-10-21T10:00:00Z', 'cat-in'),
+    ]
+    expect(totals(buildCashFlow(txs, period, 'uk'))).toEqual([1000, 0])
+    expect(totals(buildCashFlow(txs, period, 'uk', { includeExcluded: true }))).toEqual([1230, 230])
+    const cats = [category('cat-in', 'income', 'Sprzedaż')]
+    const rows = (opts?: { includeExcluded: boolean }) => buildPL(txs, cats, period, NONE, undefined, opts).rows.map((r) => [r.categoryId, r.total])
+    expect(rows()).toEqual([['cat-in', 1000]])
+    expect(rows({ includeExcluded: true })).toEqual([
+      ['cat-in', 1000],
+      ['__uncategorized_income', 230],
+      ['__uncategorized_expense', 230],
+    ])
+  })
+
+  it('the Calendar leaves the excluded operations out too, also from the balance carried in (the S10t gap)', () => {
+    const txs = [
+      excluded(tx('income', 500, '2026-09-10T12:00:00Z')),
+      tx('income', 100, '2026-09-11T12:00:00Z'),
+      excluded(tx('income', 230, '2026-10-20T10:00:00Z')),
+      excluded(tx('expense', 230, '2026-10-20T11:00:00Z')),
+      tx('expense', 40, '2026-10-21T12:00:00Z'),
+    ]
+    const days = buildCalendar(txs, 2026, 9)
+    expect(days.reduce((s, d) => s + d.income, 0)).toBe(0)
+    expect(days.reduce((s, d) => s + d.expense, 0)).toBe(40)
+    expect(days[19]).toMatchObject({ date: '2026-10-20', income: 0, expense: 0, hasTransactions: false, balance: 100 })
+    expect(days[30].balance).toBe(60)
+    const all = buildCalendar(txs, 2026, 9, { includeExcluded: true })
+    expect(all[19]).toMatchObject({ income: 230, expense: 230, hasTransactions: true, balance: 600 })
+    expect(all[30].balance).toBe(560)
+  })
+
+  it('with a filter the totals are the sums of the operations it chose (the data of the e2e)', () => {
+    const at = (t: Transaction, over: Partial<Transaction>): Transaction => ({ ...t, ...over })
+    const txs = [
+      at(tx('income', 500, '2026-10-02T10:00:00Z', 'cat-in'), { accountId: 'main' }),
+      at(tx('expense', 120, '2026-10-05T10:00:00Z', 'cat-ex'), { accountId: 'main' }),
+      at(tx('expense', 40, '2026-10-06T10:00:00Z', 'cat-ex'), { accountId: 'main', tags: ['fuel'] }),
+      at(tx('expense', 230, '2026-10-07T10:00:00Z'), { accountId: 'main', tags: ['vat'], excluded: true }),
+      at(tx('income', 230, '2026-10-07T10:00:00Z'), { accountId: 'vat', tags: ['vat'], excluded: true }),
+      at(tx('expense', 15, '2026-10-08T10:00:00Z', 'cat-ex'), { accountId: 'vat' }),
+      at(tx('transfer', 300, '2026-10-09T10:00:00Z'), { accountId: 'main', toAccountId: 'vat' }),
+    ]
+    const cats = [category('cat-in', 'income', 'Sprzedaż'), category('cat-ex', 'expense', 'Koszty')]
+    const cases: [Partial<AnalyticsFilters>, [number, number]][] = [
+      [{}, [500, 175]],
+      [{ tagIds: ['vat'] }, [230, 230]],
+      [{ tagIds: [NO_TAG] }, [500, 135]],
+      [{ accountIds: ['vat'] }, [0, 15]],
+      [{ types: ['expense'], categoryIds: ['cat-ex'] }, [0, 175]],
+    ]
+    for (const [choice, expected] of cases) {
+      const { operations, includeExcluded } = filterForAnalytics(txs, { ...EMPTY_ANALYTICS_FILTERS, ...choice })
+      const counted = operations.filter((t) => t.type !== 'transfer' && (includeExcluded || t.excluded !== true))
+      const sum = (type: 'income' | 'expense') => counted.filter((t) => t.type === type).reduce((s, t) => s + t.amount, 0)
+      const label = JSON.stringify(choice)
+      expect([sum('income'), sum('expense')], label).toEqual(expected)
+      expect(totals(buildCashFlow(operations, period, 'uk', { includeExcluded })), label).toEqual(expected)
+      const pl = buildPL(operations, cats, period, NONE, undefined, { includeExcluded })
+      const plSum = (type: 'income' | 'expense') => pl.rows.filter((r) => r.type === type).reduce((s, r) => s + r.total, 0)
+      expect([plSum('income'), plSum('expense')], label).toEqual(expected)
+    }
   })
 })
