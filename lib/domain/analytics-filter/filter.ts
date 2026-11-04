@@ -1,4 +1,13 @@
-import { idList, matchesSelection, NO_TAG, typeList, type SelectionFacts } from '@/lib/domain/journal/filter'
+import {
+  isKindListItem,
+  matchesAnalyticsKinds,
+  normaliseKinds,
+  parseNoCategoryId,
+  type KindCategory,
+  type KindSelection,
+  type KindTree,
+} from '@/lib/domain/analytics-filter/kinds'
+import { idList, matchesSharedChoices, NO_TAG, typeList, type SelectionFacts } from '@/lib/domain/journal/filter'
 import type { TxType } from '@/lib/domain/ledger/types'
 
 /**
@@ -6,7 +15,9 @@ import type { TxType } from '@/lib/domain/ledger/types'
  * The period is chosen separately and stays out of them.
  */
 export interface AnalyticsFilters {
+  /** Whole payment groups (`income`, `expense`, `transfer`); see `kinds.ts` for the union with `categoryIds`. */
   types: TxType[]
+  /** Chosen categories (any depth) and uncategorised rows (`_none:income`, `_none:expense`). */
   categoryIds: string[]
   counterpartyIds: string[]
   /** Any of these tags; `NO_TAG` stands for «без тегів». */
@@ -27,7 +38,7 @@ export type AnalyticsScope = 'operations' | 'accounts'
 export function parseAnalyticsFilters(p: Pick<URLSearchParams, 'get'>): AnalyticsFilters {
   return {
     types: typeList(p.get('types')),
-    categoryIds: idList(p.get('cat')),
+    categoryIds: idList(p.get('cat'), isKindListItem),
     counterpartyIds: idList(p.get('cp')),
     tagIds: idList(p.get('tg')),
     accountIds: idList(p.get('accounts')),
@@ -62,10 +73,18 @@ export function countsInAnalytics(tx: { excluded?: boolean }, includeExcluded: b
   return tx.excluded !== true || includeExcluded
 }
 
-/** The operations the reports are built from, by the journal's rule (`matchesSelection`); without a choice the same array. */
+/**
+ * The report's rule for an operation: the payment types and categories by their union (`matchesAnalyticsKinds`), the other
+ * choices by the rule the journal shares (`matchesSharedChoices`).
+ */
+export function matchesAnalyticsSelection(tx: SelectionFacts, f: AnalyticsFilters): boolean {
+  return matchesAnalyticsKinds(tx, f) && matchesSharedChoices(tx, f)
+}
+
+/** The operations the reports are built from; without a choice the same array. */
 export function filterForAnalytics<T extends SelectionFacts & { excluded?: boolean }>(operations: T[], f: AnalyticsFilters): AnalyticsSelection<T> {
   const includeExcluded = f.tagIds.some((id) => id !== NO_TAG)
-  const chosen = activeAnalyticsFilterCount(f, 'operations') === 0 ? operations : operations.filter((tx) => matchesSelection(tx, f))
+  const chosen = activeAnalyticsFilterCount(f, 'operations') === 0 ? operations : operations.filter((tx) => matchesAnalyticsSelection(tx, f))
   return { operations: chosen, includeExcluded }
 }
 
@@ -82,20 +101,31 @@ export interface KnownAnalyticsIds {
 
 /**
  * The filters without the ids the company does not have (a deleted account or category in an old link): the dialog, the
- * count and the reports all read the filters through this. The same object comes back when nothing is dropped.
+ * count and the reports all read the filters through this. The same object comes back when nothing is dropped. The
+ * uncategorised rows and «без тегів» are not company ids, so they stay.
  */
 export function knownAnalyticsFilters(f: AnalyticsFilters, known: KnownAnalyticsIds): AnalyticsFilters {
-  const keep = (ids: string[], set: ReadonlySet<string> | undefined, always?: string): string[] =>
-    set === undefined ? ids : ids.filter((id) => id === always || set.has(id))
+  const keep = (ids: string[], set: ReadonlySet<string> | undefined, always: (id: string) => boolean): string[] =>
+    set === undefined ? ids : ids.filter((id) => always(id) || set.has(id))
   const next: AnalyticsFilters = {
     types: f.types,
-    categoryIds: keep(f.categoryIds, known.categoryIds),
-    counterpartyIds: keep(f.counterpartyIds, known.counterpartyIds),
-    tagIds: keep(f.tagIds, known.tagIds, NO_TAG),
-    accountIds: keep(f.accountIds, known.accountIds),
+    categoryIds: keep(f.categoryIds, known.categoryIds, (id) => parseNoCategoryId(id) !== undefined),
+    counterpartyIds: keep(f.counterpartyIds, known.counterpartyIds, () => false),
+    tagIds: keep(f.tagIds, known.tagIds, (id) => id === NO_TAG),
+    accountIds: keep(f.accountIds, known.accountIds, () => false),
   }
   const changed = (Object.keys(next) as (keyof AnalyticsFilters)[]).some((k) => next[k].length !== f[k].length)
   return changed ? next : f
+}
+
+/**
+ * The payment-type choice in its normal form (`normaliseKinds`): a whole group is stored as its type. The same object comes
+ * back when nothing changes. Called once the company's categories are known.
+ */
+export function withNormalKinds<C extends KindCategory>(f: AnalyticsFilters, tree: KindTree<C>): AnalyticsFilters {
+  const kinds: KindSelection = normaliseKinds({ types: f.types, categoryIds: f.categoryIds }, tree)
+  const same = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((x, i) => x === b[i])
+  return same(kinds.types, f.types) && same(kinds.categoryIds, f.categoryIds) ? f : { ...f, types: kinds.types, categoryIds: kinds.categoryIds }
 }
 
 /** The accounts the Balance shows: the chosen ones, or every account without a choice. */

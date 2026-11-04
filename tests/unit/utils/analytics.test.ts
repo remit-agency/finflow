@@ -282,6 +282,8 @@ describe('report filters (S10f)', () => {
       [{ tagIds: [NO_TAG] }, [500, 135]],
       [{ accountIds: ['vat'] }, [0, 15]],
       [{ types: ['expense'], categoryIds: ['cat-ex'] }, [0, 175]],
+      [{ types: ['income'] }, [500, 0]],
+      [{ types: ['income'], categoryIds: ['cat-ex'] }, [500, 175]],
     ]
     for (const [choice, expected] of cases) {
       const selection = filterForAnalytics(txs, { ...EMPTY_ANALYTICS_FILTERS, ...choice })

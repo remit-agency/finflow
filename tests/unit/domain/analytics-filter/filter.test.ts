@@ -20,7 +20,7 @@ const ids = (list: { id: string }[]): string[] => list.map((x) => x.id)
 
 describe('the address', () => {
   it('round-trips every field under the journal names, the accounts in `accounts`', () => {
-    const value = f({ types: ['income', 'transfer'], categoryIds: ['c1'], counterpartyIds: ['p1', 'p2'], tagIds: ['vat', NO_TAG], accountIds: ['a1', 'a2'] })
+    const value = f({ types: ['income', 'transfer'], categoryIds: ['c1', '_none:expense'], counterpartyIds: ['p1', 'p2'], tagIds: ['vat', NO_TAG], accountIds: ['a1', 'a2'] })
     const params = analyticsFiltersToParams(value)
     expect([...params.keys()]).toEqual(['types', 'cat', 'cp', 'tg', 'accounts'])
     expect(params.get('tg')).toBe('vat,_none')
@@ -33,24 +33,32 @@ describe('the address', () => {
   })
 
   it('drops bad values, repeats and the parameters it does not own', () => {
-    const p = new URLSearchParams('types=income,bogus,income&cat=c1,,c 2,__x__&cp=a/b&tg=vat,vat&accounts=a1,a.b&period=prevYear&q=x')
-    expect(parseAnalyticsFilters(p)).toEqual(f({ types: ['income'], categoryIds: ['c1'], tagIds: ['vat'], accountIds: ['a1'] }))
+    const p = new URLSearchParams('types=income,bogus,income&cat=c1,,c 2,__x__,_none:bogus,_none:expense&cp=a/b&tg=vat,vat&accounts=a1,a.b&period=prevYear&q=x')
+    expect(parseAnalyticsFilters(p)).toEqual(f({ types: ['income'], categoryIds: ['c1', '_none:expense'], tagIds: ['vat'], accountIds: ['a1'] }))
+  })
+
+  it('the uncategorised sentinel is read only in the category list, and only once', () => {
+    expect(parseAnalyticsFilters(new URLSearchParams('cat=_none:income,_none:income')).categoryIds).toEqual(['_none:income'])
+    expect(parseAnalyticsFilters(new URLSearchParams('tg=_none:income')).tagIds).toEqual([])
   })
 
   it('removes the repeats first, then keeps 30 ids: a repeat does not use up a place', () => {
     const repeated = [...Array.from({ length: 20 }, () => 'a0'), ...Array.from({ length: 35 }, (_, i) => `b${i}`)].join(',')
     const expected = ['a0', ...Array.from({ length: 29 }, (_, i) => `b${i}`)]
-    const parsed = parseAnalyticsFilters(new URLSearchParams({ accounts: repeated, tg: repeated }))
+    const parsed = parseAnalyticsFilters(new URLSearchParams({ accounts: repeated, tg: repeated, cat: repeated }))
     expect(parsed.accountIds).toEqual(expected)
     expect(parsed.tagIds).toEqual(expected)
+    expect(parsed.categoryIds).toEqual(expected)
     expect(parseAnalyticsFilters(new URLSearchParams({ types: 'income,income,expense' })).types).toEqual(['income', 'expense'])
   })
 
-  it('keeps at most 30 ids per list, as the journal', () => {
+  it('keeps at most 30 ids per list, as the journal, the sentinels included', () => {
     const many = Array.from({ length: 40 }, (_, i) => `a${i}`).join(',')
-    const parsed = parseAnalyticsFilters(new URLSearchParams({ accounts: many, tg: many }))
+    const parsed = parseAnalyticsFilters(new URLSearchParams({ accounts: many, tg: many, cat: `${many},_none:income` }))
     expect(parsed.accountIds).toHaveLength(30)
     expect(parsed.tagIds).toHaveLength(30)
+    expect(parsed.categoryIds).toHaveLength(30)
+    expect(parsed.categoryIds).not.toContain('_none:income')
   })
 })
 
@@ -80,10 +88,16 @@ describe('filterForAnalytics', () => {
     expect(out).toMatchObject({ includeExcluded: false })
   })
 
-  it('types and categories work together', () => {
+  it('a payment type and a category are a union: an operation matching either one is chosen (Finmap)', () => {
     expect(ids(filterForAnalytics(all, f({ types: ['expense'] })).operations)).toEqual(['rent', 'vat'])
-    expect(ids(filterForAnalytics(all, f({ types: ['expense'], categoryIds: ['c-rent'] })).operations)).toEqual(['rent'])
-    expect(ids(filterForAnalytics(all, f({ types: ['income'], categoryIds: ['c-rent'] })).operations)).toEqual([])
+    expect(ids(filterForAnalytics(all, f({ categoryIds: ['c-rent'] })).operations)).toEqual(['rent'])
+    expect(ids(filterForAnalytics(all, f({ types: ['income'], categoryIds: ['c-rent'] })).operations)).toEqual(['sale', 'rent'])
+    expect(ids(filterForAnalytics(all, f({ types: ['income', 'expense'], categoryIds: ['c-rent'] })).operations)).toEqual(['sale', 'rent', 'vat'])
+  })
+
+  it('the uncategorised row of a type chosen: the operations of that type without a category', () => {
+    const plain = makeTx({ id: 'plain', type: 'income', accountId: 'a1' })
+    expect(ids(filterForAnalytics([sale, plain], f({ categoryIds: ['_none:income'] })).operations)).toEqual(['plain'])
   })
 
   it('counterparties and accounts mean any of the chosen; an account matches the target of a transfer', () => {
@@ -101,7 +115,7 @@ describe('filterForAnalytics', () => {
     expect(untagged).toMatchObject({ includeExcluded: false })
   })
 
-  it('chooses the operations the journal lists for the same choice', () => {
+  it('the shared choices (counterparties, accounts, tags) keep the journal rule for the same choice', () => {
     const ledger = (over: Partial<LedgerTransaction>): LedgerTransaction => ({
       id: 'x',
       type: 'expense',
@@ -125,25 +139,42 @@ describe('filterForAnalytics', () => {
     ]
     const ui = rows.map((tx) => toUiTransaction('org', tx))
     const ctx: FilterContext = { accountName: () => undefined, counterpartyName: () => undefined }
-    const choices = [
-      f({ types: ['expense'], categoryIds: ['c2'] }),
-      f({ counterpartyIds: ['p1'] }),
-      f({ tagIds: ['vat', NO_TAG] }),
-      f({ tagIds: [NO_TAG] }),
-      f({ accountIds: ['a2'] }),
-    ]
+    const choices = [f({ counterpartyIds: ['p1'] }), f({ tagIds: ['vat', NO_TAG] }), f({ tagIds: [NO_TAG] }), f({ accountIds: ['a2'] })]
     for (const choice of choices) {
       const { accountIds, ...rest } = choice
       const journal = rows.filter((tx) => matchesFilters(tx, { ...EMPTY_FILTERS, ...rest, accountId: accountIds[0] }, ctx))
       expect(ids(filterForAnalytics(ui, choice).operations), JSON.stringify(choice)).toEqual(ids(journal))
     }
   })
+
+  it('the journal keeps AND for a type and a category; the reports take the union of the same choice (regression)', () => {
+    const ledger = (over: Partial<LedgerTransaction>): LedgerTransaction => ({
+      id: 'x',
+      type: 'expense',
+      status: 'actual',
+      accountId: 'a1',
+      amountMinor: 1000,
+      currency: 'PLN',
+      paymentDate: '2026-10-10',
+      accrual: { mode: 'date', date: '2026-10-10' },
+      isRecurring: false,
+      tags: [],
+      fileUrls: [],
+      ...over,
+    })
+    const rows = [ledger({ id: 'inc', type: 'income', categoryId: 'c1' }), ledger({ id: 'exp-c1', categoryId: 'c1' }), ledger({ id: 'exp-c2', categoryId: 'c2' })]
+    const ctx: FilterContext = { accountName: () => undefined, counterpartyName: () => undefined }
+    const journal = rows.filter((tx) => matchesFilters(tx, { ...EMPTY_FILTERS, types: ['expense'], categoryIds: ['c1'] }, ctx))
+    expect(journal.map((tx) => tx.id)).toEqual(['exp-c1'])
+    const reports = filterForAnalytics(rows.map((tx) => toUiTransaction('org', tx)), f({ types: ['expense'], categoryIds: ['c1'] }))
+    expect(ids(reports.operations)).toEqual(['inc', 'exp-c1', 'exp-c2'])
+  })
 })
 
 describe('knownAnalyticsFilters', () => {
   const known = {
     accountIds: new Set(['a1', 'archived-account']),
-    categoryIds: new Set(['c1']),
+    categoryIds: new Set(['c1', 'c1-child']),
     counterpartyIds: new Set(['p1']),
     tagIds: new Set(['vat']),
   }
@@ -153,6 +184,11 @@ describe('knownAnalyticsFilters', () => {
     expect(knownAnalyticsFilters(value, known)).toEqual(
       f({ categoryIds: ['c1'], counterpartyIds: ['p1'], tagIds: [NO_TAG, 'vat'], accountIds: ['archived-account'] }),
     )
+  })
+
+  it('keeps the uncategorised sentinels (they are not company ids), and a subcategory the company still has', () => {
+    const value = f({ categoryIds: ['c1-child', '_none:income', '_none:expense', 'deleted-child'] })
+    expect(knownAnalyticsFilters(value, known)).toEqual(f({ categoryIds: ['c1-child', '_none:income', '_none:expense'] }))
   })
 
   it('the Balance: a deleted account is dropped, so no account is left and the field counts nothing', () => {

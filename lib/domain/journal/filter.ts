@@ -48,9 +48,9 @@ export function normalizeText(s: string): string {
  * A comma-separated list of ids from the address: what is not an id is dropped, a repeat is dropped, and only then at most
  * `MAX_FILTER_IDS` stay (a repeat does not use up a place).
  */
-export function idList(raw: string | null): string[] {
+export function idList(raw: string | null, accept: (s: string) => boolean = isId): string[] {
   if (!raw) return []
-  return [...new Set(raw.split(',').filter((s) => isId(s)))].slice(0, MAX_FILTER_IDS)
+  return [...new Set(raw.split(',').filter(accept))].slice(0, MAX_FILTER_IDS)
 }
 
 /** A comma-separated list of operation types from the address; anything else is dropped, a repeat too. */
@@ -154,12 +154,20 @@ export interface Selection {
 }
 
 /**
- * Every non-empty list must match, and inside a list any value does: types and categories therefore work together (an
- * operation must fit both when both are chosen); counterparties, accounts and tags mean «any of the chosen».
+ * The journal's kind rule (S08): a non-empty type list and a non-empty category list both have to match, so the journal
+ * shows the operations that fit both. The reports use their own union rule (`matchesAnalyticsKinds`, S10f).
  */
-export function matchesSelection(tx: SelectionFacts, s: Selection): boolean {
+export function matchesJournalKinds(tx: SelectionFacts, s: Pick<Selection, 'types' | 'categoryIds'>): boolean {
   if (s.types.length && !s.types.includes(tx.type)) return false
   if (s.categoryIds.length && (tx.categoryId === undefined || !s.categoryIds.includes(tx.categoryId))) return false
+  return true
+}
+
+/**
+ * The choice parts the journal and the reports share: counterparties, accounts and tags mean «any of the chosen»; a
+ * non-empty list must match, and an operation without a tag matches `NO_TAG`.
+ */
+export function matchesSharedChoices(tx: SelectionFacts, s: Pick<Selection, 'counterpartyIds' | 'accountIds' | 'tagIds'>): boolean {
   if (s.counterpartyIds.length && (tx.counterpartyId === undefined || !s.counterpartyIds.includes(tx.counterpartyId))) return false
   if (s.accountIds.length && !s.accountIds.includes(tx.accountId) && (tx.toAccountId === undefined || !s.accountIds.includes(tx.toAccountId))) return false
   if (s.tagIds.length) {
@@ -167,6 +175,11 @@ export function matchesSelection(tx: SelectionFacts, s: Selection): boolean {
     if (!untagged && !tx.tags.some((id) => s.tagIds.includes(id))) return false
   }
   return true
+}
+
+/** The journal's whole choice: its kind rule and the shared choices. */
+export function matchesSelection(tx: SelectionFacts, s: Selection): boolean {
+  return matchesJournalKinds(tx, s) && matchesSharedChoices(tx, s)
 }
 
 /** The whole predicate, so the in-memory part of a page read and the tests use one definition. */
