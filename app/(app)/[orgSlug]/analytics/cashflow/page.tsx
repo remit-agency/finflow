@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { filterForAnalytics } from '@/lib/domain/analytics-filter/filter'
+import { useAnalyticsFilters } from '@/lib/hooks/useAnalyticsFilters'
 import { useTransactions } from '@/lib/hooks/useTransactions'
 import { buildCashFlow } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
@@ -8,6 +10,7 @@ import { DEFAULT_REPORT_PERIOD, periodSlug, resolvePeriod, type PeriodSelection 
 import { todayUtcDay } from '@/lib/utils/today'
 import { cn } from '@/lib/utils'
 import CashFlowChart from '@/components/charts/CashFlowChart'
+import { ExcludedHint } from '@/components/analytics/AnalyticsFilters'
 import { ReportToolbar } from '@/components/analytics/ReportToolbar'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -30,9 +33,13 @@ export default function CashFlowPage() {
   // Warsaw's date, read once per visit (presets resolve against it).
   const [now] = useState(() => todayUtcDay())
 
+  // The report filters live in the address (S10f); a concrete tag brings the operations excluded from analytics in.
+  const { filters, setFilters } = useAnalyticsFilters()
+  const selection = useMemo(() => filterForAnalytics(transactions, filters), [transactions, filters])
+
   const { granularity, buckets: data } = useMemo(
-    () => buildCashFlow(transactions, resolvePeriod(period, now), locale),
-    [transactions, period, now, locale]
+    () => buildCashFlow(selection.operations, resolvePeriod(period, now), locale, { includeExcluded: selection.includeExcluded }),
+    [selection, period, now, locale]
   )
   const unitLabel = granularity === 'month' ? t('columns.month') : t('columns.day')
 
@@ -58,7 +65,8 @@ export default function CashFlowPage() {
             <h1 className="font-display text-xl font-semibold text-ink">{tSections('cashflow')}</h1>
             <p className="text-sm text-ink-muted">{t('cashflow.subtitle')}</p>
           </div>
-          <ReportToolbar period={period} onPeriodChange={setPeriod} onExport={handleExport} />
+          <ReportToolbar period={period} onPeriodChange={setPeriod} filters={filters} onFiltersChange={setFilters} onExport={handleExport} />
+          {selection.showsExcluded && <ExcludedHint />}
         </div>
 
         {/* Summary cards */}
