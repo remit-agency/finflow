@@ -949,6 +949,39 @@
         "quarter": "Quarter",
         "year": "Year"
       }
+    },
+    "filters": {
+      "button": "Filters",
+      "buttonActive": "Filters (active: {count})",
+      "title": "Filters",
+      "apply": "Done",
+      "reset": "Reset filters",
+      "choose": "Select",
+      "excludedHint": "Also showing operations excluded from analytics",
+      "noMatches": "Nothing found",
+      "more": "{count} more: narrow the search",
+      "full": "At most {max} in the list",
+      "kinds": {
+        "label": "Payment types and categories",
+        "all": "All types and categories",
+        "search": "Search categories"
+      },
+      "counterparties": {
+        "label": "Counterparties",
+        "all": "All counterparties",
+        "search": "Search counterparties"
+      },
+      "tags": {
+        "label": "Tags",
+        "all": "All tags",
+        "search": "Search tags",
+        "untagged": "No tags"
+      },
+      "accounts": {
+        "label": "Accounts",
+        "all": "All accounts",
+        "search": "Search accounts"
+      }
     }
   },
   "periods": {

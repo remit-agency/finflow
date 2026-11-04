@@ -949,6 +949,39 @@
         "quarter": "Kwartał",
         "year": "Rok"
       }
+    },
+    "filters": {
+      "button": "Filtry",
+      "buttonActive": "Filtry (aktywne: {count})",
+      "title": "Filtry",
+      "apply": "Gotowe",
+      "reset": "Zresetuj filtry",
+      "choose": "Wybrać",
+      "excludedHint": "Pokazano też operacje wyłączone z analityki",
+      "noMatches": "Nic nie znaleziono",
+      "more": "Jeszcze {count}: zawęź wyszukiwanie",
+      "full": "Nie więcej niż {max} na liście",
+      "kinds": {
+        "label": "Rodzaje płatności i kategorie",
+        "all": "Wszystkie rodzaje i kategorie",
+        "search": "Szukaj kategorii"
+      },
+      "counterparties": {
+        "label": "Kontrahenci",
+        "all": "Wszyscy kontrahenci",
+        "search": "Szukaj kontrahentów"
+      },
+      "tags": {
+        "label": "Tagi",
+        "all": "Wszystkie tagi",
+        "search": "Szukaj tagów",
+        "untagged": "Bez tagów"
+      },
+      "accounts": {
+        "label": "Konta",
+        "all": "Wszystkie konta",
+        "search": "Szukaj kont"
+      }
     }
   },
   "periods": {
