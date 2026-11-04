@@ -130,7 +130,7 @@ export function FilterMultiSelect({ label, allLabel, searchLabel, options, value
           count > 0 && 'border-brand',
         )}
       >
-        <span className="min-w-0 flex-1 truncate font-medium">{count > 0 ? `${label} (${count})` : label}</span>
+        <span className="min-w-0 flex-1 truncate font-medium">{count > 0 ? t('fieldWithCount', { label, count }) : label}</span>
         <ChevronDownIcon aria-hidden className={cn('size-4 shrink-0 text-ink-muted transition-transform', open && 'rotate-180')} />
       </button>
       {open && (

@@ -953,6 +953,7 @@
     "filters": {
       "button": "Фільтри",
       "buttonActive": "Фільтри (активних: {count})",
+      "fieldWithCount": "{label} ({count})",
       "title": "Фільтри",
       "apply": "Готово",
       "reset": "Скинути фільтри",

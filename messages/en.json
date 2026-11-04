@@ -953,6 +953,7 @@
     "filters": {
       "button": "Filters",
       "buttonActive": "Filters (active: {count})",
+      "fieldWithCount": "{label} ({count})",
       "title": "Filters",
       "apply": "Done",
       "reset": "Reset filters",
