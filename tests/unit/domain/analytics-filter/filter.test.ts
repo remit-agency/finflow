@@ -6,6 +6,7 @@ import {
   EMPTY_ANALYTICS_FILTERS,
   filterAccounts,
   filterForAnalytics,
+  knownAnalyticsFilters,
   parseAnalyticsFilters,
   type AnalyticsFilters,
 } from '@/lib/domain/analytics-filter/filter'
@@ -127,6 +128,35 @@ describe('filterForAnalytics', () => {
       const journal = rows.filter((tx) => matchesFilters(tx, { ...EMPTY_FILTERS, ...rest, accountId: accountIds[0] }, ctx))
       expect(ids(filterForAnalytics(ui, choice).operations), JSON.stringify(choice)).toEqual(ids(journal))
     }
+  })
+})
+
+describe('knownAnalyticsFilters', () => {
+  const known = {
+    accountIds: new Set(['a1', 'archived-account']),
+    categoryIds: new Set(['c1']),
+    counterpartyIds: new Set(['p1']),
+    tagIds: new Set(['vat']),
+  }
+
+  it('drops the ids the company does not have (deleted), keeps the archived ones and «без тегів»', () => {
+    const value = f({ categoryIds: ['c1', 'gone'], counterpartyIds: ['gone', 'p1'], tagIds: ['gone', NO_TAG, 'vat'], accountIds: ['gone', 'archived-account'] })
+    expect(knownAnalyticsFilters(value, known)).toEqual(
+      f({ categoryIds: ['c1'], counterpartyIds: ['p1'], tagIds: [NO_TAG, 'vat'], accountIds: ['archived-account'] }),
+    )
+  })
+
+  it('the Balance: a deleted account is dropped, so no account is left and the field counts nothing', () => {
+    const pruned = knownAnalyticsFilters(f({ accountIds: ['gone'] }), { accountIds: new Set(['a1']) })
+    expect(activeAnalyticsFilterCount(pruned, 'accounts')).toBe(0)
+    expect(ids(filterAccounts([makeAccount({ id: 'a1' })], pruned))).toEqual(['a1'])
+  })
+
+  it('a list that is still loading (undefined) keeps its ids; the same object comes back when nothing is dropped', () => {
+    const value = f({ categoryIds: ['gone'], tagIds: [NO_TAG] })
+    expect(knownAnalyticsFilters(value, { categoryIds: undefined })).toBe(value)
+    const clean = f({ categoryIds: ['c1'], tagIds: [NO_TAG, 'vat'] })
+    expect(knownAnalyticsFilters(clean, known)).toBe(clean)
   })
 })
 

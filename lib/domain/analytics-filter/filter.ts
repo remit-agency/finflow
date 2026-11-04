@@ -72,6 +72,35 @@ export function filterForAnalytics<T extends SelectionFacts & { excluded?: boole
   return { operations: chosen, includeExcluded }
 }
 
+/**
+ * The ids of the company's lists that a field may keep. `undefined` while that list is still loading: its ids stay until it
+ * is known. Archived rows are in the lists (old operations still carry them), so they count as known.
+ */
+export interface KnownAnalyticsIds {
+  accountIds?: ReadonlySet<string>
+  categoryIds?: ReadonlySet<string>
+  counterpartyIds?: ReadonlySet<string>
+  tagIds?: ReadonlySet<string>
+}
+
+/**
+ * The filters without the ids the company does not have (a deleted account or category in an old link): the dialog, the
+ * count and the reports all read the filters through this. The same object comes back when nothing is dropped.
+ */
+export function knownAnalyticsFilters(f: AnalyticsFilters, known: KnownAnalyticsIds): AnalyticsFilters {
+  const keep = (ids: string[], set: ReadonlySet<string> | undefined, always?: string): string[] =>
+    set === undefined ? ids : ids.filter((id) => id === always || set.has(id))
+  const next: AnalyticsFilters = {
+    types: f.types,
+    categoryIds: keep(f.categoryIds, known.categoryIds),
+    counterpartyIds: keep(f.counterpartyIds, known.counterpartyIds),
+    tagIds: keep(f.tagIds, known.tagIds, NO_TAG),
+    accountIds: keep(f.accountIds, known.accountIds),
+  }
+  const changed = (Object.keys(next) as (keyof AnalyticsFilters)[]).some((k) => next[k].length !== f[k].length)
+  return changed ? next : f
+}
+
 /** The accounts the Balance shows: the chosen ones, or every account without a choice. */
 export function filterAccounts<T extends { id: string }>(accounts: T[], f: AnalyticsFilters): T[] {
   return f.accountIds.length === 0 ? accounts : accounts.filter((a) => f.accountIds.includes(a.id))

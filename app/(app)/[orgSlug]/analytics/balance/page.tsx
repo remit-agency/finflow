@@ -24,7 +24,7 @@ export default function BalancePage() {
   const [selectedPeriod, setSelectedPeriod] = useState<(typeof PERIODS)[number]>(PERIODS[0])
 
   // The Balance is made of accounts: of the report filters (S10f) only the accounts apply; the rest stay in the address for the other tabs.
-  const { filters, setFilters } = useAnalyticsFilters()
+  const { filters, setFilters } = useAnalyticsFilters('accounts')
   const shown = useMemo(() => filterAccounts(accounts, filters), [accounts, filters])
 
   const handleExport = () => {
