@@ -9,6 +9,7 @@ import CalendarView from '@/components/charts/CalendarView'
 import { AnalyticsFiltersButton, ExcludedHint } from '@/components/analytics/AnalyticsFilters'
 import { filterForAnalytics } from '@/lib/domain/analytics-filter/filter'
 import { useAnalyticsFilters } from '@/lib/hooks/useAnalyticsFilters'
+import { buildCalendar } from '@/lib/utils/analytics'
 import { todayUtcDay } from '@/lib/utils/today'
 
 export default function CalendarPage() {
@@ -29,6 +30,11 @@ export default function CalendarPage() {
   const [today] = useState(() => todayUtcDay())
   const [year, setYear] = useState(today.getUTCFullYear())
   const [month, setMonth] = useState(today.getUTCMonth())
+
+  const calendar = useMemo(
+    () => buildCalendar(selection.operations, year, month, { includeExcluded: selection.includeExcluded }),
+    [selection, year, month]
+  )
 
   const handleNavigate = (dir: 'prev' | 'next') => {
     if (dir === 'prev') {
@@ -51,11 +57,12 @@ export default function CalendarPage() {
 
       <div className="space-y-4">
         <AnalyticsFiltersButton scope="operations" value={filters} onChange={setFilters} />
-        {selection.showsExcluded && <ExcludedHint />}
+        {calendar.excludedCounted && <ExcludedHint />}
       </div>
 
       <CalendarView
         transactions={selection.operations}
+        days={calendar.days}
         includeExcluded={selection.includeExcluded}
         year={year}
         month={month}

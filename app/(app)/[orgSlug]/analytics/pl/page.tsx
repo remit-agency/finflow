@@ -38,10 +38,11 @@ export default function PLPage() {
   const { filters, setFilters } = useAnalyticsFilters()
   const selection = useMemo(() => filterForAnalytics(transactions, filters), [transactions, filters])
 
-  const { monthKeys, rows } = useMemo(
+  const report = useMemo(
     () => buildPL(selection.operations, categories, resolvePeriod(period, now), noCategory, categoryName, { includeExcluded: selection.includeExcluded }),
     [selection, categories, period, now, noCategory, categoryName]
   )
+  const { monthKeys, rows } = report
 
   const handleExport = () => {
     exportToCSV(
@@ -65,7 +66,7 @@ export default function PLPage() {
             <p className="text-sm text-ink-muted">{t('pl.subtitle')}</p>
           </div>
           <ReportToolbar period={period} onPeriodChange={setPeriod} filters={filters} onFiltersChange={setFilters} onExport={handleExport} />
-          {selection.showsExcluded && <ExcludedHint />}
+          {report.excludedCounted && <ExcludedHint />}
         </div>
 
         {/* Summary + pie charts */}

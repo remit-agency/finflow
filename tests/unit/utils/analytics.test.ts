@@ -130,7 +130,7 @@ describe('buildCashFlow over a period', () => {
 
   it('all time spans the transactions; nothing to show without transactions', () => {
     const all = resolvePeriod({ preset: 'allTime' }, NOW)
-    expect(buildCashFlow([], all, 'uk')).toEqual({ granularity: 'month', buckets: [] })
+    expect(buildCashFlow([], all, 'uk')).toEqual({ granularity: 'month', buckets: [], excludedCounted: false })
     const report = buildCashFlow(
       [tx('income', 10, '2025-11-03T10:00:00Z'), tx('expense', 4, '2026-01-20T10:00:00Z')],
       all,
@@ -193,7 +193,7 @@ describe('buildPL over a period', () => {
   })
 
   it('all time without transactions is empty', () => {
-    expect(buildPL([], categories, resolvePeriod({ preset: 'allTime' }, NOW), NONE)).toEqual({ monthKeys: [], rows: [] })
+    expect(buildPL([], categories, resolvePeriod({ preset: 'allTime' }, NOW), NONE)).toEqual({ monthKeys: [], rows: [], excludedCounted: false })
   })
 
   it('names the rows with nameOf when given and with the stored name otherwise', () => {
@@ -260,12 +260,12 @@ describe('report filters (S10f)', () => {
       excluded(tx('expense', 230, '2026-10-20T11:00:00Z')),
       tx('expense', 40, '2026-10-21T12:00:00Z'),
     ]
-    const days = buildCalendar(txs, 2026, 9)
+    const { days } = buildCalendar(txs, 2026, 9)
     expect(days.reduce((s, d) => s + d.income, 0)).toBe(0)
     expect(days.reduce((s, d) => s + d.expense, 0)).toBe(40)
     expect(days[19]).toMatchObject({ date: '2026-10-20', income: 0, expense: 0, hasTransactions: false, balance: 100 })
     expect(days[30].balance).toBe(60)
-    const all = buildCalendar(txs, 2026, 9, { includeExcluded: true })
+    const { days: all } = buildCalendar(txs, 2026, 9, { includeExcluded: true })
     expect(all[19]).toMatchObject({ income: 230, expense: 230, hasTransactions: true, balance: 600 })
     expect(all[30].balance).toBe(560)
   })
@@ -300,5 +300,41 @@ describe('report filters (S10f)', () => {
       const plSum = (type: 'income' | 'expense') => pl.rows.filter((r) => r.type === type).reduce((s, r) => s + r.total, 0)
       expect([plSum('income'), plSum('expense')], label).toEqual(expected)
     }
+  })
+})
+
+describe('excludedCounted: whether a report counted an excluded operation (the hint, S10f)', () => {
+  const october = resolvePeriod({ preset: 'currentMonth' }, NOW)
+  const NONE = 'Bez kategorii'
+  const excluded = (t: Transaction): Transaction => ({ ...t, tags: ['vat'], excluded: true })
+  const withTags = { includeExcluded: true }
+
+  it('Cash Flow: an excluded operation outside the period is not counted', () => {
+    const txs = [excluded(tx('income', 230, '2026-09-20T10:00:00Z')), tx('income', 1000, '2026-10-21T10:00:00Z', 'cat-in')]
+    expect(buildCashFlow(txs, october, 'uk', withTags).excludedCounted).toBe(false)
+  })
+
+  it('an excluded transfer is not counted: transfers never count in Cash Flow, P&L or the Calendar', () => {
+    const txs = [excluded(tx('transfer', 230, '2026-10-20T10:00:00Z'))]
+    expect(buildCashFlow(txs, october, 'uk', withTags).excludedCounted).toBe(false)
+    expect(buildPL(txs, [], october, NONE, undefined, withTags).excludedCounted).toBe(false)
+    expect(buildCalendar(txs, 2026, 9, withTags).excludedCounted).toBe(false)
+  })
+
+  it('an excluded operation in the period is counted only with a concrete tag (includeExcluded)', () => {
+    const txs = [excluded(tx('income', 230, '2026-10-20T10:00:00Z')), tx('expense', 40, '2026-10-21T10:00:00Z')]
+    expect(buildCashFlow(txs, october, 'uk', withTags).excludedCounted).toBe(true)
+    expect(buildCashFlow(txs, october, 'uk').excludedCounted).toBe(false)
+    expect(buildPL(txs, [], october, NONE, undefined, withTags).excludedCounted).toBe(true)
+    expect(buildPL(txs, [], october, NONE).excludedCounted).toBe(false)
+    expect(buildCalendar(txs, 2026, 9, withTags).excludedCounted).toBe(true)
+    expect(buildCalendar(txs, 2026, 9).excludedCounted).toBe(false)
+  })
+
+  it('the Calendar says so for the visible month only, or for a balance carried in from an earlier month', () => {
+    const txs = [excluded(tx('expense', 230, '2026-10-20T10:00:00Z'))]
+    expect(buildCalendar(txs, 2026, 8, withTags).excludedCounted).toBe(false) // September: nothing shown
+    expect(buildCalendar(txs, 2026, 9, withTags).excludedCounted).toBe(true) // October: the day
+    expect(buildCalendar(txs, 2026, 10, withTags).excludedCounted).toBe(true) // November: the balance carried in
   })
 })

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Transaction } from '@/types'
-import { buildCalendar, countsInAnalytics, DayData } from '@/lib/utils/analytics'
+import { countsInAnalytics, DayData } from '@/lib/utils/analytics'
 import { ChevronLeft, ChevronRight, ChevronRight as ExpandIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -14,6 +14,8 @@ import { todayUtcDay } from '@/lib/utils/today'
 
 interface CalendarViewProps {
   transactions: Transaction[]
+  /** The days of the month shown (`buildCalendar` over the same operations). */
+  days: DayData[]
   year: number
   month: number
   onNavigate: (dir: 'prev' | 'next') => void
@@ -154,13 +156,12 @@ function DayRow({ day, dayNum, year, month, transactions, currency }: DayRowProp
   )
 }
 
-export default function CalendarView({ transactions, year, month, onNavigate, currency, loading, includeExcluded = false }: CalendarViewProps) {
+export default function CalendarView({ transactions, days, year, month, onNavigate, currency, loading, includeExcluded = false }: CalendarViewProps) {
   const { orgSlug } = useParams<{ orgSlug: string }>()
   const { can } = useShell()
   const t = useTranslations('charts.calendar')
   const tCharts = useTranslations('charts')
   const { money, date } = useFormatters()
-  const days = buildCalendar(transactions, year, month, { includeExcluded })
   // The list under an opened day shows what the day's totals count (transfers stay listed, as before).
   const counted = transactions.filter((tx) => countsInAnalytics(tx, { includeExcluded }))
   const totalIncome = days.reduce((s, d) => s + d.income, 0)

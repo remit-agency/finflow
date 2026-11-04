@@ -37,10 +37,11 @@ export default function CashFlowPage() {
   const { filters, setFilters } = useAnalyticsFilters()
   const selection = useMemo(() => filterForAnalytics(transactions, filters), [transactions, filters])
 
-  const { granularity, buckets: data } = useMemo(
+  const report = useMemo(
     () => buildCashFlow(selection.operations, resolvePeriod(period, now), locale, { includeExcluded: selection.includeExcluded }),
     [selection, period, now, locale]
   )
+  const { granularity, buckets: data } = report
   const unitLabel = granularity === 'month' ? t('columns.month') : t('columns.day')
 
   const handleExport = () => {
@@ -66,7 +67,7 @@ export default function CashFlowPage() {
             <p className="text-sm text-ink-muted">{t('cashflow.subtitle')}</p>
           </div>
           <ReportToolbar period={period} onPeriodChange={setPeriod} filters={filters} onFiltersChange={setFilters} onExport={handleExport} />
-          {selection.showsExcluded && <ExcludedHint />}
+          {report.excludedCounted && <ExcludedHint />}
         </div>
 
         {/* Summary cards */}

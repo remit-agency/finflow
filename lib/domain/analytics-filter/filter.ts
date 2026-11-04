@@ -57,15 +57,13 @@ export interface AnalyticsSelection<T> {
   operations: T[]
   /** A concrete tag is chosen: the reports count the operations excluded from analytics too (Finmap's rule). */
   includeExcluded: boolean
-  /** ...and some of the chosen operations are such: the page says so («Показано також операції, виключені з аналітики»). */
-  showsExcluded: boolean
 }
 
 /** The operations the reports are built from, by the journal's rule (`matchesSelection`); without a choice the same array. */
 export function filterForAnalytics<T extends SelectionFacts & { excluded?: boolean }>(operations: T[], f: AnalyticsFilters): AnalyticsSelection<T> {
   const includeExcluded = f.tagIds.some((id) => id !== NO_TAG)
   const chosen = activeAnalyticsFilterCount(f, 'operations') === 0 ? operations : operations.filter((tx) => matchesSelection(tx, f))
-  return { operations: chosen, includeExcluded, showsExcluded: includeExcluded && chosen.some((tx) => tx.excluded === true) }
+  return { operations: chosen, includeExcluded }
 }
 
 /** The accounts the Balance shows: the chosen ones, or every account without a choice. */

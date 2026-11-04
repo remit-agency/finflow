@@ -66,7 +66,7 @@ describe('filterForAnalytics', () => {
   it('without a choice: the same array, the excluded operations left to the reports', () => {
     const out = filterForAnalytics(all, EMPTY_ANALYTICS_FILTERS)
     expect(out.operations).toBe(all)
-    expect(out).toMatchObject({ includeExcluded: false, showsExcluded: false })
+    expect(out).toMatchObject({ includeExcluded: false })
   })
 
   it('types and categories work together', () => {
@@ -83,11 +83,11 @@ describe('filterForAnalytics', () => {
   it('a concrete tag brings the excluded operations in and says so when there are any; «без тегів» does not', () => {
     const vatOnly = filterForAnalytics(all, f({ tagIds: ['vat'] }))
     expect(ids(vatOnly.operations)).toEqual(['vat'])
-    expect(vatOnly).toMatchObject({ includeExcluded: true, showsExcluded: true })
-    expect(filterForAnalytics(all, f({ tagIds: ['q4'] }))).toMatchObject({ includeExcluded: true, showsExcluded: false })
+    expect(vatOnly).toMatchObject({ includeExcluded: true })
+    expect(filterForAnalytics(all, f({ tagIds: ['q4'] }))).toMatchObject({ includeExcluded: true })
     const untagged = filterForAnalytics(all, f({ tagIds: [NO_TAG] }))
     expect(ids(untagged.operations)).toEqual(['sale', 'move'])
-    expect(untagged).toMatchObject({ includeExcluded: false, showsExcluded: false })
+    expect(untagged).toMatchObject({ includeExcluded: false })
   })
 
   it('chooses the operations the journal lists for the same choice', () => {

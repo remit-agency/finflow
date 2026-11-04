@@ -29,6 +29,8 @@ export interface CashFlowBucket {
 export interface CashFlowReport {
   granularity: CashFlowGranularity
   buckets: CashFlowBucket[]
+  /** An operation excluded from analytics was counted into a bucket: the page's hint (S10f). */
+  excludedCounted: boolean
 }
 
 export interface PLRow {
@@ -43,6 +45,18 @@ export interface PLReport {
   /** The months of the range, oldest first ("2026-01"); the table's columns. */
   monthKeys: string[]
   rows: PLRow[]
+  /** An operation excluded from analytics was counted into a row: the page's hint (S10f). */
+  excludedCounted: boolean
+}
+
+export interface CalendarReport {
+  /** The days of the month shown. */
+  days: DayData[]
+  /**
+   * An operation excluded from analytics was counted: on one of the days, or in the balance carried in from before the
+   * month (the days show that balance). The page's hint (S10f).
+   */
+  excludedCounted: boolean
 }
 
 export interface DayData {
@@ -153,7 +167,8 @@ function daysOf(range: { start: Date; end: Date }): number {
  */
 export function buildCashFlow(transactions: Transaction[], range: PeriodRange, locale: Locale, opts: ReportOptions = {}): CashFlowReport {
   const bounded = reportRange(range, transactions)
-  if (!bounded) return { granularity: 'month', buckets: [] }
+  if (!bounded) return { granularity: 'month', buckets: [], excludedCounted: false }
+  let excludedCounted = false
 
   const granularity: CashFlowGranularity =
     daysOf(bounded) > CASHFLOW_DAY_BUCKETS_MAX_DAYS ? 'month' : 'day'
@@ -178,6 +193,8 @@ export function buildCashFlow(transactions: Transaction[], range: PeriodRange, l
     if (!entry) continue
     if (tx.type === 'income') entry.income += tx.amount
     else if (tx.type === 'expense') entry.expense += tx.amount
+    else continue
+    if (tx.excluded === true) excludedCounted = true
   }
 
   // Net and the running balance
@@ -188,7 +205,7 @@ export function buildCashFlow(transactions: Transaction[], range: PeriodRange, l
     entry.balance = runningBalance
   }
 
-  return { granularity, buckets }
+  return { granularity, buckets, excludedCounted }
 }
 
 /**
@@ -207,7 +224,8 @@ export function buildPL(
   opts: ReportOptions = {}
 ): PLReport {
   const bounded = reportRange(range, transactions)
-  if (!bounded) return { monthKeys: [], rows: [] }
+  if (!bounded) return { monthKeys: [], rows: [], excludedCounted: false }
+  let excludedCounted = false
   const monthKeys = monthsOf(bounded).map(({ year, month }) => formatMonthKey(year, month))
 
   const rowMap = new Map<string, PLRow>()
@@ -256,6 +274,7 @@ export function buildPL(
       bucket.months[key] = (bucket.months[key] || 0) + tx.amount
       bucket.total += tx.amount
     }
+    if (tx.excluded === true) excludedCounted = true
   }
 
   const rows = Array.from(rowMap.values()).filter(r => r.total > 0)
@@ -264,7 +283,7 @@ export function buildPL(
   if (uncatIncome.total > 0) rows.push(uncatIncome)
   if (uncatExpense.total > 0) rows.push(uncatExpense)
 
-  return { monthKeys, rows }
+  return { monthKeys, rows, excludedCounted }
 }
 
 /**
@@ -277,9 +296,10 @@ export function buildCalendar(
   year: number,
   month: number,
   opts: ReportOptions = {}
-): DayData[] {
+): CalendarReport {
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const result: DayData[] = []
+  let excludedCounted = false
 
   // Get running balance up to start of month
   let startingBalance = 0
@@ -289,6 +309,8 @@ export function buildCalendar(
     if (date.getFullYear() < year || (date.getFullYear() === year && date.getMonth() < month)) {
       if (tx.type === 'income') startingBalance += tx.amount
       else if (tx.type === 'expense') startingBalance -= tx.amount
+      else continue
+      if (tx.excluded === true) excludedCounted = true
     }
   }
 
@@ -306,6 +328,8 @@ export function buildCalendar(
       if (txDateStr === dateStr) {
         if (tx.type === 'income') income += tx.amount
         else if (tx.type === 'expense') expense += tx.amount
+        else continue
+        if (tx.excluded === true) excludedCounted = true
       }
     }
 
@@ -320,5 +344,5 @@ export function buildCalendar(
     })
   }
 
-  return result
+  return { days: result, excludedCounted }
 }
