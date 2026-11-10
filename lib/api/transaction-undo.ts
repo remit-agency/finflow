@@ -23,6 +23,10 @@ export function bankRestoreOf(tx: Transaction): BankRestore {
 /**
  * Undo of an edit or of a bulk change: the operation as it was stored before is written back as a full replace. It says so
  * (`restore`), because the state may carry a tag that is archived by now.
+ * The series flags (`manual`, `estimated`, S11) are not part of the draft and are not restored: they are the server's, and
+ * the request may not set them. An undo of a manual change of a planned occurrence therefore keeps `manual` (the series no
+ * longer rewrites it) and leaves `estimated` off. Restoring them exactly would need the pre-edit flags on the server
+ * (PROGRESS.md, S11 follow-ups).
  */
 export function revertTransaction(orgId: string, before: Transaction): Promise<void> {
   return updateTransaction(orgId, before.id, transactionToDraft(before), { restore: true })

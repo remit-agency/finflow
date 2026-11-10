@@ -244,6 +244,19 @@ describe('a planned occurrence is never a transfer (C2)', () => {
     expect((await verifyLedger(deps, ORG)).ok).toBe(true)
   })
 
+  it('an undo of a manual amount change restores the content, and keeps the flags the edit left (MINOR b, documented)', async () => {
+    // The undo sends the content only (`revertTransaction`): the series flags are the server's, so `manual` stays and
+    // `estimated` does not come back. The plan stays out of the series' rewrites, which is the safe side of the trade-off.
+    const { series } = await createSeries(deps, ORG, UID, ZUS)
+    const id = `pl_${series.id}_2026-11-15`
+    await updateTransaction(deps, ORG, UID, id, { amountMinor: 200_000 })
+    expect(await txDoc(db, id)).toMatchObject({ amountMinor: 200_000, manual: true })
+    expect((await txDoc(db, id))?.estimated).toBeUndefined()
+    await updateTransaction(deps, ORG, UID, id, { amountMinor: 150_000 }, { restore: true })
+    expect(await txDoc(db, id)).toMatchObject({ amountMinor: 150_000, manual: true, seriesId: series.id })
+    expect((await txDoc(db, id))?.estimated).toBeUndefined()
+  })
+
   it('a paid one is refused the same way', async () => {
     await seedAccount(db, ORG, 'cash', 'PLN', 0)
     const { series } = await createSeries(deps, ORG, UID, RENT)
