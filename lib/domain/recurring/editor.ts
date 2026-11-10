@@ -14,6 +14,8 @@ export interface EditorState {
   estimated: boolean
   categoryId: string
   counterpartyId: string
+  /** The server refused the counterparty as archived: a preset must name another one (see `counterpartyArchivedState`). */
+  counterpartyArchived: boolean
   tagIds: string[]
   description: string
   frequency: Frequency
@@ -26,7 +28,7 @@ export interface EditorState {
   preset: Preset | null
 }
 
-export type EditorField = 'name' | 'accountId' | 'amount' | 'dayOfMonth' | 'interval' | 'startDate' | 'endDate'
+export type EditorField = 'name' | 'accountId' | 'amount' | 'dayOfMonth' | 'interval' | 'startDate' | 'endDate' | 'counterparty'
 export type EditorErrors = Partial<Record<EditorField, true>>
 
 export interface InitialOptions {
@@ -46,7 +48,7 @@ export function initialEditorState(o: InitialOptions): EditorState {
   if (s !== undefined) {
     return {
       name: s.name, kind: s.kind, accountId: s.accountId, amount: o.formatAmount(fromMinor(s.amountMinor)), estimated: s.estimated,
-      categoryId: s.categoryId ?? '', counterpartyId: s.counterpartyId ?? '', tagIds: [...s.tags], description: s.description ?? '',
+      categoryId: s.categoryId ?? '', counterpartyId: s.counterpartyId ?? '', counterpartyArchived: false, tagIds: [...s.tags], description: s.description ?? '',
       frequency: s.frequency, interval: String(s.interval), dayOfMonth: s.dayOfMonth === null ? '' : String(s.dayOfMonth),
       weekday: s.weekday === null ? '1' : String(s.weekday), startDate: s.startDate, endDate: s.endDate ?? '', weekendRule: s.weekendRule,
       preset: s.preset ?? null,
@@ -62,6 +64,7 @@ export function initialEditorState(o: InitialOptions): EditorState {
     categoryId: '',
     // A preset names no counterparty: the server takes the company's record of its name, else the S06 record (I1).
     counterpartyId: '',
+    counterpartyArchived: false,
     tagIds: [],
     description: '',
     frequency: 'monthly',
@@ -78,6 +81,14 @@ export function initialEditorState(o: InitialOptions): EditorState {
 const whole = (text: string, min: number, max: number): boolean => /^\d+$/.test(text) && Number(text) >= min && Number(text) <= max
 const cleanName = (text: string): string => text.replace(/\s+/g, ' ').trim()
 
+/**
+ * The counterparty the server refused as archived. A preset's empty counterparty is the server's pick, and the archived
+ * record is refused again, so a preset's form asks for another one (`validateEditor`). Any other series clears it to none.
+ */
+export function counterpartyArchivedState(s: EditorState): EditorState {
+  return s.preset === null ? { ...s, counterpartyId: '' } : { ...s, counterpartyId: '', counterpartyArchived: true }
+}
+
 /** The fields the server would refuse, checked before the request (the server checks again). */
 export function validateEditor(s: EditorState): EditorErrors {
   const e: EditorErrors = {}
@@ -90,6 +101,7 @@ export function validateEditor(s: EditorState): EditorErrors {
   if (s.frequency === 'everyNMonths' && !whole(s.interval, 1, MAX_INTERVAL)) e.interval = true
   if (!isDay(s.startDate)) e.startDate = true
   if (s.endDate !== '' && (!isDay(s.endDate) || s.endDate < s.startDate)) e.endDate = true
+  if (s.counterpartyArchived && s.counterpartyId === '') e.counterparty = true
   return e
 }
 

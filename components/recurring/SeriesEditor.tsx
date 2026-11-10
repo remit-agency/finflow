@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { LedgerApiError } from '@/lib/api/ledger-client'
 import { createSeries, updateSeries } from '@/lib/api/recurring-client'
-import { editorToBody, editorToPatch, initialEditorState, validateEditor, type EditorErrors, type EditorState } from '@/lib/domain/recurring/editor'
+import { counterpartyArchivedState, editorToBody, editorToPatch, initialEditorState, validateEditor, type EditorErrors, type EditorState } from '@/lib/domain/recurring/editor'
 import { FREQUENCIES, WEEKEND_RULES, type Preset, type Series } from '@/lib/domain/recurring/types'
 import { useCounterparties } from '@/lib/hooks/useCounterparties'
 import { useShell } from '@/lib/hooks/useShell'
@@ -91,8 +91,12 @@ export function SeriesEditor({ orgId, series, preset, onClose }: Props) {
       }
       onClose()
     } catch (e) {
-      // An archived counterparty is taken off the form: the person picks another one (the message says so).
-      if (e instanceof LedgerApiError && e.code === 'counterparty_archived') patch({ counterpartyId: '' })
+      // An archived counterparty is taken off the form; a preset then asks for another one (the field says so), never the
+      // server's pick again.
+      if (e instanceof LedgerApiError && e.code === 'counterparty_archived') {
+        setState(counterpartyArchivedState)
+        setErrors((prev) => ({ ...prev, counterparty: true }))
+      }
       toast.error(errorText(e))
     } finally {
       setBusy(false)
@@ -156,6 +160,7 @@ export function SeriesEditor({ orgId, series, preset, onClose }: Props) {
           </div>
           <div className="sm:col-span-2">
             <CounterpartyField orgId={orgId} counterparties={counterparties} value={state.counterpartyId} onChange={(id) => patch({ counterpartyId: id })} />
+            {fieldError(errors.counterparty, t('editor.errors.counterpartyArchived'))}
           </div>
           <div className="sm:col-span-2">
             <TagsField orgId={orgId} tags={tags} value={state.tagIds} onChange={(ids) => patch({ tagIds: ids })} canCreate={can('data.write')} />

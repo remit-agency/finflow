@@ -1,10 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { editorToBody, editorToPatch, initialEditorState, validateEditor, type EditorState } from '@/lib/domain/recurring/editor'
+import { counterpartyArchivedState, editorToBody, editorToPatch, initialEditorState, validateEditor, type EditorState } from '@/lib/domain/recurring/editor'
 import { parseSeriesInput, seriesFromInput } from '@/lib/domain/recurring/input'
 
 const base = { today: '2026-11-10', defaultAccountId: 'mil', formatAmount: (n: number) => String(n).replace('.', ',') }
 
 describe('the series editor (S11)', () => {
+  it('a preset whose counterparty is archived asks for another one: the server’s pick would be refused again (C2 loop)', () => {
+    const zus: EditorState = { ...initialEditorState({ ...base, preset: 'zus', presetName: 'ZUS' }), amount: '1500', accountId: 'mil' }
+    const asked = counterpartyArchivedState(zus)
+    expect(asked).toMatchObject({ counterpartyId: '', counterpartyArchived: true })
+    expect(validateEditor(asked)).toEqual({ counterparty: true })
+    expect(validateEditor({ ...asked, counterpartyId: 'mine' })).toEqual({})
+    expect(editorToBody({ ...asked, counterpartyId: 'mine' })).toMatchObject({ counterpartyId: 'mine', preset: 'zus' })
+  })
+
+  it('a series without a preset whose counterparty is archived is cleared to none, as before', () => {
+    const rent: EditorState = { ...initialEditorState(base), name: 'Czynsz', amount: '2500', accountId: 'mil', counterpartyId: 'old' }
+    const cleared = counterpartyArchivedState(rent)
+    expect(cleared).toMatchObject({ counterpartyId: '' })
+    expect(validateEditor(cleared)).toEqual({})
+    expect(editorToBody(cleared)).not.toHaveProperty('counterpartyId')
+  })
+
   it('a preset starts as an estimated expense to ZUS on the 15th, moved to the next business day', () => {
     expect(initialEditorState({ ...base, preset: 'zus', presetName: 'ZUS' })).toMatchObject({
       name: 'ZUS', kind: 'expense', accountId: 'mil', estimated: true, counterpartyId: '', frequency: 'monthly', dayOfMonth: '15', weekendRule: 'next', startDate: '2026-11-10', preset: 'zus',
