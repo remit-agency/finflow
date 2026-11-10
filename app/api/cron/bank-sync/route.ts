@@ -31,7 +31,11 @@ export async function POST(req: Request) {
     // route's time, at most RECURRING_CRON_BUDGET_MS; an hour without time is caught up by the next call. They never throw.
     const left = CRON_ROUTE_BUDGET_MS - (Date.now() - started)
     const plans = await recurring.cron(Math.max(0, Math.min(RECURRING_CRON_BUDGET_MS, left)))
-    if (bankError !== null || bank === null) return errorResponse(bankError)
+    if (bankError !== null || bank === null) {
+      // The job turns red either way; the planned payments' counts (no names) stay in the log with the failure.
+      console.error('bank-sync: the bank refresh failed', { recurring: plans })
+      return errorResponse(bankError)
+    }
     return Response.json({ ...bank, recurring: plans }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (e) {
     return errorResponse(e)

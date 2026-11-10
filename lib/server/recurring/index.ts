@@ -21,5 +21,5 @@ export const recurring = {
   },
   matches: (orgId: string, uid: string, req: MatchRequest) => runMatches(ledger, orgId, uid, req),
   /** The daily fill, a step of the hourly cron call; never throws. */
-  cron: (budgetMs: number) => runRecurringCron(ledgerDeps(), { budgetMs }),
+  cron: (budgetMs: number) => runRecurringCron(() => ledgerDeps(), { budgetMs }),
 }

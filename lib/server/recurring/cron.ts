@@ -15,16 +15,20 @@ const TRANSIENT = new Set(['ledger_busy', 'conflict'])
  * again inside, so parallel calls never fill twice). The time budget is checked before each series: what is left waits for
  * the next call. A failing series never stops the others: it is logged by ids and counted; a lasting failure (no account,
  * an unreadable series) moves its `dueOn` to tomorrow, a passing one leaves it for the next hour. Counts only, never names.
- * Never throws: a failed read of the due series is one failure.
+ * Never throws: the dependencies are made inside (`deps` is a factory, so a missing setting is a failure too), and a failed
+ * read of the due series is one failure.
  */
-export async function runRecurringCron(deps: LedgerDeps, opts: { budgetMs: number; max?: number }): Promise<RecurringCronSummary> {
+export async function runRecurringCron(deps: () => LedgerDeps, opts: { budgetMs: number; max?: number }): Promise<RecurringCronSummary> {
   const started = Date.now()
   const summary: RecurringCronSummary = { considered: 0, filled: 0, created: 0, skipped: 0, failed: 0 }
   if (opts.budgetMs <= 0) return summary
-  const today = deps.today()
+  let ledger: LedgerDeps
+  let today: string
   let docs
   try {
-    docs = (await dueSeriesQuery(deps.db, today).select().limit(opts.max ?? CRON_MAX_SERIES).get()).docs
+    ledger = deps()
+    today = ledger.today()
+    docs = (await dueSeriesQuery(ledger.db, today).select().limit(opts.max ?? CRON_MAX_SERIES).get()).docs
   } catch (e) {
     console.error('recurring cron: the due series could not be read', { error: e instanceof Error ? e.name : 'unknown' })
     summary.failed++
@@ -42,7 +46,7 @@ export async function runRecurringCron(deps: LedgerDeps, opts: { budgetMs: numbe
       continue
     }
     try {
-      const r = await fillSeries(deps, orgId, doc.id)
+      const r = await fillSeries(ledger, orgId, doc.id)
       if (r.due) {
         summary.filled++
         summary.created += r.created

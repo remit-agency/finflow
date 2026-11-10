@@ -86,4 +86,10 @@ describe('POST /api/cron/bank-sync', () => {
     expect(await res.json()).toEqual({ error: 'internal' })
     expect(recurring.cron).toHaveBeenCalledTimes(1)
   })
+
+  it('logs the planned payments counts too when the bank refresh breaks, so a red run keeps them (MINOR a)', async () => {
+    vi.mocked(banking.runBackgroundSync).mockRejectedValue(new Error('boom'))
+    await call(`Bearer ${SECRET}`)
+    expect(console.error).toHaveBeenCalledWith('bank-sync: the bank refresh failed', { recurring: PLANS })
+  })
 })

@@ -40,7 +40,8 @@ jobs:
             exit 1
           fi
           failed=$(jq -r '.failed' "$RUNNER_TEMP/out.json") || { echo "bank-sync: the response is not JSON" >&2; exit 1; }
-          planned=$(jq -r '.recurring.failed' "$RUNNER_TEMP/out.json") || { echo "bank-sync: the response is not JSON" >&2; exit 1; }
+          # `// 0`: a route that predates the planned payments (deploy ordering) has no `recurring` part, which counts as 0.
+          planned=$(jq -r '.recurring.failed // 0' "$RUNNER_TEMP/out.json") || { echo "bank-sync: the response is not JSON" >&2; exit 1; }
           case "$failed" in
             ''|*[!0-9]*) echo "bank-sync: the response has no failed count" >&2; exit 1 ;;
           esac
