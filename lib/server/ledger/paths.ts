@@ -17,3 +17,7 @@ export const tagsCol = (db: Firestore, orgId: string) => orgRef(db, orgId).colle
 export const tagKeysCol = (db: Firestore, orgId: string) => orgRef(db, orgId).collection('tagKeys')
 /** organizations/{org}/ledger/lock: closed to clients (firestore.rules). */
 export const lockRef = (db: Firestore, orgId: string) => orgRef(db, orgId).collection('ledger').doc('lock')
+/** The series of planned payments (S11): written by the server, readable by members (firestore.rules). */
+export const recurringCol = (db: Firestore, orgId: string) => orgRef(db, orgId).collection('recurring')
+/** One mark per settled occurrence (S11: paid, skipped, deleted), id = the plan id: closed to clients (firestore.rules). */
+export const recurringDoneCol = (db: Firestore, orgId: string) => orgRef(db, orgId).collection('recurringDone')
