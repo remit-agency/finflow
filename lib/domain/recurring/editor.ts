@@ -60,7 +60,8 @@ export function initialEditorState(o: InitialOptions): EditorState {
     amount: '',
     estimated: preset !== null,
     categoryId: '',
-    counterpartyId: preset !== null ? PRESET_DEFAULTS[preset].counterpartyId : '',
+    // A preset names no counterparty: the server takes the company's record of its name, else the S06 record (I1).
+    counterpartyId: '',
     tagIds: [],
     description: '',
     frequency: 'monthly',

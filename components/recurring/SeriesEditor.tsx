@@ -65,6 +65,7 @@ export function SeriesEditor({ orgId, series, preset, onClose }: Props) {
   const errorText = (e: unknown): string => {
     if (e instanceof LedgerApiError) {
       if (e.code === 'limit_reached') return t('editor.errors.limit')
+      if (e.code === 'counterparty_archived') return t('editor.errors.counterpartyArchived')
       const key = `errors.${e.code}` as 'errors.unknown'
       if (tBulk.has(key)) return tBulk(key)
     }
@@ -90,6 +91,8 @@ export function SeriesEditor({ orgId, series, preset, onClose }: Props) {
       }
       onClose()
     } catch (e) {
+      // An archived counterparty is taken off the form: the person picks another one (the message says so).
+      if (e instanceof LedgerApiError && e.code === 'counterparty_archived') patch({ counterpartyId: '' })
       toast.error(errorText(e))
     } finally {
       setBusy(false)

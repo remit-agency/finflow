@@ -12,7 +12,7 @@ import { parseDone, parseSeries, seriesToDoc } from '@/lib/domain/recurring/doc'
 import { RecurringError } from '@/lib/domain/recurring/errors'
 import { applySeriesPatch, assertSeriesHorizon, seriesFromInput, type SeriesInput, type SeriesPatch } from '@/lib/domain/recurring/input'
 import { fillPlan, planId, planInputOf, rewriteOccurrences, rewriteState, seriesFieldsOf, type UsableRefs } from '@/lib/domain/recurring/plan'
-import { presetCounterparty } from '@/lib/domain/recurring/presets'
+import { PRESET_DEFAULTS, presetCounterparty } from '@/lib/domain/recurring/presets'
 import { periodOf, periodStart } from '@/lib/domain/recurring/schedule'
 import { MARKS_SCAN, MAX_SERIES, MAX_SHIFT_DAYS, RECURRING_UID, REWRITE_CAP, type FutureMode, type Preset, type Series } from '@/lib/domain/recurring/types'
 import { excludedFromTags, tagFlagsOf, withExcluded } from '@/lib/domain/tags/exclude'
@@ -165,6 +165,14 @@ interface PresetCounterparty {
   create: boolean
 }
 
+/**
+ * Whether the server picks the preset's counterparty: when the body names none, or names the preset's own system id (a client
+ * may send it as a default; the company may have its own «ZUS» record under another id). Any other id is the person's choice.
+ */
+export function presetWantsCounterparty(preset: Preset, counterpartyId: string | undefined): boolean {
+  return counterpartyId === undefined || counterpartyId === PRESET_DEFAULTS[preset].counterpartyId
+}
+
 /** The counterparty of a preset (S06 system record): by its fixed id, else the record that owns its name, else a new one. */
 async function presetCounterpartyIn(t: Transaction, db: Firestore, orgId: string, preset: Preset): Promise<PresetCounterparty> {
   const spec = presetCounterparty(preset)
@@ -192,7 +200,8 @@ export interface CreatedSeries {
 
 /**
  * A new series (S11) in ONE transaction: the limit, the references, the series document, the plans of its first fill
- * (from today to three months ahead) and the audit entries. A preset without a counterparty takes the S06 system record.
+ * (from today to three months ahead) and the audit entries. A preset that names no counterparty, or its system id, takes the
+ * company's record of its name, else its S06 system record (`presetWantsCounterparty`).
  */
 export async function createSeries(deps: LedgerDeps, orgId: string, uid: string, input: SeriesInput, opts: { maxCount?: number } = {}): Promise<CreatedSeries> {
   const { db } = deps
@@ -202,7 +211,7 @@ export async function createSeries(deps: LedgerDeps, orgId: string, uid: string,
   return db.runTransaction(async (t) => {
     await assertUnlocked(t, deps, orgId)
     const count = (await t.get(recurringCol(db, orgId).count())).data().count
-    const preset = input.preset !== undefined && input.counterpartyId === undefined ? await presetCounterpartyIn(t, db, orgId, input.preset) : null
+    const preset = input.preset !== undefined && presetWantsCounterparty(input.preset, input.counterpartyId) ? await presetCounterpartyIn(t, db, orgId, input.preset) : null
     const draft = seriesFromInput(ref.id, preset === null ? input : { ...input, counterpartyId: preset.id }, '')
     const ctx = await readContext(t, db, orgId, draft, { category: true, counterparty: true, tags: draft.tags }, preset?.create === true)
     if (count >= (opts.maxCount ?? MAX_SERIES)) throw new RecurringError('limit_reached')

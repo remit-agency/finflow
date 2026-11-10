@@ -83,6 +83,27 @@ describe('creating a series (S11)', () => {
     await db.doc(`organizations/${ORG}/counterpartyKeys/name_zus`).set({ counterpartyId: 'my-zus' })
     expect((await createSeries(deps, ORG, UID, ZUS)).series.counterpartyId).toBe('my-zus')
   })
+
+  // The editor of the page sends the preset's system id (`system_zus`) as the counterparty. The server owns that choice.
+  it('a preset sent with the system id creates the S06 record in a company that has none (I1)', async () => {
+    const { series } = await createSeries(deps, ORG, UID, { ...ZUS, counterpartyId: 'system_zus' })
+    expect(series.counterpartyId).toBe('system_zus')
+    expect(await readDoc(db, `organizations/${ORG}/counterparties/system_zus`)).toMatchObject({ name: 'ZUS', kind: 'zus' })
+  })
+
+  it('a preset sent with the system id uses the company’s own ZUS record, creating no system one (I1)', async () => {
+    await seedCounterparty(db, ORG, 'my-zus')
+    await db.doc(`organizations/${ORG}/counterpartyKeys/name_zus`).set({ counterpartyId: 'my-zus' })
+    expect((await createSeries(deps, ORG, UID, { ...ZUS, counterpartyId: 'system_zus' })).series.counterpartyId).toBe('my-zus')
+    expect(await readDoc(db, `organizations/${ORG}/counterparties/system_zus`)).toBeUndefined()
+  })
+
+  it('a preset whose system record is archived is refused, never planned without its counterparty (I1)', async () => {
+    await seedCounterparty(db, ORG, 'system_zus', { archived: true })
+    await db.doc(`organizations/${ORG}/counterpartyKeys/name_zus`).set({ counterpartyId: 'system_zus' })
+    expect(await code(createSeries(deps, ORG, UID, { ...ZUS, counterpartyId: 'system_zus' }))).toBe('counterparty_archived:counterpartyId')
+    expect(await code(createSeries(deps, ORG, UID, ZUS))).toBe('counterparty_archived:counterpartyId')
+  })
 })
 
 describe('the daily fill', () => {

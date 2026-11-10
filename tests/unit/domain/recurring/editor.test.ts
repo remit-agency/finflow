@@ -7,9 +7,15 @@ const base = { today: '2026-11-10', defaultAccountId: 'mil', formatAmount: (n: n
 describe('the series editor (S11)', () => {
   it('a preset starts as an estimated expense to ZUS on the 15th, moved to the next business day', () => {
     expect(initialEditorState({ ...base, preset: 'zus', presetName: 'ZUS' })).toMatchObject({
-      name: 'ZUS', kind: 'expense', accountId: 'mil', estimated: true, counterpartyId: 'system_zus', frequency: 'monthly', dayOfMonth: '15', weekendRule: 'next', startDate: '2026-11-10', preset: 'zus',
+      name: 'ZUS', kind: 'expense', accountId: 'mil', estimated: true, counterpartyId: '', frequency: 'monthly', dayOfMonth: '15', weekendRule: 'next', startDate: '2026-11-10', preset: 'zus',
     })
-    expect(initialEditorState({ ...base, preset: 'vat7', presetName: 'VAT-7' })).toMatchObject({ counterpartyId: 'system_us', dayOfMonth: '25' })
+    expect(initialEditorState({ ...base, preset: 'vat7', presetName: 'VAT-7' })).toMatchObject({ counterpartyId: '', dayOfMonth: '25' })
+  })
+
+  it('a preset sends no counterparty unless the person picks one: the server takes the company’s record (I1)', () => {
+    const body = editorToBody({ ...initialEditorState({ ...base, preset: 'zus', presetName: 'ZUS' }), accountId: 'mil', amount: '1500' })
+    expect(body).not.toHaveProperty('counterpartyId')
+    expect(body).toMatchObject({ preset: 'zus' })
   })
 
   it('a new series starts monthly on today, without a weekend rule', () => {
@@ -26,7 +32,7 @@ describe('the series editor (S11)', () => {
   it('builds a body the server reads, the amount in minor units', () => {
     const s: EditorState = { ...initialEditorState({ ...base, preset: 'zus', presetName: 'ZUS' }), amount: '1 234,50', tagIds: ['t1'], description: '  grudzień ' }
     expect(parseSeriesInput(editorToBody(s))).toEqual({
-      name: 'ZUS', kind: 'expense', accountId: 'mil', counterpartyId: 'system_zus', tags: ['t1'], description: 'grudzień', amountMinor: 123_450,
+      name: 'ZUS', kind: 'expense', accountId: 'mil', tags: ['t1'], description: 'grudzień', amountMinor: 123_450,
       estimated: true, preset: 'zus', frequency: 'monthly', interval: 1, dayOfMonth: 15, weekday: null, startDate: '2026-11-10', weekendRule: 'next',
     })
   })

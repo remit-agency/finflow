@@ -1220,6 +1220,7 @@
         "startDate": "Podaj datę początku",
         "endDate": "Koniec nie wcześniej niż początek",
         "limit": "Najwyżej 100 serii w firmie",
+        "counterpartyArchived": "Kontrahent jest w archiwum. Wybierz innego",
         "save": "Nie udało się zapisać serii"
       }
     },

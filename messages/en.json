@@ -1220,6 +1220,7 @@
         "startDate": "Enter the start date",
         "endDate": "The end is not before the start",
         "limit": "At most 100 series per company",
+        "counterpartyArchived": "The counterparty is archived. Choose another one",
         "save": "Could not save the series"
       }
     },
