@@ -126,7 +126,8 @@
   "shell": {
     "modules": {
       "transactions": "Payments",
-      "analytics": "Analytics"
+      "analytics": "Analytics",
+      "recurring": "Planned payments"
     },
     "analyticsSections": {
       "cashflow": "Cash Flow",
@@ -287,7 +288,8 @@
       "loadingMore": "Loading more…",
       "searching": "Searching older operations…",
       "loadMoreRetry": "Could not load more, retry",
-      "gone": "The operation no longer exists"
+      "gone": "The operation no longer exists",
+      "overdue": "Overdue"
     },
     "selection": {
       "region": "Selected operations",
@@ -432,6 +434,26 @@
       "splitDone": "The transfer was split",
       "splitFailed": "Could not split the transfer",
       "arrival": "arrived {date}"
+    },
+    "plans": {
+      "banner": "Matches with planned payments found: {count}",
+      "bannerOpen": "Review",
+      "dialogTitle": "Matches with planned payments",
+      "dialogBody": "These bank operations look like planned payments. The ticked pairs will be linked: the planned operation goes, and the bank one takes its category, counterparty, tags and comment where it has none. Unticked pairs are not offered again in this browser.",
+      "pick": "Link “{name}” ({planDate}) to the bank operation of {bankDate}, {amount}",
+      "planLabel": "Plan {date}",
+      "bankLabel": "Bank {date}",
+      "estimated": "estimated",
+      "confirm": "Confirm selected",
+      "later": "Not now",
+      "truncated": "Only part of the operations was looked at.",
+      "failedPair": "Failed: {reason}",
+      "done": "Linked to plans: {count}.",
+      "partial": "Failed: {count} ({reason}).",
+      "undo": "Undo",
+      "undoFailed": "Could not undo everything",
+      "undone": "Plans brought back: {count}",
+      "unnamed": "Planned payment"
     }
   },
   "forms": {
@@ -512,7 +534,10 @@
         "tagMissing": "The tag was not found",
         "tagCreate": "Could not create the tag"
       },
-      "tags": "Tags"
+      "tags": "Tags",
+      "seriesHint": "From the series “{name}”. Changing the amount, the date or another field detaches it: changes of the series will no longer update it.",
+      "seriesHintManual": "From the series “{name}”, changed by hand: the series no longer updates it.",
+      "seriesGone": "From a deleted series of planned payments."
     },
     "account": {
       "titleNew": "New account",
@@ -961,7 +986,8 @@
       "excludedHint": "Also showing operations excluded from analytics",
       "noMatches": "Nothing found",
       "more": "{count} more: narrow the search",
-      "full": "At most {max} in the list",      "kinds": {
+      "full": "At most {max} in the list",
+      "kinds": {
         "label": "Payment types and categories",
         "all": "All types and categories",
         "root": "All payment types and categories",
@@ -1069,5 +1095,146 @@
       "balanced": "Assets = Equity + Liabilities",
       "difference": "Difference: {amount}"
     }
+  },
+  "recurring": {
+    "title": "Planned payments",
+    "loadError": "Could not load the planned payments",
+    "truncated": "Not every planned operation is shown.",
+    "strip": {
+      "overdue": "Overdue: {count}",
+      "overdueNone": "Nothing overdue",
+      "soon": "Next 7 days",
+      "income": "Incoming",
+      "expense": "Outgoing"
+    },
+    "series": {
+      "title": "Series",
+      "add": "Add a series",
+      "addPreset": "Add from a preset",
+      "empty": "No planned payments yet. Add rent, a subscription or a tax to see them ahead.",
+      "name": "Name",
+      "next": "Next date",
+      "amount": "Amount",
+      "repeat": "Repeats",
+      "state": "State",
+      "noNext": "none",
+      "estimated": "estimated",
+      "active": "Active",
+      "paused": "Paused",
+      "edit": "Edit",
+      "pause": "Pause",
+      "resume": "Resume",
+      "delete": "Delete",
+      "actions": "Actions for {name}"
+    },
+    "repeat": {
+      "weekly": "Weekly, {weekday}",
+      "monthly": "Monthly, on day {day}",
+      "everyNMonths": "Every {interval} months, on day {day}",
+      "yearly": "Yearly, {date}"
+    },
+    "presets": {
+      "zus": "ZUS",
+      "pit4": "PIT-4",
+      "vat7": "VAT-7",
+      "hint": "The amount is an estimate you enter. The date moves to the next business day."
+    },
+    "planned": {
+      "title": "Upcoming planned operations",
+      "overdueTitle": "Overdue",
+      "upcomingTitle": "Next 31 days",
+      "empty": "Nothing planned soon.",
+      "planned": "Planned",
+      "overdue": "Overdue",
+      "estimated": "Estimated",
+      "manual": "Changed by hand",
+      "markPaid": "Mark as paid",
+      "move": "Move",
+      "skip": "Skip",
+      "rowActions": "Actions for {name}, {amount}, {date}",
+      "paid": "Marked as paid",
+      "moved": "Date moved",
+      "skipped": "Skipped this time",
+      "undo": "Undo",
+      "undoFailed": "Could not undo",
+      "failed": "Failed: {reason}"
+    },
+    "move": {
+      "title": "Move the date",
+      "body": "The operation is marked as changed by hand: changes of the series no longer update it.",
+      "date": "New date",
+      "confirm": "Move",
+      "cancel": "Cancel"
+    },
+    "editor": {
+      "titleNew": "New series",
+      "titleEdit": "Edit the series",
+      "titlePreset": "New {preset} payment",
+      "name": "Name",
+      "kind": "Kind",
+      "income": "Income",
+      "expense": "Expense",
+      "account": "Account",
+      "chooseAccount": "Choose an account",
+      "amount": "Amount",
+      "estimated": "The amount is an estimate",
+      "category": "Category",
+      "noCategory": "No category",
+      "description": "Comment",
+      "frequency": "Repeats",
+      "freq": {
+        "weekly": "Weekly",
+        "monthly": "Monthly",
+        "everyNMonths": "Every few months",
+        "yearly": "Yearly"
+      },
+      "interval": "Every N months",
+      "dayOfMonth": "Day of the month",
+      "dayHint": "A shorter month takes its last day.",
+      "weekday": "Weekday",
+      "startDate": "Starts",
+      "endDate": "Ends (optional)",
+      "weekendRule": "If the day is a weekend or a holiday",
+      "weekend": {
+        "none": "Keep the day",
+        "next": "Next business day",
+        "previous": "Previous business day"
+      },
+      "datePlaceholder": "DD.MM.YYYY",
+      "openCalendar": "Open the calendar",
+      "save": "Save",
+      "create": "Create",
+      "cancel": "Cancel",
+      "rewriteHint": "The change updates the future unpaid operations of the series, except those changed by hand.",
+      "created": "Series created, planned operations: {count}",
+      "saved": "Series updated",
+      "errors": {
+        "name": "Enter a name (up to 80 characters)",
+        "account": "Choose an account",
+        "amount": "Enter an amount above zero",
+        "dayOfMonth": "A day from 1 to 31",
+        "interval": "From 1 to 24 months",
+        "startDate": "Enter the start date",
+        "endDate": "The end is not before the start",
+        "limit": "At most 100 series per company",
+        "save": "Could not save the series"
+      }
+    },
+    "pause": {
+      "title": "Pause the series",
+      "body": "No new operations will be created.",
+      "removeFuture": "Delete the future unpaid operations",
+      "confirm": "Pause",
+      "done": "Series paused",
+      "resumed": "Series resumed"
+    },
+    "remove": {
+      "title": "Delete the series “{name}”?",
+      "body": "Paid and past operations stay in the journal.",
+      "future": "Also delete the future unpaid operations",
+      "confirm": "Delete",
+      "done": "Series deleted"
+    },
+    "cancel": "Cancel"
   }
 }

@@ -126,7 +126,8 @@
   "shell": {
     "modules": {
       "transactions": "Płatności",
-      "analytics": "Analityka"
+      "analytics": "Analityka",
+      "recurring": "Płatności planowane"
     },
     "analyticsSections": {
       "cashflow": "Przepływy pieniężne (Cash Flow)",
@@ -287,7 +288,8 @@
       "loadingMore": "Wczytywanie kolejnych…",
       "searching": "Szukamy wśród starszych operacji…",
       "loadMoreRetry": "Nie udało się wczytać, ponów",
-      "gone": "Tej operacji już nie ma"
+      "gone": "Tej operacji już nie ma",
+      "overdue": "Zaległe"
     },
     "selection": {
       "region": "Zaznaczone operacje",
@@ -432,6 +434,26 @@
       "splitDone": "Przelew rozdzielono",
       "splitFailed": "Nie udało się rozdzielić przelewu",
       "arrival": "wpływ {date}"
+    },
+    "plans": {
+      "banner": "Znaleziono dopasowania do płatności planowanych: {count}",
+      "bannerOpen": "Przejrzyj",
+      "dialogTitle": "Dopasowania do płatności planowanych",
+      "dialogBody": "Te operacje z banku wyglądają na płatności planowane. Zaznaczone pary zostaną powiązane: operacja planowana zniknie, a bankowa otrzyma jej kategorię, kontrahenta, tagi i komentarz, jeśli ich jeszcze nie ma. Pary bez zaznaczenia nie będą już proponowane w tej przeglądarce.",
+      "pick": "Powiąż „{name}” ({planDate}) z operacją banku {bankDate}, {amount}",
+      "planLabel": "Plan {date}",
+      "bankLabel": "Bank {date}",
+      "estimated": "szacunkowo",
+      "confirm": "Potwierdź wybrane",
+      "later": "Nie teraz",
+      "truncated": "Przejrzano tylko część operacji.",
+      "failedPair": "Nie udało się: {reason}",
+      "done": "Powiązano z planowanymi: {count}.",
+      "partial": "Nie udało się: {count} ({reason}).",
+      "undo": "Cofnij",
+      "undoFailed": "Nie udało się cofnąć wszystkiego",
+      "undone": "Przywrócono planowanych: {count}",
+      "unnamed": "Płatność planowana"
     }
   },
   "forms": {
@@ -512,7 +534,10 @@
         "tagMissing": "Nie znaleziono tagu",
         "tagCreate": "Nie udało się utworzyć tagu"
       },
-      "tags": "Tagi"
+      "tags": "Tagi",
+      "seriesHint": "Operacja z serii „{name}”. Zmiana kwoty, daty lub innych pól odłączy ją od serii: zmiany serii nie będą jej już aktualizować.",
+      "seriesHintManual": "Operacja z serii „{name}”, zmieniona ręcznie: seria jej już nie aktualizuje.",
+      "seriesGone": "Operacja z usuniętej serii płatności planowanych."
     },
     "account": {
       "titleNew": "Nowe konto",
@@ -961,7 +986,8 @@
       "excludedHint": "Pokazano też operacje wyłączone z analityki",
       "noMatches": "Nic nie znaleziono",
       "more": "Jeszcze {count}: zawęź wyszukiwanie",
-      "full": "Nie więcej niż {max} na liście",      "kinds": {
+      "full": "Nie więcej niż {max} na liście",
+      "kinds": {
         "label": "Rodzaje płatności i kategorie",
         "all": "Wszystkie rodzaje i kategorie",
         "root": "Wszystkie rodzaje płatności i kategorie",
@@ -1069,5 +1095,146 @@
       "balanced": "Aktywa = Pasywa",
       "difference": "Różnica: {amount}"
     }
+  },
+  "recurring": {
+    "title": "Płatności planowane",
+    "loadError": "Nie udało się wczytać płatności planowanych",
+    "truncated": "Nie pokazano wszystkich operacji planowanych.",
+    "strip": {
+      "overdue": "Zaległe: {count}",
+      "overdueNone": "Brak zaległych",
+      "soon": "Najbliższe 7 dni",
+      "income": "Wpływy",
+      "expense": "Wydatki"
+    },
+    "series": {
+      "title": "Serie",
+      "add": "Dodaj serię",
+      "addPreset": "Dodaj z szablonu",
+      "empty": "Nie ma jeszcze płatności planowanych. Dodaj czynsz, subskrypcję lub podatek, aby widzieć je z wyprzedzeniem.",
+      "name": "Nazwa",
+      "next": "Następna data",
+      "amount": "Kwota",
+      "repeat": "Powtarzanie",
+      "state": "Stan",
+      "noNext": "brak",
+      "estimated": "szacunkowo",
+      "active": "Aktywna",
+      "paused": "Wstrzymana",
+      "edit": "Edytuj",
+      "pause": "Wstrzymaj",
+      "resume": "Wznów",
+      "delete": "Usuń",
+      "actions": "Działania dla serii {name}"
+    },
+    "repeat": {
+      "weekly": "Co tydzień, {weekday}",
+      "monthly": "Co miesiąc, {day}.",
+      "everyNMonths": "Co {interval} mies., {day}.",
+      "yearly": "Co roku, {date}"
+    },
+    "presets": {
+      "zus": "ZUS",
+      "pit4": "PIT-4",
+      "vat7": "VAT-7",
+      "hint": "Kwota jest szacunkowa, wpisujesz ją sam. Termin przesuwa się na następny dzień roboczy."
+    },
+    "planned": {
+      "title": "Najbliższe operacje planowane",
+      "overdueTitle": "Zaległe",
+      "upcomingTitle": "Następne 31 dni",
+      "empty": "W najbliższym czasie nic nie zaplanowano.",
+      "planned": "Zaplanowano",
+      "overdue": "Zaległe",
+      "estimated": "Szacunkowo",
+      "manual": "Zmieniono ręcznie",
+      "markPaid": "Oznacz jako zapłaconą",
+      "move": "Przesuń",
+      "skip": "Pomiń",
+      "rowActions": "Działania dla operacji {name}, {amount}, {date}",
+      "paid": "Oznaczono jako zapłaconą",
+      "moved": "Termin przesunięty",
+      "skipped": "Pominięto tym razem",
+      "undo": "Cofnij",
+      "undoFailed": "Nie udało się cofnąć",
+      "failed": "Nie udało się: {reason}"
+    },
+    "move": {
+      "title": "Przesuń termin",
+      "body": "Operacja zostanie oznaczona jako zmieniona ręcznie: zmiany serii nie będą jej już aktualizować.",
+      "date": "Nowa data",
+      "confirm": "Przesuń",
+      "cancel": "Anuluj"
+    },
+    "editor": {
+      "titleNew": "Nowa seria",
+      "titleEdit": "Edytuj serię",
+      "titlePreset": "Nowa płatność {preset}",
+      "name": "Nazwa",
+      "kind": "Rodzaj",
+      "income": "Wpływ",
+      "expense": "Wydatek",
+      "account": "Konto",
+      "chooseAccount": "Wybierz konto",
+      "amount": "Kwota",
+      "estimated": "Kwota szacunkowa",
+      "category": "Kategoria",
+      "noCategory": "Bez kategorii",
+      "description": "Komentarz",
+      "frequency": "Powtarzanie",
+      "freq": {
+        "weekly": "Co tydzień",
+        "monthly": "Co miesiąc",
+        "everyNMonths": "Co kilka miesięcy",
+        "yearly": "Co roku"
+      },
+      "interval": "Co ile miesięcy",
+      "dayOfMonth": "Dzień miesiąca",
+      "dayHint": "W krótszym miesiącu będzie to ostatni dzień miesiąca.",
+      "weekday": "Dzień tygodnia",
+      "startDate": "Początek",
+      "endDate": "Koniec (opcjonalnie)",
+      "weekendRule": "Jeśli dzień jest wolny od pracy",
+      "weekend": {
+        "none": "Nie przesuwaj",
+        "next": "Następny dzień roboczy",
+        "previous": "Poprzedni dzień roboczy"
+      },
+      "datePlaceholder": "DD.MM.RRRR",
+      "openCalendar": "Otwórz kalendarz",
+      "save": "Zapisz",
+      "create": "Utwórz",
+      "cancel": "Anuluj",
+      "rewriteHint": "Zmiany zaktualizują przyszłe niezapłacone operacje serii, poza zmienionymi ręcznie.",
+      "created": "Seria utworzona, zaplanowanych operacji: {count}",
+      "saved": "Seria zmieniona",
+      "errors": {
+        "name": "Podaj nazwę (do 80 znaków)",
+        "account": "Wybierz konto",
+        "amount": "Podaj kwotę większą od zera",
+        "dayOfMonth": "Dzień od 1 do 31",
+        "interval": "Od 1 do 24 miesięcy",
+        "startDate": "Podaj datę początku",
+        "endDate": "Koniec nie wcześniej niż początek",
+        "limit": "Najwyżej 100 serii w firmie",
+        "save": "Nie udało się zapisać serii"
+      }
+    },
+    "pause": {
+      "title": "Wstrzymać serię",
+      "body": "Nowe operacje nie będą tworzone.",
+      "removeFuture": "Usuń przyszłe niezapłacone operacje",
+      "confirm": "Wstrzymaj",
+      "done": "Seria wstrzymana",
+      "resumed": "Seria wznowiona"
+    },
+    "remove": {
+      "title": "Usunąć serię „{name}”?",
+      "body": "Zapłacone i minione operacje zostaną w dzienniku.",
+      "future": "Usuń też przyszłe niezapłacone operacje",
+      "confirm": "Usuń",
+      "done": "Seria usunięta"
+    },
+    "cancel": "Anuluj"
   }
 }
