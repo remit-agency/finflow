@@ -13,6 +13,7 @@ import type { LedgerDeps } from './deps'
 import { updateOrganization } from './org'
 import { rebuildLedger } from './rebuild'
 import { createSeries, deleteSeries, updateSeries } from './series'
+import { confirmMatch, skipOccurrence, undoMatch, type MatchJob } from './plan-match'
 import { makeTransfer, splitTransfer, type TransferJob } from './transfer'
 import { createTransaction, deleteTransaction, retagTransaction, updateTransaction, type WriteExtras } from './write'
 
@@ -35,6 +36,9 @@ export const ledger = {
   createSeries: (orgId: string, uid: string, input: SeriesInput) => createSeries(ledgerDeps(), orgId, uid, input),
   updateSeries: (orgId: string, uid: string, seriesId: string, patch: SeriesPatch) => updateSeries(ledgerDeps(), orgId, uid, seriesId, patch),
   deleteSeries: (orgId: string, uid: string, seriesId: string, mode: FutureMode) => deleteSeries(ledgerDeps(), orgId, uid, seriesId, mode),
+  confirmMatch: (orgId: string, uid: string, job: MatchJob) => confirmMatch(ledgerDeps(), orgId, uid, job),
+  undoMatch: (orgId: string, uid: string, planId: string) => undoMatch(ledgerDeps(), orgId, uid, planId),
+  skipOccurrence: (orgId: string, uid: string, seriesId: string, occurrence: string) => skipOccurrence(ledgerDeps(), orgId, uid, seriesId, occurrence),
   createAccount: (orgId: string, uid: string, input: AccountInput) => createAccount(ledgerDeps(), orgId, uid, input),
   updateAccount: (orgId: string, uid: string, accountId: string, patch: AccountPatch) => updateAccount(ledgerDeps(), orgId, uid, accountId, patch),
   deleteAccount: (orgId: string, uid: string, accountId: string) => deleteAccount(ledgerDeps(), orgId, uid, accountId),
