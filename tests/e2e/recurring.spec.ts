@@ -11,6 +11,9 @@ import { deleteDoc, readDoc, seedDoc } from './helpers/emulator-firestore'
 import { seedLedgerAccount } from './helpers/ledger-seed'
 import { isoWeekdayOf, seedPlanned, seedSeries } from './helpers/recurring-seed'
 import { seedBankOperation } from './helpers/transfer-seed'
+import { addDays } from '../../lib/domain/ledger/days'
+import { addMonthsClamped, paymentDayOf } from '../../lib/domain/recurring/schedule'
+import { LIST_DAYS } from '../../lib/domain/recurring/types'
 import { todayDay } from '../../lib/utils/today'
 
 const NEEDS_EMULATORS =
@@ -41,6 +44,16 @@ async function setup(page: Page, request: APIRequestContext, prefix: string): Pr
   return user
 }
 
+/**
+ * The first payment day on or after `today` of the ZUS preset (the 15th, the next business day), by the schedule's own rule.
+ * The 15th of the previous month is paid before `today` in every case, so this month's and next month's 15th cover it.
+ */
+function zusPaymentDayFrom(today: string): string {
+  const thisMonth = `${today.slice(0, 8)}15`
+  const candidates = [thisMonth, addMonthsClamped(thisMonth, 1)].map((o) => paymentDayOf(o, 'next'))
+  return candidates.find((day) => day >= today) ?? candidates[candidates.length - 1]
+}
+
 /** A monthly rent on today's day of the month: plans for today and the next three months. */
 function rentToday(amountMinor: number): Record<string, unknown> {
   const day = todayDay()
@@ -67,7 +80,11 @@ test.describe('planned payments (emulators)', () => {
     await dialog.getByTestId('series-save').click()
     await expect(dialog).toBeHidden()
     await expect(page.getByTestId('series-row').filter({ hasText: 'ZUS' })).toHaveCount(1)
-    await expect(page.getByTestId('plan-estimated').first()).toBeVisible()
+    // The list shows today and the LIST_DAYS - 1 days after it: the first ZUS plan is in it when its payment day is in them.
+    // The day moves with the run date, so the expectation comes from the same rule the server uses.
+    const today = todayDay()
+    if (zusPaymentDayFrom(today) <= addDays(today, LIST_DAYS - 1)) await expect(page.getByTestId('plan-estimated').first()).toBeVisible()
+    else await expect(page.getByTestId('plan-estimated')).toHaveCount(0)
 
     await page.goto(`/${user.orgId}/transactions`)
     const plans = rowsOf(page).filter({ hasText: 'План' })

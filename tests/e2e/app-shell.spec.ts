@@ -5,6 +5,7 @@ import { seedDoc, seedMember } from './helpers/emulator-firestore'
 import { seedLedgerAccount, seedLedgerOperation } from './helpers/ledger-seed'
 import { formatDayLongUtc } from '../../lib/utils/calendar-grid'
 import { formatPeriodLabel } from '../../lib/utils/period'
+import { todayUtcDay } from '../../lib/utils/today'
 
 const NEEDS_EMULATORS =
   'Needs the Auth + Firestore emulators. Run: firebase emulators:exec --only auth,firestore --project demo-finflow "npm run test:e2e"'
@@ -570,7 +571,8 @@ function inspectMenuItems(popup: Element) {
  * sums are unique, so a total identifies its period.
  */
 async function seedReportData(request: APIRequestContext, orgId: string) {
-  const now = new Date()
+  // The app's «today» is the Warsaw day: the month of the report is that month, also between 22:00 and 24:00 UTC.
+  const now = todayUtcDay()
   const y = now.getUTCFullYear()
   const m = now.getUTCMonth()
   const prevMonthDay = (day: number) => new Date(Date.UTC(y, m - 1, day, 12))

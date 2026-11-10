@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { createEmulatorUser } from './helpers/emulator-auth'
+import { todayUtcDay } from '../../lib/utils/today'
 
 // Month labels exactly as lib/utils/analytics.ts renders them: UA_MONTHS + 2-digit year.
 const UA_MONTHS = ['Січ', 'Лют', 'Бер', 'Кві', 'Тра', 'Чер', 'Лип', 'Сер', 'Вер', 'Жов', 'Лис', 'Гру']
@@ -94,7 +95,8 @@ test.describe('smoke on emulators', () => {
     await page.getByRole('navigation', { name: 'Модулі' }).getByRole('link', { name: 'Аналітика' }).click()
     await page.waitForURL(`**/${orgId}/analytics/cashflow`)
     await expect(page.getByRole('heading', { name: 'Cash Flow' })).toBeVisible()
-    const now = new Date()
+    // The Warsaw month, as the report shows it (between 22:00 and 24:00 UTC the UTC month can be the one before).
+    const now = todayUtcDay()
     const monthLabel = `${UA_MONTHS[now.getUTCMonth()]} ${String(now.getUTCFullYear()).slice(2)}`
     const monthRow = page.getByRole('row').filter({ hasText: monthLabel })
     await expect(monthRow.getByRole('cell').nth(1)).toHaveText(`+${amount}`)
