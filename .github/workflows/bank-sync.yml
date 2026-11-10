@@ -40,8 +40,9 @@ jobs:
             exit 1
           fi
           failed=$(jq -r '.failed' "$RUNNER_TEMP/out.json") || { echo "bank-sync: the response is not JSON" >&2; exit 1; }
-          # `// 0`: a route that predates the planned payments (deploy ordering) has no `recurring` part, which counts as 0.
-          planned=$(jq -r '.recurring.failed // 0' "$RUNNER_TEMP/out.json") || { echo "bank-sync: the response is not JSON" >&2; exit 1; }
+          # A route that predates the planned payments (deploy ordering) has no `recurring` part: that counts as 0. A `recurring`
+          # part without a numeric `failed` (missing, null, a string) is a broken answer: jq stops with an error and the job fails.
+          planned=$(jq -r 'if has("recurring") then (.recurring.failed | if type == "number" then . else error("recurring.failed is not a number") end) else 0 end' "$RUNNER_TEMP/out.json") || { echo "bank-sync: the planned payments count is missing or not a number" >&2; exit 1; }
           case "$failed" in
             ''|*[!0-9]*) echo "bank-sync: the response has no failed count" >&2; exit 1 ;;
           esac
