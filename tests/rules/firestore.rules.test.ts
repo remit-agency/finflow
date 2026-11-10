@@ -31,11 +31,16 @@ const PROJECT_ID = 'demo-finflow'
 const RULES_FILE = process.env.FIRESTORE_RULES_FILE ?? resolve(process.cwd(), 'firestore.rules')
 const DAY = 24 * 60 * 60 * 1000
 // Written by the server only (S05, S06, S10, S10t): clients may read accounts, transactions, rollups, counterparties, rules and tags, the owner reads audit.
-const SERVER_WRITTEN_SUBS = ['accounts', 'transactions', 'rollups', 'audit', 'counterparties', 'rules', 'tags'] as const
-const MEMBER_READ_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'counterparties', 'rules', 'tags'] as const
-const ALL_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'counterparties', 'rules', 'tags'] as const
+const SERVER_WRITTEN_SUBS = ['accounts', 'transactions', 'rollups', 'audit', 'counterparties', 'rules', 'tags', 'recurring'] as const
+const MEMBER_READ_SUBS = ['accounts', 'categories', 'transactions', 'rollups', 'counterparties', 'rules', 'tags', 'recurring'] as const
+const ALL_SUBS = [
+  'accounts', 'categories', 'transactions', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'counterparties', 'rules', 'tags',
+  'recurring', 'recurringDone',
+] as const
 // S09: the bank collections written by the server only. bankAccounts and bankSeen are closed to every client role.
 const BANK_SERVER_ONLY_SUBS = ['bankAccounts', 'bankSeen'] as const
+// S11: the occurrence marks of planned payments, written by the server only and closed to every client role.
+const PLAN_SERVER_ONLY_SUBS = ['recurringDone'] as const
 
 let testEnv: RulesTestEnvironment
 
@@ -268,7 +273,7 @@ describe('collection group query on members (the "my companies" query)', () => {
   })
 
   it('does not open other collection groups', async () => {
-    for (const group of ['accounts', 'transactions', 'categories', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'ledger', 'counterparties', 'counterpartyKeys', 'rules', 'tags', 'tagKeys']) {
+    for (const group of ['accounts', 'transactions', 'categories', 'rollups', 'audit', 'bankConnections', 'bankAccounts', 'bankSeen', 'ledger', 'counterparties', 'counterpartyKeys', 'rules', 'tags', 'tagKeys', 'recurring', 'recurringDone']) {
       await assertFails(getDocs(collectionGroup(as('alice'), group)))
     }
   })
@@ -316,7 +321,7 @@ describe('data subcollections by role', () => {
       await assertFails(deleteDoc(doc(as(uid), 'organizations/orgA/bankConnections/seed')))
     })
 
-    it.each(BANK_SERVER_ONLY_SUBS)('%s: closed to every role, for reads and writes', async (sub) => {
+    it.each([...BANK_SERVER_ONLY_SUBS, ...PLAN_SERVER_ONLY_SUBS])('%s: closed to every role, for reads and writes', async (sub) => {
       await assertFails(getDoc(doc(as(uid), `organizations/orgA/${sub}/seed`)))
       await assertFails(getDocs(collection(as(uid), `organizations/orgA/${sub}`)))
       await assertFails(setDoc(doc(as(uid), `organizations/orgA/${sub}/new1`), { orgId: 'orgA' }))
