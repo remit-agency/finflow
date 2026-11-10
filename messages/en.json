@@ -539,7 +539,7 @@
       "tags": "Tags",
       "seriesHint": "From the series “{name}”. Changing the amount, the date or another field detaches it: changes of the series will no longer update it.",
       "seriesHintManual": "From the series “{name}”, changed by hand: the series no longer updates it.",
-      "seriesTransferHint": "A planned payment of a series stays income or an expense, so the transfer tab is off.",
+      "seriesTransferHint": "An operation of a series stays income or an expense, so the transfer tab is off.",
       "seriesGone": "From a deleted series of planned payments."
     },
     "account": {

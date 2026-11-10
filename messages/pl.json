@@ -539,7 +539,7 @@
       "tags": "Tagi",
       "seriesHint": "Operacja z serii „{name}”. Zmiana kwoty, daty lub innych pól odłączy ją od serii: zmiany serii nie będą jej już aktualizować.",
       "seriesHintManual": "Operacja z serii „{name}”, zmieniona ręcznie: seria jej już nie aktualizuje.",
-      "seriesTransferHint": "Zaplanowana płatność z serii pozostaje przychodem lub wydatkiem, więc zakładka przelewu jest wyłączona.",
+      "seriesTransferHint": "Operacja z serii pozostaje przychodem lub wydatkiem, więc zakładka przelewu jest wyłączona.",
       "seriesGone": "Operacja z usuniętej serii płatności planowanych."
     },
     "account": {

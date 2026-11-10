@@ -55,3 +55,12 @@ describe('message catalogs', () => {
     }
   })
 })
+
+describe('the transfer hint of a series operation (S11)', () => {
+  // The hint shows on every operation a series links, a paid or matched one included: none of them is a plan any more.
+  it('does not call the operation planned in any language', () => {
+    expect(uk.forms.transaction.seriesTransferHint).not.toMatch(/Планов/)
+    expect(pl.forms.transaction.seriesTransferHint).not.toMatch(/[Zz]aplanowan/)
+    expect(en.forms.transaction.seriesTransferHint).not.toMatch(/planned/i)
+  })
+})
