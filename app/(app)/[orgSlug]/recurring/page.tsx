@@ -115,7 +115,7 @@ export default function RecurringPage() {
   return (
     <div className={cn(PAGE_CONTAINER, 'space-y-6')}>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="min-w-0 flex-1 font-display text-2xl font-semibold text-ink">{t('title')}</h1>
+        <h1 className="min-w-0 basis-full font-display text-2xl font-semibold text-ink sm:flex-1 sm:basis-0">{t('title')}</h1>
         {canEdit && (
           <>
             <PresetMenu onPick={(preset) => setEditor({ preset })} />
