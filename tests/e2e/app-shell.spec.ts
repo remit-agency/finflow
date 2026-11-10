@@ -54,14 +54,15 @@ test.describe('app shell (emulators)', () => {
     const user = await registerViaUi(page, 'tabs')
     await waitForShell(page, user.companyName)
     const tabs = page.getByRole('navigation', { name: 'Модулі' })
-    const payments = tabs.getByRole('link', { name: 'Платежі' })
+    const payments = tabs.getByRole('link', { name: 'Платежі', exact: true })
     const analytics = tabs.getByRole('link', { name: 'Аналітика' })
 
     await expect(payments).toHaveAttribute('aria-current', 'page')
     await expect(analytics).not.toHaveAttribute('aria-current', 'page')
 
-    // Keyboard: focus «Платежі», Tab to «Аналітика», Enter follows the link.
+    // Keyboard: focus «Платежі», Tab to «Планові платежі» (the next tab), Tab again to «Аналітика», Enter follows the link.
     await payments.focus()
+    await page.keyboard.press('Tab')
     await page.keyboard.press('Tab')
     await expect(analytics).toBeFocused()
     await page.keyboard.press('Enter')
@@ -268,7 +269,7 @@ test.describe('app shell (emulators)', () => {
     await settingsColumn.getByRole('link', { name: 'До платежів' }).click()
     await page.waitForURL(new RegExp(`/${user.orgId}/transactions$`))
     await expect(accountsSidebar(page)).toBeVisible()
-    await expect(modules.getByRole('link', { name: 'Платежі' })).toHaveAttribute('aria-current', 'page')
+    await expect(modules.getByRole('link', { name: 'Платежі', exact: true })).toHaveAttribute('aria-current', 'page')
     await expect(settingsColumn).toHaveCount(0)
 
     // Phone: no left column; the sections are a pill row with the same name, plus the way back.

@@ -2,7 +2,7 @@ import { isDay } from '@/lib/domain/ledger/days'
 import { SCHEMA_VERSION } from '@/lib/domain/ledger/doc'
 import { isId } from '@/lib/domain/ledger/guards'
 import { isMinor } from '@/lib/domain/ledger/money'
-import { TX_TYPES, type TxType } from '@/lib/domain/ledger/types'
+import { TX_TYPES, type TxStatus, type TxType } from '@/lib/domain/ledger/types'
 import type { PlannedRow } from './types'
 
 /** The fields the overview and the plan side of the suggestions select (Firestore bills the document anyway; the answer stays small). */
@@ -33,4 +33,9 @@ export function parsePlannedRow(id: string, data: unknown): PlannedRow | null {
     if (typeof value === 'string') row[key] = value
   }
   return row
+}
+
+/** «Прострочено» (S11): a planned operation whose payment day is before today. Balances and reports still leave it out. */
+export function isOverdue(op: { status: TxStatus; paymentDate: string }, today: string): boolean {
+  return op.status === 'planned' && op.paymentDate < today
 }
