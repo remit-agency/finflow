@@ -167,6 +167,29 @@ describe('changing a series', () => {
     expect(await markDoc(db, `pl_${series.id}_2026-12-10`)).toBeUndefined()
   })
 
+  it('a hand edit of the accrual or the recurring flag makes the plan manual, and a later change keeps it (I2)', async () => {
+    const { series } = await createSeries(deps, ORG, UID, RENT)
+    const [, dec, jan] = ids(series.id, ['2026-11-10', '2026-12-10', '2027-01-10'])
+    await updateTransaction(deps, ORG, UID, dec, { isRecurring: true })
+    await updateTransaction(deps, ORG, UID, jan, { accrual: { mode: 'period', from: '2027-01-01', to: '2027-01-31' } })
+    expect(await txDoc(db, dec)).toMatchObject({ isRecurring: true, manual: true })
+    expect(await txDoc(db, jan)).toMatchObject({ manual: true, accrual: { mode: 'period' } })
+    // Only the November plan is still the series': it takes the new amount; the two hand-changed ones keep theirs.
+    expect(await updateSeries(deps, ORG, UID, series.id, parseSeriesPatch({ amountMinor: 260_000 }))).toMatchObject({ updated: 1 })
+    expect(await txDoc(db, dec)).toMatchObject({ amountMinor: 250_000, isRecurring: true, manual: true })
+    expect(await txDoc(db, jan)).toMatchObject({ amountMinor: 250_000, accrual: { mode: 'period', from: '2027-01-01', to: '2027-01-31' } })
+  })
+
+  it('a change of the series rewrites the plans but keeps their project and files (I2)', async () => {
+    const { series } = await createSeries(deps, ORG, UID, RENT)
+    const [nov] = ids(series.id, ['2026-11-10'])
+    await updateTransaction(deps, ORG, UID, nov, { projectId: 'proj1', fileUrls: ['https://example.com/faktura.pdf'] })
+    expect(await updateSeries(deps, ORG, UID, series.id, parseSeriesPatch({ amountMinor: 260_000 }))).toMatchObject({ updated: 3, deleted: 0 })
+    // A project and files are not the series' to set: the plan is rewritten and stays the series' own.
+    expect(await txDoc(db, nov)).toMatchObject({ amountMinor: 260_000, projectId: 'proj1', fileUrls: ['https://example.com/faktura.pdf'] })
+    expect((await txDoc(db, nov))?.manual).toBeUndefined()
+  })
+
   it('a change on the payment day of a weekend-shifted occurrence updates its plan, it is not deleted (C1)', async () => {
     // ZUS on the 15th, next business day: 15 November 2026 is a Sunday, so the plan is due on Monday the 16th.
     const { series } = await createSeries(deps, ORG, UID, ZUS)

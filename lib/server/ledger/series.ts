@@ -7,6 +7,7 @@ import { changeSet, combineChanges } from '@/lib/domain/ledger/change'
 import { addDays } from '@/lib/domain/ledger/days'
 import { parseAccount, parseTransaction, transactionToDoc } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
+import { rewriteDiffers } from '@/lib/domain/ledger/series'
 import type { LedgerAccount, LedgerTransaction } from '@/lib/domain/ledger/types'
 import { parseDone, parseSeries, seriesToDoc } from '@/lib/domain/recurring/doc'
 import { RecurringError } from '@/lib/domain/recurring/errors'
@@ -97,8 +98,15 @@ function buildPlan(s: Series, occurrence: string, ctx: PlanContext, today: strin
   return withExcluded({ ...built, ...seriesFieldsOf(s, occurrence) }, ctx.excluded)
 }
 
-function sameDoc(a: LedgerTransaction, b: LedgerTransaction): boolean {
-  return JSON.stringify(transactionToDoc(a)) === JSON.stringify(transactionToDoc(b))
+/**
+ * What a rewrite keeps of a stored plan that the series does not set (`SERIES_SET`): its project and its files, and its rule
+ * trace while its category and counterparty stay the same (a change of either removes the trace, see `autoRulesAfter`).
+ */
+function keepUnowned(want: LedgerTransaction, stored: LedgerTransaction): LedgerTransaction {
+  const out: LedgerTransaction = { ...want, fileUrls: stored.fileUrls }
+  if (stored.projectId !== undefined) out.projectId = stored.projectId
+  if (stored.autoRules !== undefined && stored.categoryId === want.categoryId && stored.counterpartyId === want.counterpartyId) out.autoRules = stored.autoRules
+  return out
 }
 
 interface PlanWrites {
@@ -337,8 +345,8 @@ export async function updateSeries(deps: LedgerDeps, orgId: string, uid: string,
           w.deletes.push(o.tx)
           continue
         }
-        const want = buildPlan(next, desired[i], ctx, today)
-        if (!sameDoc(o.tx, want)) w.updates.push({ prior: o.tx, next: want, old: o.old })
+        const want = keepUnowned(buildPlan(next, desired[i], ctx, today), o.tx)
+        if (rewriteDiffers(o.tx, want)) w.updates.push({ prior: o.tx, next: want, old: o.old })
       }
       desired.forEach((occurrence, i) => {
         const id = desiredIds[i]

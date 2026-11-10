@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parseTransaction, transactionToDoc } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import { parseTransactionInput } from '@/lib/domain/ledger/input'
-import { markChangeOf, withSeries, type MarkChange } from '@/lib/domain/ledger/series'
+import { SERIES_SET, markChangeOf, rewriteDiffers, seriesSetDiffers, withSeries, type MarkChange } from '@/lib/domain/ledger/series'
 import { bankSideOf } from '@/lib/domain/ledger/transfer'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
 import { parseCandidate } from '@/lib/domain/transfers/pairs'
@@ -93,12 +93,15 @@ describe('withSeries: an edit keeps the link and decides «змінено вру
     ['the account', { accountId: 'mono' }],
     ['the tags', { tags: ['t1'] }],
     ['the type', { type: 'income' as const }],
-  ])('a change of %s makes it manual and keeps the estimate', (_name, change) => {
+    ['the accrual', { accrual: { mode: 'period' as const, from: '2026-11-01', to: '2026-11-30' } }],
+    ['the recurring flag', { isRecurring: true }],
+  ])('a change of %s makes it manual and keeps the estimate (I2: every field the series sets)', (_name, change) => {
     expect(withSeries(edited(change), plan)).toMatchObject({ manual: true, estimated: true, seriesId: 'ser1' })
   })
 
-  it('an edit of nothing the series sets (a file) keeps it as it was', () => {
+  it('an edit of nothing the series sets (a file, a project) keeps it as it was', () => {
     expect(withSeries(edited({ fileUrls: ['f1'] }), plan)).toEqual({ ...plan, fileUrls: ['f1'] })
+    expect(withSeries(edited({ projectId: 'p1' }), plan)).toEqual({ ...plan, projectId: 'p1' })
   })
 
   it('an occurrence of a series cannot become a transfer (C2): the link would make the transfer unreadable', () => {
@@ -113,6 +116,21 @@ describe('withSeries: an edit keeps the link and decides «змінено вру
     expect(paid.manual).toBeUndefined()
     const free = edited({})
     expect(withSeries({ ...free, description: 'x' }, free)).toEqual({ ...free, description: 'x' })
+  })
+})
+
+describe('the fields a series sets (I2): one list for the manual mark and for the rewrite', () => {
+  it('a rewrite differs when a series field or the estimate flag differs, not for a project or a file', () => {
+    expect(rewriteDiffers(plan, { ...plan, amountMinor: 1 })).toBe(true)
+    expect(rewriteDiffers(plan, { ...plan, accrual: { mode: 'date', date: '2026-11-17' } })).toBe(true)
+    expect(rewriteDiffers(plan, { ...plan, isRecurring: true })).toBe(true)
+    expect(rewriteDiffers(plan, { ...plan, estimated: undefined })).toBe(true)
+    expect(rewriteDiffers(plan, { ...plan, projectId: 'p1', fileUrls: ['f1'] })).toBe(false)
+    expect(rewriteDiffers(plan, { ...plan, tags: [...plan.tags] })).toBe(false)
+  })
+
+  it('a field the series sets, once changed by a person, is the same list a rewrite compares', () => {
+    for (const field of SERIES_SET) expect(seriesSetDiffers(plan, { ...plan, [field]: field === 'tags' ? ['t9'] : field === 'accrual' ? { mode: 'period', from: '2026-11-01', to: '2026-11-30' } : 'x' })).toBe(true)
   })
 })
 
