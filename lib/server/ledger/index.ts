@@ -3,6 +3,8 @@ import { toDay } from '@/lib/domain/ledger/days'
 import type { AccountInput, AccountPatch, OrgPatch } from '@/lib/domain/ledger/entity-input'
 import type { TransactionInput, TransactionPatch } from '@/lib/domain/ledger/input'
 import type { TagChange } from '@/lib/domain/tags/assign'
+import type { SeriesInput, SeriesPatch } from '@/lib/domain/recurring/input'
+import type { FutureMode } from '@/lib/domain/recurring/types'
 import { getAdmin } from '@/lib/server/firebase-admin'
 import { resolveRate } from '@/lib/server/fx'
 import { todayUtcDay } from '@/lib/utils/today'
@@ -10,6 +12,7 @@ import { createAccount, deleteAccount, updateAccount } from './accounts'
 import type { LedgerDeps } from './deps'
 import { updateOrganization } from './org'
 import { rebuildLedger } from './rebuild'
+import { createSeries, deleteSeries, updateSeries } from './series'
 import { makeTransfer, splitTransfer, type TransferJob } from './transfer'
 import { createTransaction, deleteTransaction, retagTransaction, updateTransaction, type WriteExtras } from './write'
 
@@ -29,6 +32,9 @@ export const ledger = {
   retagTransaction: (orgId: string, uid: string, txId: string, change: TagChange) => retagTransaction(ledgerDeps(), orgId, uid, txId, change),
   makeTransfer: (orgId: string, uid: string, job: TransferJob) => makeTransfer(ledgerDeps(), orgId, uid, job),
   splitTransfer: (orgId: string, uid: string, txId: string) => splitTransfer(ledgerDeps(), orgId, uid, txId),
+  createSeries: (orgId: string, uid: string, input: SeriesInput) => createSeries(ledgerDeps(), orgId, uid, input),
+  updateSeries: (orgId: string, uid: string, seriesId: string, patch: SeriesPatch) => updateSeries(ledgerDeps(), orgId, uid, seriesId, patch),
+  deleteSeries: (orgId: string, uid: string, seriesId: string, mode: FutureMode) => deleteSeries(ledgerDeps(), orgId, uid, seriesId, mode),
   createAccount: (orgId: string, uid: string, input: AccountInput) => createAccount(ledgerDeps(), orgId, uid, input),
   updateAccount: (orgId: string, uid: string, accountId: string, patch: AccountPatch) => updateAccount(ledgerDeps(), orgId, uid, accountId, patch),
   deleteAccount: (orgId: string, uid: string, accountId: string) => deleteAccount(ledgerDeps(), orgId, uid, accountId),

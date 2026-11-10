@@ -6,7 +6,7 @@ import type { LedgerAccount } from '@/lib/domain/ledger/types'
 import { auditData } from './audit'
 import type { LedgerDeps } from './deps'
 import { assertUnlocked } from './lock'
-import { accountsCol, auditCol, orgRef, transactionsCol } from './paths'
+import { accountsCol, auditCol, orgRef, recurringCol, transactionsCol } from './paths'
 
 /** True when any operation (any status) uses the account as source or target. */
 async function hasOperations(t: Transaction, deps: LedgerDeps, orgId: string, accountId: string): Promise<boolean> {
@@ -14,6 +14,11 @@ async function hasOperations(t: Transaction, deps: LedgerDeps, orgId: string, ac
   const asSource = await t.get(col.where('accountId', '==', accountId).limit(1))
   const asTarget = await t.get(col.where('toAccountId', '==', accountId).limit(1))
   return !asSource.empty || !asTarget.empty
+}
+
+/** A series of planned payments uses the account (S11): its daily fill would be left without it. */
+async function usedBySeries(t: Transaction, deps: LedgerDeps, orgId: string, accountId: string): Promise<boolean> {
+  return !(await t.get(recurringCol(deps.db, orgId).where('accountId', '==', accountId).select().limit(1))).empty
 }
 
 /** True when a bank account (any status, also a disconnected one) is linked to the FinFlow account. S09 writes `bankAccounts`. */
@@ -52,6 +57,9 @@ export async function updateAccount(
     if (patch.currency !== undefined && patch.currency !== before.currency && (await hasOperations(t, deps, orgId, accountId))) {
       throw new LedgerError('account_has_operations', 'currency')
     }
+    if (patch.currency !== undefined && patch.currency !== before.currency && (await usedBySeries(t, deps, orgId, accountId))) {
+      throw new LedgerError('account_has_operations', 'recurring')
+    }
 
     const after: LedgerAccount = { ...before, ...patch }
     // balance = opening + sum of effects: moving the opening balance moves the balance by the same amount.
@@ -72,6 +80,7 @@ export async function deleteAccount(deps: LedgerDeps, orgId: string, uid: string
     if (!before) throw new LedgerError('not_found')
     if (await isLinkedToBank(t, deps, orgId, accountId)) throw new LedgerError('account_linked_to_bank')
     if (await hasOperations(t, deps, orgId, accountId)) throw new LedgerError('account_has_operations')
+    if (await usedBySeries(t, deps, orgId, accountId)) throw new LedgerError('account_has_operations', 'recurring')
     t.delete(ref)
     t.create(auditCol(deps.db, orgId).doc(), auditData(deps, 'account.delete', uid, accountId, accountToDoc(before), null))
   })
