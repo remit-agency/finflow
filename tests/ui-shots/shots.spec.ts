@@ -88,10 +88,9 @@ test.describe('ui shots', () => {
     // Start from an empty folder: no stale images from an older list of screens. Removing also
     // avoids a Windows quirk where overwriting a PNG that an image viewer holds open fails.
     for (const old of readdirSync(OUT_DIR)) {
-      // journal-*.png and analytics-filters-*.png belong to their own specs, which clear them.
-      if (old.endsWith('.png') && !old.startsWith('journal-') && !old.startsWith('analytics-filters-')) {
-        rmSync(join(OUT_DIR, old), { force: true })
-      }
+      // These prefixes belong to their own specs, which clear them.
+      const ownedElsewhere = ['journal-', 'analytics-filters-', 'recurring-'].some((prefix) => old.startsWith(prefix))
+      if (old.endsWith('.png') && !ownedElsewhere) rmSync(join(OUT_DIR, old), { force: true })
     }
   })
 
