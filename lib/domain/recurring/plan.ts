@@ -49,8 +49,8 @@ export function plannedFrom(s: Series, today: string, to: string): string[] {
 
 /**
  * The first day a change reads the settled occurrences of a series from (its marks and its operations): the start of the
- * period of `planFrom(today)`. Every period a rewrite can plan starts at or after it, so a settled occurrence before it
- * takes none of them, and one that does take a period is at or after it (the period starts before it, see `takenPeriods`).
+ * period of `planFrom(today)`. A period a rewrite can plan starts at or after it, and a settled occurrence in such a period
+ * is on or after its start, so no settled occurrence that takes one of those periods is read too late.
  */
 export function takenFrom(s: Series, today: string): string {
   return periodStart(s, planFrom(today))
