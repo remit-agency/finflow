@@ -15,13 +15,16 @@ import { notifyLedgerChanged } from '@/lib/api/ledger-events'
 import { LedgerApiError } from '@/lib/api/ledger-client'
 import type { Counterparty } from '@/lib/domain/counterparties/types'
 import type { Tag } from '@/lib/domain/tags/types'
+import { toDay } from '@/lib/domain/ledger/days'
 import { fromMinor } from '@/lib/domain/ledger/money'
+import { isOverdue } from '@/lib/domain/recurring/rows'
 import { toUiTransaction } from '@/lib/firebase/ledger-map'
 import { useShell } from '@/lib/hooks/useShell'
 import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { cn } from '@/lib/utils'
 import { formatDayShortUtc, formatWeekdayShortUtc, summarizeDay } from '@/lib/utils/journal'
+import { todayDay } from '@/lib/utils/today'
 import type { Transaction, Account, Category } from '@/types'
 
 // Sign and colour of an amount; a transfer moves money between own accounts, so it stays neutral.
@@ -83,6 +86,8 @@ export function TransactionList({
   const tJournal = useTranslations('journal')
   const tTransfers = useTranslations('journal.transfers')
   const tAccountTypes = useTranslations('common.accountTypes')
+  // «Прострочено» (S11): a planned row whose payment day passed (the Warsaw day).
+  const today = todayDay()
   const { locale, money, date: formatDate } = useFormatters()
   const categoryLabel = useCategoryName()
   const { can, org } = useShell()
@@ -368,7 +373,16 @@ export function TransactionList({
                         ) : (
                           <span className={cn('block max-w-44 truncate sm:max-w-56', planned ? 'text-ink-muted' : 'text-ink')}>{accountLabel}</span>
                         )}
-                        {planned && <Badge variant="chip" className="mt-1">{t('planned')}</Badge>}
+                        {planned &&
+                          (isOverdue({ status: tx.status, paymentDate: toDay(tx.date) }, today) ? (
+                            <Badge variant="chip" data-testid="overdue-chip" className="mt-1 bg-expense-soft text-expense">
+                              {t('overdue')}
+                            </Badge>
+                          ) : (
+                            <Badge variant="chip" className="mt-1">
+                              {t('planned')}
+                            </Badge>
+                          ))}
                         {/* The date column is hidden on a phone: the arrival day goes under the account there. */}
                         {arrival && <span data-testid="transfer-arrival-phone" className="block text-xs text-ink-muted sm:hidden">{arrival}</span>}
                         {/* Second line: the category below md (its column is hidden there), the account type above. */}

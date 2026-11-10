@@ -119,6 +119,12 @@ export function transactionToDoc(tx: LedgerTransaction): Record<string, unknown>
   if (tx.bankTo !== undefined) doc.bankTo = { key: tx.bankTo.key, ...bankInfoToDoc(tx.bankTo) }
   if (tx.autoRules !== undefined && tx.autoRules.length > 0) doc.autoRules = tx.autoRules.map((r) => ({ id: r.id, name: r.name }))
   if (tx.excluded === true) doc.excluded = true
+  if (tx.seriesId !== undefined && tx.occurrence !== undefined) {
+    doc.seriesId = tx.seriesId
+    doc.occurrence = tx.occurrence
+    if (tx.estimated === true) doc.estimated = true
+    if (tx.manual === true) doc.manual = true
+  }
   return doc
 }
 
@@ -202,6 +208,18 @@ export function parseTransaction(id: string, data: unknown): LedgerTransaction |
   if (autoRules !== undefined) tx.autoRules = autoRules
   if (data.excluded !== undefined && typeof data.excluded !== 'boolean') return null
   if (data.excluded === true) tx.excluded = true
+  // S11: the series link. Malformed, on a transfer, or a flag without the link: the document is unreadable (as `excluded`).
+  if (data.seriesId !== undefined || data.occurrence !== undefined) {
+    if (type === 'transfer' || !isId(data.seriesId) || !isDay(data.occurrence)) return null
+    tx.seriesId = data.seriesId
+    tx.occurrence = data.occurrence
+  }
+  for (const key of ['estimated', 'manual'] as const) {
+    const value = data[key]
+    if (value === undefined) continue
+    if (typeof value !== 'boolean' || tx.seriesId === undefined) return null
+    if (value) tx[key] = true
+  }
   return tx
 }
 

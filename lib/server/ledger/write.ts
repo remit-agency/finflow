@@ -1,19 +1,23 @@
-import { FieldValue, Timestamp, type DocumentSnapshot, type Firestore, type QuerySnapshot, type Transaction } from 'firebase-admin/firestore'
+import { FieldValue, Timestamp, type DocumentReference, type DocumentSnapshot, type Firestore, type QuerySnapshot, type Transaction } from 'firebase-admin/firestore'
 import { attachFx, buildTransaction, fxPlan } from '@/lib/domain/ledger/build'
 import { assertBankUnlocked, withBankSides } from '@/lib/domain/ledger/bank-lock'
 import { changeSet, type ChangeSet } from '@/lib/domain/ledger/change'
 import { parseAccount, parseBankInfo, parseTransaction, transactionToDoc } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
-import { applyPatch, BANK_CLIENT_ID_PREFIX, toRawInput, type TransactionInput, type TransactionPatch } from '@/lib/domain/ledger/input'
+import { applyPatch, BANK_CLIENT_ID_PREFIX, PLAN_CLIENT_ID_PREFIX, toRawInput, type TransactionInput, type TransactionPatch } from '@/lib/domain/ledger/input'
+import { assertNotSeriesTransfer, markChangeOf, withSeries, type MarkChange } from '@/lib/domain/ledger/series'
 import { nest } from '@/lib/domain/ledger/rollups'
 import type { AutoRuleRef, BankInfo, BankToInfo, LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
 import { mergeTags, sameTags, type TagChange } from '@/lib/domain/tags/assign'
 import { excludedFromTags, tagFlagsOf, withExcluded } from '@/lib/domain/tags/exclude'
+import { doneToDoc, parseDone } from '@/lib/domain/recurring/doc'
+import { parsePlanId, planId } from '@/lib/domain/recurring/plan'
+import type { DoneReason } from '@/lib/domain/recurring/types'
 import type { RateSnapshot } from '@/lib/server/fx/types'
 import { auditData, type AuditAction } from './audit'
 import type { LedgerDeps } from './deps'
 import { assertUnlocked } from './lock'
-import { accountsCol, auditCol, categoriesCol, counterpartiesCol, orgRef, rollupsCol, tagsCol, transactionsCol } from './paths'
+import { accountsCol, auditCol, categoriesCol, counterpartiesCol, orgRef, recurringDoneCol, rollupsCol, tagsCol, transactionsCol } from './paths'
 
 export interface WriteResult {
   transaction: LedgerTransaction
@@ -56,6 +60,11 @@ interface Job {
   restore?: boolean
   /** The bank keys whose sides a create brings back (S10b): each must be free when the create is written. */
   sideKeys?: string[]
+  /**
+   * The mark of the occurrence this write moves (S11, `markChangeOf`). `restoreReason` is the reason of the mark a create
+   * under a plan id came back from: inside the transaction it must still be that mark.
+   */
+  planMark?: { change: MarkChange; restoreReason?: DoneReason }
 }
 
 export function evidenceOf(s: RateSnapshot): RateEvidence {
@@ -168,14 +177,22 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
       const holders = await t.get(transactionsCol(db, orgId).where('bankTo.key', '==', key).limit(2))
       sideReads.push({ own, holders })
     }
+    // S11: the mark of the occurrence this write settles, clears or deletes. Read here, so a concurrent write of the same
+    // occurrence (a match, a skip, another restore) conflicts and retries.
+    const markOf = job.next?.tx ?? job.prior?.tx
+    const markRef =
+      job.planMark !== undefined && markOf?.seriesId !== undefined && markOf.occurrence !== undefined
+        ? recurringDoneCol(db, orgId).doc(planId(markOf.seriesId, markOf.occurrence))
+        : null
+    const markSnap = markRef === null ? null : await t.get(markRef)
 
     // ---- checks (nothing is written yet) ----
     if (!orgSnap.exists) throw new LedgerError('not_found', 'org')
     const baseCurrency = orgSnap.get('currency') as string
     if (job.next && job.next.baseCurrency !== baseCurrency) throw new LedgerError('conflict')
     for (const side of sideReads) {
-      if (side.own?.exists) refuseBankId()
-      if (side.holders.docs.some((d) => d.id !== job.txId)) refuseBankId()
+      if (side.own?.exists) refuseClientId()
+      if (side.holders.docs.some((d) => d.id !== job.txId)) refuseClientId()
     }
 
     if (job.prior === null) {
@@ -187,6 +204,11 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
     } else {
       if (!currentSnap.exists) throw new LedgerError('not_found')
       if (!currentSnap.updateTime || !currentSnap.updateTime.isEqual(job.prior.version)) throw new LedgerError('conflict')
+    }
+    // The mark a restore comes back from must still be there (a second restore or a match in between took it).
+    const restoreReason = job.planMark?.restoreReason
+    if (restoreReason !== undefined && (markSnap === null || !markSnap.exists || markSnap.get('reason') !== restoreReason)) {
+      throw new LedgerError('conflict')
     }
 
     for (const [id, snap] of accountSnaps) {
@@ -222,6 +244,9 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
     } else {
       t.delete(txRef)
     }
+    if (markRef !== null && job.planMark !== undefined) {
+      writeMark(t, markRef, markSnap, job.planMark.change, next ?? (job.prior as NonNullable<typeof job.prior>).tx, job.txId, uid, ts)
+    }
 
     t.create(
       auditCol(db, orgId).doc(),
@@ -250,8 +275,67 @@ interface BankSides {
   bankTo?: BankToInfo
 }
 
-function refuseBankId(): never {
+function refuseClientId(): never {
   throw new LedgerError('invalid_input', 'clientId')
+}
+
+/**
+ * Writes the move of an occurrence mark (S11, `markChangeOf`) inside the write's transaction. `clear` lifts only a mark this
+ * operation may lift: a skip or a delete it comes back from, or the `paid` it wrote itself; never the `paid` of a match.
+ */
+function writeMark(
+  t: Transaction,
+  ref: DocumentReference,
+  snap: DocumentSnapshot | null,
+  change: MarkChange,
+  tx: LedgerTransaction,
+  txId: string,
+  uid: string,
+  ts: Timestamp,
+): void {
+  if (change === 'clear') {
+    if (snap?.exists && (snap.get('reason') !== 'paid' || snap.get('txId') === txId)) t.delete(ref)
+    return
+  }
+  const mark = doneToDoc({
+    seriesId: tx.seriesId as string,
+    occurrence: tx.occurrence as string,
+    reason: change === 'paid' ? 'paid' : 'deleted',
+    estimated: tx.estimated === true,
+    manual: tx.manual === true,
+    ...(change === 'paid' ? { txId } : {}),
+  })
+  t.set(ref, { ...mark, at: ts, by: uid })
+}
+
+/** What a create under a plan id brings back (S11): the series link from the mark, or the operation already back (a retry). */
+type PlanRestore = { fields: Partial<LedgerTransaction>; reason: DoneReason } | { replay: LedgerTransaction }
+
+/**
+ * The series link of a create under a plan id (`pl_`, S11), or undefined for any other id. Only the occurrence's own mark
+ * says the operation was a plan of that series: a skipped or deleted plan, or one the person had marked paid itself. The
+ * create takes `seriesId`, `occurrence`, `estimated` and `manual` from it, and `commit` lifts the mark (or keeps `paid`).
+ * A retry of a restore that went through (no mark, the operation back) is a replay. Anything else, the `paid` of a match
+ * included (its undo is `POST /recurring/matches`), is `invalid_input` on `clientId`.
+ */
+async function planRestoreOf(deps: LedgerDeps, orgId: string, input: TransactionInput): Promise<PlanRestore | undefined> {
+  const id = input.clientId
+  if (id === undefined || !id.startsWith(PLAN_CLIENT_ID_PREFIX)) return undefined
+  const parts = parsePlanId(id)
+  if (parts === null || input.type === 'transfer') refuseClientId()
+  const snap = await recurringDoneCol(deps.db, orgId).doc(id).get()
+  const mark = snap.exists ? parseDone(snap.id, snap.data()) : null
+  if (mark === null) {
+    const existing = await transactionsCol(deps.db, orgId).doc(id).get()
+    const tx = existing.exists ? parseTransaction(existing.id, existing.data()) : null
+    if (tx !== null && tx.seriesId === parts.seriesId) return { replay: tx }
+    refuseClientId()
+  }
+  if (!(mark.reason === 'skipped' || mark.reason === 'deleted' || (mark.reason === 'paid' && mark.txId === id))) refuseClientId()
+  const fields: Partial<LedgerTransaction> = { seriesId: parts.seriesId, occurrence: parts.occurrence }
+  if (mark.estimated) fields.estimated = true
+  if (mark.manual) fields.manual = true
+  return { fields, reason: mark.reason }
 }
 
 /** The bank's mark of one imported operation: its bank block and the locked fields of the import; null without them (a failed import). */
@@ -286,12 +370,12 @@ interface BankRestore {
 async function bankSidesOf(deps: LedgerDeps, orgId: string, input: TransactionInput): Promise<BankRestore | undefined> {
   const clientId = input.clientId
   if (clientId === undefined || !clientId.startsWith(BANK_CLIENT_ID_PREFIX)) return undefined
-  if (input.status !== 'actual') refuseBankId()
+  if (input.status !== 'actual') refuseClientId()
   const key = clientId.slice(BANK_CLIENT_ID_PREFIX.length)
   const own = await readMark(deps, orgId, key)
-  if (own === null) refuseBankId()
+  if (own === null) refuseClientId()
   if (input.type !== 'transfer') {
-    if (!imported(own.snapshot, input.type, input.accountId, input.amountMinor, input.paymentDate)) refuseBankId()
+    if (!imported(own.snapshot, input.type, input.accountId, input.amountMinor, input.paymentDate)) refuseClientId()
     return { sides: { bank: own.bank }, keys: [key] }
   }
   const toAccountId = input.toAccountId as string
@@ -300,10 +384,10 @@ async function bankSidesOf(deps: LedgerDeps, orgId: string, input: TransactionIn
   if (imported(own.snapshot, 'expense', input.accountId, input.amountMinor, input.paymentDate)) {
     if (input.bankToKey === undefined) return { sides: { bank: own.bank }, keys: [] }
     const other = await readMark(deps, orgId, input.bankToKey)
-    if (other === null || !imported(other.snapshot, 'income', toAccountId, toAmountMinor, input.toDate ?? input.paymentDate)) refuseBankId()
+    if (other === null || !imported(other.snapshot, 'income', toAccountId, toAmountMinor, input.toDate ?? input.paymentDate)) refuseClientId()
     return { sides: { bank: own.bank, bankTo: { key: input.bankToKey, ...other.bank } }, keys: [input.bankToKey] }
   }
-  if (input.bankToKey !== undefined || !imported(own.snapshot, 'income', toAccountId, toAmountMinor, input.paymentDate)) refuseBankId()
+  if (input.bankToKey !== undefined || !imported(own.snapshot, 'income', toAccountId, toAmountMinor, input.paymentDate)) refuseClientId()
   return { sides: { bankTo: { key, ...own.bank } }, keys: [key] }
 }
 
@@ -317,9 +401,12 @@ export async function createTransaction(
 ): Promise<WriteResult> {
   const txId = input.clientId ?? transactionsCol(deps.db, orgId).doc().id
   const restore = bank !== undefined ? undefined : await bankSidesOf(deps, orgId, input)
+  const plan = await planRestoreOf(deps, orgId, input)
+  if (plan !== undefined && 'replay' in plan) return { transaction: plan.replay, replayed: true }
   const next = await prepare(deps, orgId, txId, input)
   if (bank !== undefined) next.tx = { ...next.tx, bank }
   else if (restore !== undefined) next.tx = { ...next.tx, ...restore.sides }
+  if (plan !== undefined) next.tx = { ...next.tx, ...plan.fields }
   const autoRules = extras.autoRules ?? []
   if (autoRules.length > 0) next.tx = { ...next.tx, autoRules: autoRules.map((r) => ({ id: r.id, name: r.name })) }
   return commit(deps, orgId, uid, {
@@ -329,6 +416,7 @@ export async function createTransaction(
     next,
     via: autoRules.length > 0 ? 'rule' : undefined,
     sideKeys: restore?.keys ?? [],
+    planMark: plan === undefined ? undefined : { change: markChangeOf(null, next.tx) ?? 'clear', restoreReason: plan.reason },
   })
 }
 
@@ -365,7 +453,10 @@ export async function updateTransaction(
   const prior = await loadPrior(deps, orgId, txId)
   // The rules read the operation at `expectVersion`: anything a person did since then wins (S10).
   if (extras.expectVersion !== undefined && !prior.version.isEqual(extras.expectVersion)) throw new LedgerError('conflict')
-  const next = await prepare(deps, orgId, txId, applyPatch(toRawInput(prior.tx), patch))
+  const input = applyPatch(toRawInput(prior.tx), patch)
+  // The series' refusal of a transfer (C2) comes before `prepare` reads the accounts: the type is what the person is told.
+  if (prior.tx.seriesId !== undefined) assertNotSeriesTransfer(prior.tx, input.type)
+  const next = await prepare(deps, orgId, txId, input)
   if (prior.tx.bank !== undefined || prior.tx.bankTo !== undefined) {
     // toRawInput never carries the bank blocks or the arrival day (S10b): an edit keeps them from the prior document, and
     // the lock compares what each bank side fixes.
@@ -373,6 +464,10 @@ export async function updateTransaction(
     assertBankUnlocked(prior.tx, carried)
     next.tx = carried
   }
+  // toRawInput never carries the series link either (S11): it comes from the prior document, and a person's change of a
+  // planned occurrence makes it «змінено вручну».
+  if (prior.tx.seriesId !== undefined) next.tx = withSeries(next.tx, prior.tx)
+  const mark = markChangeOf(prior.tx, next.tx)
   const given = extras.autoRules ?? []
   // toRawInput never carries `autoRules` either: the trace is decided here.
   const autoRules = autoRulesAfter(prior.tx, next.tx, given)
@@ -384,12 +479,15 @@ export async function updateTransaction(
     next,
     via: given.length > 0 ? 'rule' : undefined,
     restore: extras.restore === true,
+    planMark: mark === null ? undefined : { change: mark },
   })
 }
 
 export async function deleteTransaction(deps: LedgerDeps, orgId: string, uid: string, txId: string): Promise<WriteResult> {
   const prior = await loadPrior(deps, orgId, txId)
-  return commit(deps, orgId, uid, { action: 'tx.delete', txId, prior, next: null })
+  // S11: a planned occurrence a person deletes is marked deleted (the generator never brings it back; an undo does).
+  const mark = markChangeOf(prior.tx, null)
+  return commit(deps, orgId, uid, { action: 'tx.delete', txId, prior, next: null, planMark: mark === null ? undefined : { change: mark } })
 }
 
 /**

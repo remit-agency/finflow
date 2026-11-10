@@ -86,6 +86,25 @@ test.describe('API guards', () => {
     }
   })
 
+  // S11: the planned payments routes refuse a request without a session cookie, before they read any data.
+  test('planned payments endpoints require a session cookie (401)', async ({ request }) => {
+    const origin = { Origin: 'http://localhost:3000' }
+    const calls: { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; path: string; data?: object }[] = [
+      { method: 'GET', path: '/api/orgs/x/recurring' },
+      { method: 'POST', path: '/api/orgs/x/recurring', data: { name: 'x' } },
+      { method: 'GET', path: '/api/orgs/x/recurring/s1' },
+      { method: 'PATCH', path: '/api/orgs/x/recurring/s1', data: { name: 'x' } },
+      { method: 'DELETE', path: '/api/orgs/x/recurring/s1' },
+      { method: 'POST', path: '/api/orgs/x/recurring/s1/skip', data: { occurrence: '2026-11-10' } },
+      { method: 'GET', path: '/api/orgs/x/recurring/suggestions' },
+      { method: 'POST', path: '/api/orgs/x/recurring/matches', data: { undo: ['pl_s1_2026-11-10'] } },
+    ]
+    for (const { method, path, data } of calls) {
+      const res = await request.fetch(path, { method, headers: origin, data })
+      expect(res.status(), `${method} ${path}`).toBe(401)
+    }
+  })
+
   test('Enable Banking callback rejects a forged state before exchanging the code (400)', async ({ request }) => {
     // The pre-S00 format: unsigned base64url JSON with just an orgId.
     const forged = Buffer.from(JSON.stringify({ orgId: 'victim-org' })).toString('base64url')

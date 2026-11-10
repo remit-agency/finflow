@@ -43,5 +43,9 @@ export function toUiTransaction(orgId: string, tx: LedgerTransaction): Transacti
   if (tx.toDate !== undefined) ui.toDate = tx.toDate
   if (tx.autoRules !== undefined) ui.autoRules = tx.autoRules
   if (tx.excluded === true) ui.excluded = true
+  if (tx.seriesId !== undefined) ui.seriesId = tx.seriesId
+  if (tx.occurrence !== undefined) ui.occurrence = tx.occurrence
+  if (tx.estimated === true) ui.estimated = true
+  if (tx.manual === true) ui.manual = true
   return ui
 }

@@ -11,10 +11,11 @@ rules_version = '2';
 //
 // Data shape:
 //   organizations/{orgId} { name, currency, ownerId, plan, trialEndsAt, createdAt }
-//   organizations/{orgId}/{accounts|categories|transactions|rollups|audit|bankConnections|bankAccounts|bankSeen|ledger|counterparties|counterpartyKeys|rules|tags|tagKeys}/{docId}
-// Accounts, transactions, rollups, audit, ledger, counterparties, rules (S10), tags (S10t) and the bank collections (bankConnections, bankAccounts,
-// bankSeen: S09) are written by the server only (S05, S06, S09). counterpartyKeys and tagKeys (uniqueness keys), bankAccounts and bankSeen
-// (bank sync state) and the root rateLimits are not readable or writable by clients at all.
+//   organizations/{orgId}/{accounts|categories|transactions|rollups|audit|bankConnections|bankAccounts|bankSeen|ledger|counterparties|counterpartyKeys|rules|tags|tagKeys|recurring|recurringDone}/{docId}
+// Accounts, transactions, rollups, audit, ledger, counterparties, rules (S10), tags (S10t), recurring (S11: series of planned payments) and the
+// bank collections (bankConnections, bankAccounts, bankSeen: S09) are written by the server only (S05, S06, S09). counterpartyKeys and tagKeys
+// (uniqueness keys), bankAccounts and bankSeen (bank sync state), recurringDone (S11: occurrence marks) and the root rateLimits are not
+// readable or writable by clients at all.
 //
 // The name `members` is reserved for memberships: the collection-group rule below applies to
 // every collection called `members`. New subcollections must be added to the lists below.
@@ -55,8 +56,8 @@ service cloud.firestore {
       }
 
       match /{subcollection}/{docId} {
-        // bankAccounts and bankSeen match no rule below: closed to clients for reads and writes (deny by default).
-        allow read: if (subcollection in ['accounts', 'categories', 'transactions', 'rollups', 'counterparties', 'rules', 'tags']
+        // bankAccounts, bankSeen and recurringDone match no rule below: closed to clients for reads and writes (deny by default).
+        allow read: if (subcollection in ['accounts', 'categories', 'transactions', 'rollups', 'counterparties', 'rules', 'tags', 'recurring']
             && hasRole(orgId, ['owner', 'accountant', 'viewer']))
           || (subcollection in ['bankConnections', 'audit'] && hasRole(orgId, ['owner']));
 

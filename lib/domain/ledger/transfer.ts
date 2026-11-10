@@ -15,14 +15,16 @@ export function bankKeyOf(id: string): string | null {
 export type BankSide = 'out' | 'in'
 
 /** What `bankSideOf` reads; the suggestions read (lib/domain/transfers/pairs.ts) has these fields too. */
-export type BankSideSource = Pick<LedgerTransaction, 'id' | 'type' | 'status' | 'isRecurring' | 'bank'>
+export type BankSideSource = Pick<LedgerTransaction, 'id' | 'type' | 'status' | 'isRecurring' | 'bank' | 'seriesId'>
 
 /**
  * The bank side an operation can give a transfer (S10b): an actual income or expense imported from a bank under its bank
- * id and not tied to a recurring template. Anything else (a manual operation, a planned one, a transfer) is null.
+ * id and not tied to a recurring template: neither marked «Повторювана» by a person (`isRecurring`) nor the payment of a
+ * planned occurrence (`seriesId`, S11: a transfer would leave that occurrence's `paid` mark without its operation).
+ * Anything else (a manual operation, a planned one, a transfer) is null.
  */
 export function bankSideOf(tx: BankSideSource): BankSide | null {
-  if (tx.status !== 'actual' || tx.isRecurring || tx.bank === undefined || bankKeyOf(tx.id) === null) return null
+  if (tx.status !== 'actual' || tx.isRecurring || tx.seriesId !== undefined || tx.bank === undefined || bankKeyOf(tx.id) === null) return null
   if (tx.type === 'expense') return 'out'
   if (tx.type === 'income') return 'in'
   return null

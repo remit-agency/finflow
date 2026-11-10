@@ -12,10 +12,10 @@ export const pairKeyOf = (fromId: string, toId: string): string => `${fromId}|${
 export const pairKey = (s: TransferSuggestion): string => pairKeyOf(s.from.id, s.to.id)
 
 /** The pairs turned down in this browser; [] when storage is missing, blocked, throws or holds something else. */
-export function readDismissed(storage: KeyValueStorage | null, orgId: string): string[] {
+export function readDismissed(storage: KeyValueStorage | null, orgId: string, prefix: string = DISMISSED_PREFIX): string[] {
   if (!storage) return []
   try {
-    const parsed: unknown = JSON.parse(storage.getItem(`${DISMISSED_PREFIX}${orgId}`) ?? '[]')
+    const parsed: unknown = JSON.parse(storage.getItem(`${prefix}${orgId}`) ?? '[]')
     return Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === 'string') : []
   } catch {
     return []
@@ -23,10 +23,10 @@ export function readDismissed(storage: KeyValueStorage | null, orgId: string): s
 }
 
 /** Keeps `keys` (the newest MAX_DISMISSED). False when storage is missing or refuses: the list then lives in memory only. */
-export function writeDismissed(storage: KeyValueStorage | null, orgId: string, keys: readonly string[]): boolean {
+export function writeDismissed(storage: KeyValueStorage | null, orgId: string, keys: readonly string[], prefix: string = DISMISSED_PREFIX): boolean {
   if (!storage) return false
   try {
-    storage.setItem(`${DISMISSED_PREFIX}${orgId}`, JSON.stringify(keys.slice(-MAX_DISMISSED)))
+    storage.setItem(`${prefix}${orgId}`, JSON.stringify(keys.slice(-MAX_DISMISSED)))
     return true
   } catch {
     return false

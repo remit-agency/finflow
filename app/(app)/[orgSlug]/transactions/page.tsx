@@ -12,6 +12,7 @@ import { ExportButton } from '@/components/transactions/ExportButton'
 import { JournalFiltersBar } from '@/components/transactions/JournalFilters'
 import { SelectionBar, type BulkField } from '@/components/transactions/SelectionBar'
 import { TransactionList } from '@/components/transactions/TransactionList'
+import { PlanMatches } from '@/components/transactions/PlanMatches'
 import { TransferSuggestionsBanner, TransferSuggestionsDialog } from '@/components/transactions/TransferSuggestions'
 import { bulkChange, bulkDelete, undoBulkChange, undoBulkDelete } from '@/lib/api/journal-actions'
 import { collectMatching, SELECT_ALL_LIMIT } from '@/lib/api/journal-matching'
@@ -404,6 +405,7 @@ export default function TransactionsPage() {
       )}
 
       {canEdit && suggestions.pairs.length > 0 && <TransferSuggestionsBanner count={suggestions.pairs.length} onOpen={openSuggestions} />}
+      {canEdit && <PlanMatches orgId={orgId} accounts={accounts} />}
 
       {canEdit && selectedRows.length > 0 && (
         <SelectionBar

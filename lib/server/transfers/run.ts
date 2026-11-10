@@ -1,8 +1,7 @@
-import { Timestamp } from 'firebase-admin/firestore'
 import type { TransferOutcome, TransferRequest } from '@/lib/domain/transfers/types'
-import { parseVersion } from '@/lib/domain/transfers/version'
 import { refusalCode } from '@/lib/server/ledger/http'
 import type { MadeTransfer, TransferJob } from '@/lib/server/ledger/transfer'
+import { timestampOf } from '@/lib/server/ledger/version'
 
 /** The ledger call a transfer request is made of (the production `ledger` object has it). */
 export interface TransferLedger {
@@ -12,13 +11,6 @@ export interface TransferLedger {
 interface Planned {
   ids: string[]
   job: TransferJob
-}
-
-function timestampOf(version: string): Timestamp {
-  const parts = parseVersion(version)
-  // parseTransferRequest has checked every version of the request.
-  if (parts === null) throw new Error('an unparsed version reached runTransfers')
-  return new Timestamp(parts.seconds, parts.nanoseconds)
 }
 
 function plan(req: TransferRequest): Planned[] {

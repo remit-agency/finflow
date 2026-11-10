@@ -33,7 +33,7 @@ export interface MadeTransfer {
 }
 
 /** The operation in a snapshot read inside the transaction: gone is `not_found`, a document the ledger cannot read is `not_eligible`. */
-function operationOf(snap: DocumentSnapshot): LedgerTransaction {
+export function operationOf(snap: DocumentSnapshot): LedgerTransaction {
   if (!snap.exists) throw new LedgerError('not_found')
   const tx = parseTransaction(snap.id, snap.data())
   if (!tx) throw new LedgerError('not_eligible')
