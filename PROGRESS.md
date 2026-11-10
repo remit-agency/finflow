@@ -794,6 +794,16 @@ CashFlowChart (Recharts), PLTable, CalendarView, BalanceSheet, all 4 analytics p
 - **UI:** вкладка «Планові платежі», сторінка `/[orgSlug]/recurring` (смуга, серії, найближчі операції, пресети, редактор), журнал (чип «Прострочено», банер і діалог збігів), підказка «з серії …» у формі.
 - **`npm run check:recurring`** (лише читання; без цілі відмовляє, для production потрібен `--project=finflow-e94b5`).
 
+### Підсумок після другого огляду (opus, 2026-11-10, реально виміряно)
+- `npm run typecheck`: exit 0. `npm run lint`: 0 errors / 10 warnings. `npm run check:server-imports`: exit 0.
+- unit: 200 файлів, 2726 тестів, усі пройшли (базово 2719 + 7 нових).
+- integration (`npm run test:integration`): 37 файлів, 383 тести, усі пройшли (базово 374 + 9 нових).
+- rules: не запускалися, `firestore.rules` не змінювався.
+- build: Compiled successfully, exit 0.
+- e2e (`firebase emulators:exec --only auth,firestore --project demo-finflow "npm run test:e2e"`): 151 з 151, 11.3 хв (без нових e2e-тестів).
+- recurring e2e (`--repeat-each=3`): 36 з 36 (12 тестів × 3), 3.4 хв.
+- Не перевірено: `jq` (локально немає), реальний production і `check:recurring` на ньому.
+
 ### Підсумок перевірок (2026-11-10, реально виміряно)
 - `npm run typecheck`: exit 0, 4 с.
 - `npm run lint`: 0 errors / 10 warnings (базово 10).
