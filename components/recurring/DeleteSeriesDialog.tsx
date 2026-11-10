@@ -12,7 +12,7 @@ export function DeleteSeriesDialog({ name, busy, onConfirm, onClose }: { name: s
   const [deleteFuture, setDeleteFuture] = useState(true)
   return (
     <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="grid-cols-[minmax(0,1fr)] sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="break-words">{t('remove.title', { name })}</DialogTitle>
           <DialogDescription>{t('remove.body')}</DialogDescription>
