@@ -5,7 +5,7 @@ import { changeSet, type ChangeSet } from '@/lib/domain/ledger/change'
 import { parseAccount, parseBankInfo, parseTransaction, transactionToDoc } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import { applyPatch, BANK_CLIENT_ID_PREFIX, PLAN_CLIENT_ID_PREFIX, toRawInput, type TransactionInput, type TransactionPatch } from '@/lib/domain/ledger/input'
-import { markChangeOf, withSeries, type MarkChange } from '@/lib/domain/ledger/series'
+import { assertNotSeriesTransfer, markChangeOf, withSeries, type MarkChange } from '@/lib/domain/ledger/series'
 import { nest } from '@/lib/domain/ledger/rollups'
 import type { AutoRuleRef, BankInfo, BankToInfo, LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
 import { mergeTags, sameTags, type TagChange } from '@/lib/domain/tags/assign'
@@ -453,7 +453,10 @@ export async function updateTransaction(
   const prior = await loadPrior(deps, orgId, txId)
   // The rules read the operation at `expectVersion`: anything a person did since then wins (S10).
   if (extras.expectVersion !== undefined && !prior.version.isEqual(extras.expectVersion)) throw new LedgerError('conflict')
-  const next = await prepare(deps, orgId, txId, applyPatch(toRawInput(prior.tx), patch))
+  const input = applyPatch(toRawInput(prior.tx), patch)
+  // The series' refusal of a transfer (C2) comes before `prepare` reads the accounts: the type is what the person is told.
+  if (prior.tx.seriesId !== undefined) assertNotSeriesTransfer(prior.tx, input.type)
+  const next = await prepare(deps, orgId, txId, input)
   if (prior.tx.bank !== undefined || prior.tx.bankTo !== undefined) {
     // toRawInput never carries the bank blocks or the arrival day (S10b): an edit keeps them from the prior document, and
     // the lock compares what each bank side fixes.

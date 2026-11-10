@@ -274,6 +274,13 @@ describe('a planned occurrence is never a transfer (C2)', () => {
     expect((await verifyLedger(deps, ORG)).ok).toBe(true)
   })
 
+  it('a bad destination account does not hide the refusal: the transfer is refused as series_transfer first (C2 minor c)', async () => {
+    const { series } = await createSeries(deps, ORG, UID, RENT)
+    const id = `pl_${series.id}_2026-11-10`
+    expect(await code(updateTransaction(deps, ORG, UID, id, { type: 'transfer', toAccountId: 'nope', categoryId: null }))).toBe('series_transfer:type')
+    expect(await txDoc(db, id)).toMatchObject({ type: 'expense', seriesId: series.id })
+  })
+
   it('an undo of a manual amount change restores the content, and keeps the flags the edit left (MINOR b, documented)', async () => {
     // The undo sends the content only (`revertTransaction`): the series flags are the server's, so `manual` stays and
     // `estimated` does not come back. The plan stays out of the series' rewrites, which is the safe side of the trade-off.

@@ -1,6 +1,6 @@
 import { sameTags } from '@/lib/domain/tags/assign'
 import { LedgerError } from './errors'
-import type { Accrual, LedgerTransaction } from './types'
+import type { Accrual, LedgerTransaction, TxType } from './types'
 
 /**
  * The fields a series sets on its planned occurrences (S11), the one list both rules use: a person's change of any of them
@@ -36,15 +36,22 @@ export function rewriteDiffers(stored: LedgerTransaction, want: LedgerTransactio
 }
 
 /**
+ * An operation of a series is never a transfer (C2): the link would make the transfer unreadable (`parseTransaction`), and a
+ * transfer moves balances the series does not own. Refused as `series_transfer` on `type`. The server asks before it reads
+ * the accounts a transfer names, so a bad destination account does not hide this refusal.
+ */
+export function assertNotSeriesTransfer(prior: Pick<LedgerTransaction, 'seriesId'>, type: TxType): void {
+  if (prior.seriesId !== undefined && type === 'transfer') throw new LedgerError('series_transfer', 'type')
+}
+
+/**
  * `next` (an edit, built from the request) with the series link of `prior` (S11): `seriesId`, `occurrence`, `estimated`,
  * `manual` come from the stored document only. A planned occurrence that stays planned becomes `manual` when a field its
  * series sets changes (then a change of the series no longer rewrites it), and loses `estimated` when its amount changes.
  * Marking it paid (or back) keeps the flags as they were: the operation is simply no longer a plan.
- * An operation of a series is never a transfer (C2): the link would make the transfer unreadable (`parseTransaction`), and
- * a transfer moves balances the series does not own. Refused as `series_transfer` on `type`.
  */
 export function withSeries(next: LedgerTransaction, prior: LedgerTransaction): LedgerTransaction {
-  if (prior.seriesId !== undefined && next.type === 'transfer') throw new LedgerError('series_transfer', 'type')
+  assertNotSeriesTransfer(prior, next.type)
   const out: LedgerTransaction = { ...next }
   delete out.seriesId
   delete out.occurrence
