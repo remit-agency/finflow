@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { addDays, daysApart, fromDay } from '@/lib/domain/ledger/days'
-import { fillPlan, planId } from '@/lib/domain/recurring/plan'
-import { occurrencesBetween, paymentDayOf, windowEnd } from '@/lib/domain/recurring/schedule'
+import { fillPlan, planId, rewriteOccurrences, takenPeriods } from '@/lib/domain/recurring/plan'
+import { occurrencesBetween, paymentDayOf, periodOf, windowEnd } from '@/lib/domain/recurring/schedule'
 import { MAX_SHIFT_DAYS, type Series } from '@/lib/domain/recurring/types'
 import { isBusinessDay } from '@/lib/utils/pl-calendar'
 
@@ -76,6 +76,24 @@ describe('the daily fill over random series and days (property)', () => {
         const pay = paymentDayOf(o, first.weekendRule)
         expect(daysApart(o, pay)).toBeLessThanOrEqual(MAX_SHIFT_DAYS)
         if (first.weekendRule !== 'none') expect(isBusinessDay(fromDay(pay)), `seed ${seed}: ${pay}`).toBe(true)
+      }
+    }
+  })
+
+  it('a change plans no period that a settled occurrence takes, whatever days were settled before it (rewrite path with marks)', () => {
+    // The server reads the marks and the operations of a change from `takenFrom` on (`takenPeriods` keeps those). Any
+    // settled day of the series, read or not, must take its period: a period the rewrite plans never holds one.
+    for (let seed = 1; seed <= 300; seed++) {
+      const r = rng(seed + 1000)
+      const changed = randomSeries(r, seed)
+      const today = addDays('2026-01-01', Math.floor(r() * 700))
+      const settled: string[] = []
+      for (let k = 0; k < 6; k++) if (r() < 0.5) settled.push(addDays(today, Math.floor(r() * 200) - 100))
+      for (const o of occurrencesBetween(changed, addDays(today, -200), addDays(today, 100))) if (r() < 0.25) settled.push(o)
+      const desired = rewriteOccurrences(changed, today, takenPeriods(changed, today, settled))
+      for (const o of desired) {
+        expect(paymentDayOf(o, changed.weekendRule) >= today, `seed ${seed}: ${o} is past`).toBe(true)
+        for (const m of settled) expect(periodOf(changed, m) === periodOf(changed, o), `seed ${seed}: ${o} takes the period of ${m}`).toBe(false)
       }
     }
   })

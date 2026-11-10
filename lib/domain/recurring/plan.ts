@@ -2,8 +2,8 @@ import { addDays, isDay } from '@/lib/domain/ledger/days'
 import { isId } from '@/lib/domain/ledger/guards'
 import { PLAN_CLIENT_ID_PREFIX, type TransactionInput } from '@/lib/domain/ledger/input'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
-import { occurrencesBetween, paymentDayOf, periodOf, windowEnd } from './schedule'
-import { MAX_FILL_PER_SERIES, MAX_SHIFT_DAYS, type Series } from './types'
+import { occurrencesBetween, paymentDayOf, periodOf, periodStart, windowEnd } from './schedule'
+import { MATCH_BEFORE_DAYS, MAX_FILL_PER_SERIES, MAX_SHIFT_DAYS, type Series } from './types'
 
 /** The deterministic id of an occurrence's operation: creating it again writes the same document. */
 export function planId(seriesId: string, occurrence: string): string {
@@ -32,14 +32,47 @@ export interface FillPlan {
   dueOn?: string
 }
 
+/** The first nominal day a plan can carry on `today`: a payment day is at most MAX_SHIFT_DAYS from its occurrence. */
+function planFrom(today: string): string {
+  return addDays(today, -MAX_SHIFT_DAYS)
+}
+
 /**
  * The occurrences a series plans on `today`, the one definition the first fill and the rewrite of a change share: the
- * nominal days from MAX_SHIFT_DAYS before `today` up to `to` whose payment day (after `weekendRule`) is today or later. A
- * nominal day that has passed still counts while its payment day has not (ZUS on the 15th, due on Monday the 16th, on the
- * 16th); one whose payment day has passed does not.
+ * nominal days from `planFrom` (MAX_SHIFT_DAYS before `today`) up to `to` whose payment day (after `weekendRule`) is today or
+ * later. A nominal day that has passed still counts while its payment day has not (ZUS on the 15th, due on Monday the 16th,
+ * on the 16th); one whose payment day has passed does not.
  */
 export function plannedFrom(s: Series, today: string, to: string): string[] {
-  return occurrencesBetween(s, addDays(today, -MAX_SHIFT_DAYS), to).filter((o) => paymentDayOf(o, s.weekendRule) >= today)
+  return occurrencesBetween(s, planFrom(today), to).filter((o) => paymentDayOf(o, s.weekendRule) >= today)
+}
+
+/**
+ * The first day a change reads the settled occurrences of a series from (its marks and its operations): the start of the
+ * period of `planFrom(today)`. Every period a rewrite can plan starts at or after it, so a settled occurrence before it
+ * takes none of them, and one that does take a period is at or after it (the period starts before it, see `takenPeriods`).
+ */
+export function takenFrom(s: Series, today: string): string {
+  return periodStart(s, planFrom(today))
+}
+
+/**
+ * The first payment day of the operations a change reads: an operation of an occurrence from `takenFrom` on is paid at most
+ * MAX_SHIFT_DAYS before that occurrence, and a bank operation matched to it up to MATCH_BEFORE_DAYS before its payment day.
+ */
+export function paymentFrom(s: Series, today: string): string {
+  return addDays(takenFrom(s, today), -(MAX_SHIFT_DAYS + MATCH_BEFORE_DAYS))
+}
+
+/**
+ * The periods a change of a series does not plan again: the period (`periodOf` of the new schedule) of each settled
+ * occurrence (a mark, or an operation the change keeps) from `takenFrom` on. Days before it are not read and take nothing.
+ */
+export function takenPeriods(s: Series, today: string, settled: Iterable<string>): Set<string> {
+  const from = takenFrom(s, today)
+  const out = new Set<string>()
+  for (const o of settled) if (o >= from) out.add(periodOf(s, o))
+  return out
 }
 
 /**

@@ -3,11 +3,13 @@ import { LedgerError } from '@/lib/domain/ledger/errors'
 import { RecurringError } from '@/lib/domain/recurring/errors'
 import { parseSeriesInput, parseSeriesPatch, type SeriesInput } from '@/lib/domain/recurring/input'
 import { deleteAccount } from '@/lib/server/ledger/accounts'
+import { confirmMatch, skipOccurrence } from '@/lib/server/ledger/plan-match'
 import { createSeries, deleteSeries, fillSeries, updateSeries } from '@/lib/server/ledger/series'
 import { verifyLedger } from '@/lib/server/ledger/verify'
 import { deleteTransaction, updateTransaction } from '@/lib/server/ledger/write'
 import { ORG, TODAY, UID, auditActions, balanceOf, clearFirestore, makeDeps, readDoc, seedAccount, seedCategory, seedCounterparty, seedOrg, testDb } from './helpers'
 import { markDoc, txDoc } from './recurring-helpers'
+import { KEY, importBankOp } from './transfer-helpers'
 
 const db = testDb()
 const deps = makeDeps(db)
@@ -264,6 +266,61 @@ describe('a planned occurrence is never a transfer (C2)', () => {
     await updateTransaction(deps, ORG, UID, id, { status: 'actual', paymentDate: TODAY })
     expect(await code(updateTransaction(deps, ORG, UID, id, { type: 'transfer', toAccountId: 'cash', categoryId: null }))).toBe('series_transfer:type')
     expect(await txDoc(db, id)).toMatchObject({ type: 'expense', seriesId: series.id, status: 'actual' })
+  })
+})
+
+describe('a settled occurrence before the day of a change keeps its period (C1 regression)', () => {
+  // Every Saturday, paid on the next business day: Saturday 14 November is paid on Monday 16 November.
+  const SATURDAY: SeriesInput = parseSeriesInput({ name: 'Dom', kind: 'expense', accountId: 'mil', amountMinor: 100_000, frequency: 'weekly', weekday: 6, startDate: '2026-10-03', weekendRule: 'next' })
+  // Day 31, next business day: Saturday 31 October is paid on Monday 2 November.
+  const LAST: SeriesInput = parseSeriesInput({ name: 'Najem', kind: 'expense', accountId: 'mil', amountMinor: 250_000, frequency: 'monthly', dayOfMonth: 31, startDate: '2026-10-01', weekendRule: 'next', categoryId: 'rent' })
+
+  it('a skip on the payment day survives an amount change that day', async () => {
+    const { series } = await createSeries(deps, ORG, UID, SATURDAY)
+    const id = `pl_${series.id}_2026-11-14`
+    expect(await txDoc(db, id)).toMatchObject({ paymentDate: '2026-11-16' })
+    await skipOccurrence(on('2026-11-16'), ORG, UID, series.id, '2026-11-14')
+    await updateSeries(on('2026-11-16'), ORG, UID, series.id, parseSeriesPatch({ amountMinor: 110_000 }))
+    expect(await txDoc(db, id)).toBeUndefined()
+    expect(await markDoc(db, id)).toMatchObject({ reason: 'skipped' })
+    expect(await plansOf(series.id)).not.toContain(id)
+    expect((await verifyLedger(deps, ORG)).ok).toBe(true)
+  })
+
+  it('a skip on the payment day survives a pause and a resume on that day', async () => {
+    const { series } = await createSeries(deps, ORG, UID, SATURDAY)
+    const id = `pl_${series.id}_2026-11-14`
+    await skipOccurrence(on('2026-11-16'), ORG, UID, series.id, '2026-11-14')
+    await updateSeries(on('2026-11-16'), ORG, UID, series.id, parseSeriesPatch({ status: 'paused' }))
+    await updateSeries(on('2026-11-16'), ORG, UID, series.id, parseSeriesPatch({ status: 'active' }))
+    expect(await txDoc(db, id)).toBeUndefined()
+    expect(await markDoc(db, id)).toMatchObject({ reason: 'skipped' })
+  })
+
+  it('a bank payment matched to the 31 October plan keeps November from planning it again on 1 or 2 November', async () => {
+    const { series } = await createSeries(deps, ORG, UID, LAST)
+    const plan = `pl_${series.id}_2026-10-31`
+    expect(await txDoc(db, plan)).toMatchObject({ paymentDate: '2026-11-02' })
+    await importBankOp(db, on('2026-10-30'), { key: KEY(7), type: 'expense', accountId: 'mil', amountMinor: 250_000, paymentDate: '2026-10-30' })
+    await confirmMatch(on('2026-10-30'), ORG, UID, { planId: plan, bankId: `bk_${KEY(7)}` })
+    expect(await txDoc(db, `bk_${KEY(7)}`)).toMatchObject({ seriesId: series.id, occurrence: '2026-10-31', status: 'actual' })
+    await updateSeries(on('2026-11-01'), ORG, UID, series.id, parseSeriesPatch({ amountMinor: 260_000 }))
+    expect(await txDoc(db, plan)).toBeUndefined()
+    expect(await markDoc(db, plan)).toMatchObject({ reason: 'paid' })
+    expect(await plansOf(series.id)).not.toContain(plan)
+    expect(await balanceOf(db, ORG, 'mil')).toBe(250_000)
+    expect((await verifyLedger(deps, ORG)).ok).toBe(true)
+  })
+
+  it('the same match survives a pause and a resume on 2 November', async () => {
+    const { series } = await createSeries(deps, ORG, UID, LAST)
+    const plan = `pl_${series.id}_2026-10-31`
+    await importBankOp(db, on('2026-10-30'), { key: KEY(7), type: 'expense', accountId: 'mil', amountMinor: 250_000, paymentDate: '2026-10-30' })
+    await confirmMatch(on('2026-10-30'), ORG, UID, { planId: plan, bankId: `bk_${KEY(7)}` })
+    await updateSeries(on('2026-11-02'), ORG, UID, series.id, parseSeriesPatch({ status: 'paused' }))
+    await updateSeries(on('2026-11-02'), ORG, UID, series.id, parseSeriesPatch({ status: 'active' }))
+    expect(await txDoc(db, plan)).toBeUndefined()
+    expect(await plansOf(series.id)).not.toContain(plan)
   })
 })
 

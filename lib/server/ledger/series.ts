@@ -4,7 +4,6 @@ import { nameKey } from '@/lib/domain/counterparties/normalize'
 import { systemCounterparty } from '@/lib/domain/counterparties/system'
 import { buildTransaction } from '@/lib/domain/ledger/build'
 import { changeSet, combineChanges } from '@/lib/domain/ledger/change'
-import { addDays } from '@/lib/domain/ledger/days'
 import { parseAccount, parseTransaction, transactionToDoc } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import { rewriteDiffers } from '@/lib/domain/ledger/series'
@@ -12,10 +11,9 @@ import type { LedgerAccount, LedgerTransaction } from '@/lib/domain/ledger/types
 import { parseDone, parseSeries, seriesToDoc } from '@/lib/domain/recurring/doc'
 import { RecurringError } from '@/lib/domain/recurring/errors'
 import { applySeriesPatch, assertSeriesHorizon, seriesFromInput, type SeriesInput, type SeriesPatch } from '@/lib/domain/recurring/input'
-import { fillPlan, planId, planInputOf, rewriteOccurrences, rewriteState, seriesFieldsOf, type UsableRefs } from '@/lib/domain/recurring/plan'
+import { fillPlan, paymentFrom, planId, planInputOf, rewriteOccurrences, rewriteState, seriesFieldsOf, takenFrom, takenPeriods, type UsableRefs } from '@/lib/domain/recurring/plan'
 import { PRESET_DEFAULTS, presetCounterparty } from '@/lib/domain/recurring/presets'
-import { periodOf, periodStart } from '@/lib/domain/recurring/schedule'
-import { MARKS_SCAN, MAX_SERIES, MAX_SHIFT_DAYS, RECURRING_UID, REWRITE_CAP, type FutureMode, type Preset, type Series } from '@/lib/domain/recurring/types'
+import { MARKS_SCAN, MAX_SERIES, RECURRING_UID, REWRITE_CAP, type FutureMode, type Preset, type Series } from '@/lib/domain/recurring/types'
 import { excludedFromTags, tagFlagsOf, withExcluded } from '@/lib/domain/tags/exclude'
 import { auditData } from './audit'
 import type { LedgerDeps } from './deps'
@@ -308,8 +306,7 @@ export async function updateSeries(deps: LedgerDeps, orgId: string, uid: string,
     }
     const ctx = await readContext(t, db, orgId, changed, strict)
     const next: Series = { ...changed, currency: ctx.account.currency }
-    const periodFrom = periodStart(next, today)
-    const opsSnap = await t.get(seriesOpsQuery(db, orgId, seriesId, addDays(periodFrom, -MAX_SHIFT_DAYS)).limit(REWRITE_CAP + 1))
+    const opsSnap = await t.get(seriesOpsQuery(db, orgId, seriesId, paymentFrom(next, today)).limit(REWRITE_CAP + 1))
     if (opsSnap.size > REWRITE_CAP) throw new RecurringError('limit_reached', 'planned')
     const ops = opsSnap.docs.flatMap((d) => {
       const tx = parseTransaction(d.id, d.data())
@@ -323,18 +320,18 @@ export async function updateSeries(deps: LedgerDeps, orgId: string, uid: string,
       if (patch.removeFuture) w.deletes = future.map((o) => o.tx)
       series = withState(next, { generatedThrough: prior.generatedThrough })
     } else {
-      const marksSnap = await t.get(seriesMarksQuery(db, orgId, seriesId, periodFrom).limit(MARKS_SCAN))
+      const marksSnap = await t.get(seriesMarksQuery(db, orgId, seriesId, takenFrom(next, today)).limit(MARKS_SCAN))
       const rewritable = future.filter((o) => o.tx.manual !== true)
       const rewritableIds = new Set(rewritable.map((o) => o.tx.id))
-      const taken = new Set<string>()
+      const settled: string[] = []
       for (const d of marksSnap.docs) {
         const mark = parseDone(d.id, d.data())
-        if (mark !== null) taken.add(periodOf(next, mark.occurrence))
+        if (mark !== null) settled.push(mark.occurrence)
       }
       for (const o of ops) {
-        if (!rewritableIds.has(o.tx.id) && o.tx.occurrence !== undefined && o.tx.occurrence >= periodFrom) taken.add(periodOf(next, o.tx.occurrence))
+        if (!rewritableIds.has(o.tx.id) && o.tx.occurrence !== undefined) settled.push(o.tx.occurrence)
       }
-      const desired = rewriteOccurrences(next, today, taken)
+      const desired = rewriteOccurrences(next, today, takenPeriods(next, today, settled))
       const desiredIds = desired.map((o) => planId(seriesId, o))
       // An operation with a wanted id outside the read above (moved by hand far back) must not be created twice.
       const others = await readAll(t, desiredIds.filter((id) => !rewritableIds.has(id)).map((id) => transactionsCol(db, orgId).doc(id)))

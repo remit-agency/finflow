@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseSeriesInput, seriesFromInput } from '@/lib/domain/recurring/input'
-import { fillPlan, parsePlanId, planId, planInputOf, rewriteOccurrences, rewriteState, seriesFieldsOf } from '@/lib/domain/recurring/plan'
+import { fillPlan, paymentFrom, parsePlanId, planId, planInputOf, rewriteOccurrences, rewriteState, seriesFieldsOf, takenFrom, takenPeriods } from '@/lib/domain/recurring/plan'
 import type { Series } from '@/lib/domain/recurring/types'
 
 const rent: Series = seriesFromInput(
@@ -62,6 +62,31 @@ describe('rewriting after a change', () => {
     const zus: Series = { ...rent, dayOfMonth: 15, weekendRule: 'next', startDate: '2026-10-01', preset: 'zus' }
     expect(rewriteOccurrences(zus, '2026-11-16', new Set())).toContain('2026-11-15')
     expect(rewriteOccurrences(zus, '2026-11-17', new Set())).not.toContain('2026-11-15')
+  })
+
+  it('a skip made on the payment day of a Saturday occurrence still takes its period (C1 regression)', () => {
+    // Every Saturday, paid on the next business day: Saturday 14 November is paid on Monday 16 November, and the person
+    // skipped it that day. Its period (the week of 9 November) starts before the day of the change.
+    const saturday: Series = { ...rent, frequency: 'weekly', dayOfMonth: null, weekday: 6, startDate: '2026-10-03', weekendRule: 'next' }
+    expect(takenFrom(saturday, '2026-11-16')).toBe('2026-11-09')
+    const taken = takenPeriods(saturday, '2026-11-16', ['2026-11-14'])
+    expect(rewriteOccurrences(saturday, '2026-11-16', taken)).not.toContain('2026-11-14')
+    expect(rewriteOccurrences(saturday, '2026-11-16', new Set())).toContain('2026-11-14')
+  })
+
+  it('a paid occurrence of the month before still takes its month when the change is the day after (C1 regression)', () => {
+    // Day 31, next business day: Saturday 31 October is paid on Monday 2 November; a bank payment of 30 October matched it.
+    const last: Series = { ...rent, dayOfMonth: 31, weekendRule: 'next', startDate: '2026-10-01' }
+    expect(rewriteOccurrences(last, '2026-11-01', new Set())).toContain('2026-10-31')
+    const taken = takenPeriods(last, '2026-11-01', ['2026-10-31'])
+    expect(taken).toEqual(new Set(['2026-10']))
+    expect(rewriteOccurrences(last, '2026-11-01', taken)).not.toContain('2026-10-31')
+  })
+
+  it('the bounds of a change: the period of the first day a plan can carry, and the payment day an operation of it can have', () => {
+    const last: Series = { ...rent, dayOfMonth: 31, weekendRule: 'next', startDate: '2026-10-01' }
+    expect(takenFrom(last, '2026-11-01')).toBe('2026-10-01')
+    expect(paymentFrom(last, '2026-11-01')).toBe('2026-09-21')
   })
 
   it('a resumed or changed series is filled to the window end and due tomorrow until it ends', () => {
