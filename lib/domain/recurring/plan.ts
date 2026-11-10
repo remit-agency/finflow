@@ -3,7 +3,7 @@ import { isId } from '@/lib/domain/ledger/guards'
 import { PLAN_CLIENT_ID_PREFIX, type TransactionInput } from '@/lib/domain/ledger/input'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
 import { occurrencesBetween, paymentDayOf, periodOf, windowEnd } from './schedule'
-import { MAX_FILL_PER_SERIES, type Series } from './types'
+import { MAX_FILL_PER_SERIES, MAX_SHIFT_DAYS, type Series } from './types'
 
 /** The deterministic id of an occurrence's operation: creating it again writes the same document. */
 export function planId(seriesId: string, occurrence: string): string {
@@ -33,17 +33,27 @@ export interface FillPlan {
 }
 
 /**
- * One fill of an active series on `today` (the daily generator and the create): the occurrences from the day after the last
- * fill (from today on the first fill, never before `startDate`) to the window end, at most `max`. A fill that reached the
- * window end is due again tomorrow, or never once `endDate` is behind it; a capped one stays due today and continues after
- * its last occurrence. A paused series creates nothing and is not due. Whether an occurrence already has an operation or a
- * mark is the server's check; this plan never returns an occurrence twice across fills.
+ * The occurrences a series plans on `today`, the one definition the first fill and the rewrite of a change share: the
+ * nominal days from MAX_SHIFT_DAYS before `today` up to `to` whose payment day (after `weekendRule`) is today or later. A
+ * nominal day that has passed still counts while its payment day has not (ZUS on the 15th, due on Monday the 16th, on the
+ * 16th); one whose payment day has passed does not.
+ */
+export function plannedFrom(s: Series, today: string, to: string): string[] {
+  return occurrencesBetween(s, addDays(today, -MAX_SHIFT_DAYS), to).filter((o) => paymentDayOf(o, s.weekendRule) >= today)
+}
+
+/**
+ * One fill of an active series on `today` (the daily generator and the create): the first fill plans `plannedFrom` the
+ * window end; a later one takes the occurrences after the last fill (the nominal days missed while the cron was away become
+ * overdue plans) to the window end, at most `max`. A fill that reached the window end is due again tomorrow, or never once
+ * `endDate` is behind it; a capped one stays due today and continues after its last occurrence. A paused series creates
+ * nothing and is not due. Whether an occurrence already has an operation or a mark is the server's check; this plan never
+ * returns an occurrence twice across fills.
  */
 export function fillPlan(s: Series, today: string, max: number = MAX_FILL_PER_SERIES): FillPlan {
   if (s.status !== 'active') return { occurrences: [], generatedThrough: s.generatedThrough }
-  const from = s.generatedThrough === undefined ? today : addDays(s.generatedThrough, 1)
   const end = windowEnd(today)
-  const all = occurrencesBetween(s, from, end)
+  const all = s.generatedThrough === undefined ? plannedFrom(s, today, end) : occurrencesBetween(s, addDays(s.generatedThrough, 1), end)
   if (all.length > max) {
     const occurrences = all.slice(0, max)
     return { occurrences, generatedThrough: occurrences[occurrences.length - 1], dueOn: today }
@@ -53,11 +63,11 @@ export function fillPlan(s: Series, today: string, max: number = MAX_FILL_PER_SE
 }
 
 /**
- * The occurrences a changed (or resumed) series plans on `today`: its schedule from today to the window end, except those
- * whose period (`periodOf` of the new schedule) is already taken by a mark or an operation the change does not rewrite.
+ * The occurrences a changed (or resumed) series plans on `today`: `plannedFrom` the window end, except those whose period
+ * (`periodOf` of the new schedule) is already taken by a mark or an operation the change does not rewrite.
  */
 export function rewriteOccurrences(s: Series, today: string, taken: ReadonlySet<string>): string[] {
-  return occurrencesBetween(s, today, windowEnd(today)).filter((o) => !taken.has(periodOf(s, o)))
+  return plannedFrom(s, today, windowEnd(today)).filter((o) => !taken.has(periodOf(s, o)))
 }
 
 /** The fill state after a change of an active series: filled to the window end, due tomorrow until it ends. */

@@ -23,6 +23,12 @@ describe('fillPlan', () => {
     expect(fillPlan(rent, '2026-10-27')).toEqual({ occurrences: ['2026-11-10', '2026-12-10', '2027-01-10'], generatedThrough: '2027-01-27', dueOn: '2026-10-28' })
   })
 
+  it('the first fill plans the occurrence whose payment day is today, though its nominal day has passed (C1)', () => {
+    const zus: Series = { ...rent, dayOfMonth: 15, weekendRule: 'next', startDate: '2026-10-01' }
+    expect(fillPlan(zus, '2026-11-16').occurrences[0]).toBe('2026-11-15')
+    expect(fillPlan(zus, '2026-11-17').occurrences[0]).toBe('2026-12-15')
+  })
+
   it('a later fill starts the day after the last one', () => {
     expect(fillPlan({ ...rent, generatedThrough: '2027-01-27' }, '2026-11-27')).toEqual({ occurrences: ['2027-02-10'], generatedThrough: '2027-02-27', dueOn: '2026-11-28' })
   })
@@ -49,6 +55,13 @@ describe('rewriting after a change', () => {
     const moved: Series = { ...rent, dayOfMonth: 20 }
     expect(rewriteOccurrences(moved, '2026-10-27', new Set())).toEqual(['2026-11-20', '2026-12-20', '2027-01-20'])
     expect(rewriteOccurrences(moved, '2026-10-27', new Set(['2026-11']))).toEqual(['2026-12-20', '2027-01-20'])
+  })
+
+  it('keeps a weekend-shifted occurrence whose nominal day has passed while its payment day is still ahead (C1)', () => {
+    // ZUS on the 15th, next business day: 2026-11-15 is a Sunday, so the payment falls on Monday 16 November.
+    const zus: Series = { ...rent, dayOfMonth: 15, weekendRule: 'next', startDate: '2026-10-01', preset: 'zus' }
+    expect(rewriteOccurrences(zus, '2026-11-16', new Set())).toContain('2026-11-15')
+    expect(rewriteOccurrences(zus, '2026-11-17', new Set())).not.toContain('2026-11-15')
   })
 
   it('a resumed or changed series is filled to the window end and due tomorrow until it ends', () => {

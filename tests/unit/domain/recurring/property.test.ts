@@ -64,7 +64,13 @@ describe('the daily fill over random series and days (property)', () => {
       const ids = returned.map((o) => planId(first.id, o))
       expect(new Set(ids).size, `seed ${seed}: an occurrence came twice`).toBe(ids.length)
       if (firstFill !== null && lastFill !== null) {
-        expect(returned, `seed ${seed}`).toEqual(occurrencesBetween(first, firstFill, windowEnd(lastFill)))
+        // The first fill plans what `plannedFrom` gives: a nominal day up to MAX_SHIFT_DAYS before it whose payment day is
+        // still ahead, then the window. Later fills take the nominal days after that window (the missed ones included).
+        const firstWindow = windowEnd(firstFill)
+        expect(returned, `seed ${seed}`).toEqual([
+          ...occurrencesBetween(first, addDays(firstFill, -MAX_SHIFT_DAYS), firstWindow).filter((o) => paymentDayOf(o, first.weekendRule) >= firstFill),
+          ...occurrencesBetween(first, addDays(firstWindow, 1), windowEnd(lastFill)),
+        ])
       }
       for (const o of returned) {
         const pay = paymentDayOf(o, first.weekendRule)

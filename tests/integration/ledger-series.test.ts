@@ -146,6 +146,18 @@ describe('changing a series', () => {
     expect(await markDoc(db, `pl_${series.id}_2026-12-10`)).toBeUndefined()
   })
 
+  it('a change on the payment day of a weekend-shifted occurrence updates its plan, it is not deleted (C1)', async () => {
+    // ZUS on the 15th, next business day: 15 November 2026 is a Sunday, so the plan is due on Monday the 16th.
+    const { series } = await createSeries(deps, ORG, UID, ZUS)
+    const id = `pl_${series.id}_2026-11-15`
+    expect(await txDoc(db, id)).toMatchObject({ paymentDate: '2026-11-16', amountMinor: 150_000 })
+    const changed = await updateSeries(on('2026-11-16'), ORG, UID, series.id, parseSeriesPatch({ amountMinor: 160_000 }))
+    expect(changed.deleted).toBe(0)
+    expect(await txDoc(db, id)).toMatchObject({ amountMinor: 160_000, paymentDate: '2026-11-16', status: 'planned', seriesId: series.id, occurrence: '2026-11-15' })
+    expect(await markDoc(db, id)).toBeUndefined()
+    expect((await verifyLedger(deps, ORG)).ok).toBe(true)
+  })
+
   it('an occurrence a person deleted is not planned again by a change', async () => {
     const { series } = await createSeries(deps, ORG, UID, RENT)
     await deleteTransaction(deps, ORG, UID, `pl_${series.id}_2026-12-10`)
