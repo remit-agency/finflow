@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useCounterparties } from '@/lib/hooks/useCounterparties'
 import { useShell } from '@/lib/hooks/useShell'
 import { useTags } from '@/lib/hooks/useTags'
+import { useSeriesName } from '@/lib/hooks/useSeriesName'
 import { LedgerApiError, createTransaction, deleteTransaction, updateTransaction } from '@/lib/api/ledger-client'
 import { buildCreateDraft, buildEditDraft, categoryAfterTypeChange, stateToDraft } from '@/lib/api/transaction-draft'
 import { restoreTransaction, revertTransaction } from '@/lib/api/transaction-undo'
@@ -97,6 +98,9 @@ export function TransactionForm({
   // The form is mounted inside the shell (ShellProvider and the journal), which knows the role.
   const { can } = useShell()
   const { tags } = useTags(orgId)
+  // A planned occurrence of a series (S11) names its series and warns that a change detaches it.
+  const seriesPlan = transaction?.seriesId !== undefined && transaction.status === 'planned'
+  const seriesName = useSeriesName(orgId, seriesPlan ? transaction?.seriesId : undefined)
   // One id per operation being created: a retry or a double click creates it once on the server.
   const clientIdRef = useRef(crypto.randomUUID())
 
@@ -265,6 +269,15 @@ export function TransactionForm({
           {bankLocked && (
             <p data-testid="bank-locked-hint" className="text-xs text-ink-muted">
               {t('bankLockedHint')}
+            </p>
+          )}
+          {seriesPlan && (
+            <p data-testid="series-hint" className="rounded-control bg-brand-soft px-3 py-2 text-xs text-brand-soft-foreground">
+              {seriesName === null
+                ? t('seriesGone')
+                : transaction?.manual
+                  ? t('seriesHintManual', { name: seriesName ?? '…' })
+                  : t('seriesHint', { name: seriesName ?? '…' })}
             </p>
           )}
           {bankTransfer && (
