@@ -17,6 +17,12 @@ const RESERVED = /^__.*__$/
  * this id only when the bank's own mark for that key matches the create (see `createTransaction` in lib/server/ledger/write.ts).
  */
 export const BANK_CLIENT_ID_PREFIX = 'bk_'
+/**
+ * The id prefix of a planned occurrence of a series (S11: `pl_<seriesId>_<occurrence>`). A client may not pick it either:
+ * only the server's generator writes such ids, and the create route brings one back only from the occurrence's own mark
+ * (`recurringDone`, see `createTransaction` in lib/server/ledger/write.ts): the undo of a delete or of «Пропустити».
+ */
+export const PLAN_CLIENT_ID_PREFIX = 'pl_'
 
 const CREATE_KEYS = [
   'clientId', 'type', 'status', 'accountId', 'amountMinor', 'toAccountId', 'toAmountMinor', 'paymentDate',
@@ -106,6 +112,7 @@ function tagList(v: unknown): string[] {
  * - the bank sync passes it (its operations carry `bk_` ids);
  * - the create route passes it too, and only so that an undo of a deleted bank operation (which re-creates it under its
  *   own `bk_` id) reaches `createTransaction`. There the bank mark decides, so a client still cannot make a bank operation.
+ * - the same holds for a plan id (`pl_`, S11): the occurrence's mark decides.
  */
 export interface ParseOptions {
   internal?: boolean
@@ -124,6 +131,7 @@ export function parseTransactionInput(body: unknown, opts?: ParseOptions): Trans
     bad('clientId')
   }
   if (typeof r.clientId === 'string' && r.clientId.startsWith(BANK_CLIENT_ID_PREFIX) && opts?.internal !== true) bad('clientId')
+  if (typeof r.clientId === 'string' && r.clientId.startsWith(PLAN_CLIENT_ID_PREFIX) && opts?.internal !== true) bad('clientId')
   if (!isId(r.accountId)) bad('accountId')
   const paymentDate = day(r.paymentDate, 'paymentDate')
 

@@ -107,6 +107,17 @@ export interface LedgerTransaction {
    * false (operations written before S10t).
    */
   excluded?: boolean
+  /**
+   * The series this operation is an occurrence of (S11): set only by the server (the generator, a confirmed match), never
+   * taken from a request. Income and expense only.
+   */
+  seriesId?: string
+  /** The occurrence of the series it stands for: its nominal day before any weekend move (`YYYY-MM-DD`). With `seriesId`. */
+  occurrence?: string
+  /** The amount is only an estimate (a tax preset, S11); stored only when true. A new amount of a plan takes it off. */
+  estimated?: boolean
+  /** A person changed this planned occurrence (S11): a change of its series no longer rewrites it. Stored only when true. */
+  manual?: boolean
 }
 
 export interface LedgerAccount {

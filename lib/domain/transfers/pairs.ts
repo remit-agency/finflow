@@ -6,7 +6,7 @@ import { TX_STATUSES, TX_TYPES, type TxStatus, type TxType } from '@/lib/domain/
 import { MAX_SUGGESTIONS, SUGGEST_MAX_DAYS, type Candidate, type SuggestionSide, type SuggestionsResult, type TransferSuggestion } from './types'
 
 /** The fields the suggestions read selects (Firestore bills the document anyway; the answer stays small). */
-export const CANDIDATE_FIELDS = ['schemaVersion', 'type', 'status', 'isRecurring', 'accountId', 'amountMinor', 'currency', 'paymentDate', 'source', 'bank'] as const
+export const CANDIDATE_FIELDS = ['schemaVersion', 'type', 'status', 'isRecurring', 'accountId', 'amountMinor', 'currency', 'paymentDate', 'source', 'bank', 'seriesId'] as const
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -24,6 +24,7 @@ export function parseCandidate(id: string, data: unknown, version: string): Cand
     const bank = parseBankInfo(data.bank)
     if (bank) c.bank = bank
   }
+  if (typeof data.seriesId === 'string') c.seriesId = data.seriesId
   return c
 }
 

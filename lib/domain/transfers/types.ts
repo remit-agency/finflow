@@ -25,6 +25,8 @@ export interface Candidate {
   currency: string
   paymentDate: string
   bank?: BankInfo
+  /** Set when the operation paid a planned occurrence (S11): then it is no side of a transfer. */
+  seriesId?: string
 }
 
 /** One side of a suggested pair: what the dialog shows, and the version the confirmation sends back. */

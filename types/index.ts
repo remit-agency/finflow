@@ -73,4 +73,11 @@ export interface Transaction {
   autoRules?: AutoRuleRef[]
   /** One of the tags keeps the operation out of Cash Flow and P&L (S10t); the balances still count it. */
   excluded?: boolean
+  /** The series this operation is an occurrence of (S11), and that occurrence's day. Set by the server only. */
+  seriesId?: string
+  occurrence?: string
+  /** The amount is an estimate (S11). */
+  estimated?: boolean
+  /** A person changed this planned occurrence: its series no longer rewrites it (S11). */
+  manual?: boolean
 }
