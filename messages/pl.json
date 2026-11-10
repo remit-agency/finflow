@@ -353,6 +353,7 @@
         "tag_not_found": "Nie znaleziono tagu",
         "tag_archived": "Tag jest w archiwum",
         "not_eligible": "Operacja nie nadaje się na przelew",
+        "series_transfer": "Zaplanowana płatność z serii nie może być przelewem",
         "currency_mismatch": "Konta mają różne waluty",
         "account_not_found": "Nie znaleziono konta"
       },
@@ -532,11 +533,13 @@
         "delete": "Nie udało się usunąć operacji. Spróbuj ponownie.",
         "tagArchived": "Tag jest w archiwum. Usuń go z operacji",
         "tagMissing": "Nie znaleziono tagu",
-        "tagCreate": "Nie udało się utworzyć tagu"
+        "tagCreate": "Nie udało się utworzyć tagu",
+        "seriesTransfer": "Zaplanowana płatność z serii nie może być przelewem"
       },
       "tags": "Tagi",
       "seriesHint": "Operacja z serii „{name}”. Zmiana kwoty, daty lub innych pól odłączy ją od serii: zmiany serii nie będą jej już aktualizować.",
       "seriesHintManual": "Operacja z serii „{name}”, zmieniona ręcznie: seria jej już nie aktualizuje.",
+      "seriesTransferHint": "Zaplanowana płatność z serii pozostaje przychodem lub wydatkiem, więc zakładka przelewu jest wyłączona.",
       "seriesGone": "Operacja z usuniętej serii płatności planowanych."
     },
     "account": {

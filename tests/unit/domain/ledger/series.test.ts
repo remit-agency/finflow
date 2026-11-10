@@ -101,6 +101,12 @@ describe('withSeries: an edit keeps the link and decides «змінено вру
     expect(withSeries(edited({ fileUrls: ['f1'] }), plan)).toEqual({ ...plan, fileUrls: ['f1'] })
   })
 
+  it('an occurrence of a series cannot become a transfer (C2): the link would make the transfer unreadable', () => {
+    const toTransfer = edited({ type: 'transfer', toAccountId: 'cash', toAmountMinor: 150_000, toCurrency: 'PLN' })
+    expect(code(() => withSeries(toTransfer, plan))).toBe('series_transfer:type')
+    expect(code(() => withSeries({ ...toTransfer, status: 'actual' }, plan))).toBe('series_transfer:type')
+  })
+
   it('marking it paid keeps the link and the flags; an operation without a series gets none', () => {
     const paid = withSeries(edited({ status: 'actual', paymentDate: '2026-11-10', amountMinor: 151_000 }), plan)
     expect(paid).toMatchObject({ status: 'actual', seriesId: 'ser1', occurrence: '2026-11-15', estimated: true })

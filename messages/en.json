@@ -353,6 +353,7 @@
         "tag_not_found": "The tag was not found",
         "tag_archived": "The tag is archived",
         "not_eligible": "The operation cannot become a transfer",
+        "series_transfer": "A planned payment of a series cannot become a transfer",
         "currency_mismatch": "The accounts have different currencies",
         "account_not_found": "The account was not found"
       },
@@ -532,11 +533,13 @@
         "delete": "Could not delete the transaction. Try again.",
         "tagArchived": "The tag is archived. Remove it from the transaction",
         "tagMissing": "The tag was not found",
-        "tagCreate": "Could not create the tag"
+        "tagCreate": "Could not create the tag",
+        "seriesTransfer": "A planned payment of a series cannot be a transfer"
       },
       "tags": "Tags",
       "seriesHint": "From the series “{name}”. Changing the amount, the date or another field detaches it: changes of the series will no longer update it.",
       "seriesHintManual": "From the series “{name}”, changed by hand: the series no longer updates it.",
+      "seriesTransferHint": "A planned payment of a series stays income or an expense, so the transfer tab is off.",
       "seriesGone": "From a deleted series of planned payments."
     },
     "account": {

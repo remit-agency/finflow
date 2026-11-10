@@ -99,7 +99,9 @@ export function TransactionForm({
   const { can } = useShell()
   const { tags } = useTags(orgId)
   // A planned occurrence of a series (S11) names its series and warns that a change detaches it.
-  const seriesPlan = transaction?.seriesId !== undefined && transaction.status === 'planned'
+  // An operation of a series (planned or paid) is never a transfer (S11, C2): its tab is off and the server refuses it too.
+  const seriesLinked = transaction?.seriesId !== undefined
+  const seriesPlan = seriesLinked && transaction.status === 'planned'
   const seriesName = useSeriesName(orgId, seriesPlan ? transaction?.seriesId : undefined)
   // One id per operation being created: a retry or a double click creates it once on the server.
   const clientIdRef = useRef(crypto.randomUUID())
@@ -146,6 +148,7 @@ export function TransactionForm({
       if (e.code === 'bank_locked') return t('errors.bankLocked')
       if (e.code === 'tag_archived') return t('errors.tagArchived')
       if (e.code === 'tag_not_found') return t('errors.tagMissing')
+      if (e.code === 'series_transfer') return t('errors.seriesTransfer')
     }
     return t('errors.save')
   }
@@ -286,6 +289,11 @@ export function TransactionForm({
             </p>
           )}
 
+          {seriesLinked && (
+            <p data-testid="series-transfer-hint" className="text-xs text-ink-muted">
+              {t('seriesTransferHint')}
+            </p>
+          )}
           <Tabs value={state.type} onValueChange={(value) => changeType(value as TxType)}>
             <TabsList className="w-full">
               <TabsTrigger value="income" disabled={bankLocked} className="flex-1 data-active:text-income">
@@ -294,7 +302,7 @@ export function TransactionForm({
               <TabsTrigger value="expense" disabled={bankLocked} className="flex-1 data-active:text-expense">
                 {t('expense')}
               </TabsTrigger>
-              <TabsTrigger value="transfer" disabled={bankLocked} className="flex-1">
+              <TabsTrigger value="transfer" disabled={bankLocked || seriesLinked} className="flex-1">
                 {t('transfer')}
               </TabsTrigger>
             </TabsList>

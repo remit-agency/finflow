@@ -1,4 +1,5 @@
 import { sameTags } from '@/lib/domain/tags/assign'
+import { LedgerError } from './errors'
 import type { LedgerTransaction } from './types'
 
 /** The fields of an operation its series sets (S11). A person's change of any of them on a planned occurrence makes it manual. */
@@ -9,8 +10,11 @@ const SERIES_SET = ['type', 'accountId', 'amountMinor', 'paymentDate', 'category
  * `manual` come from the stored document only. A planned occurrence that stays planned becomes `manual` when a field its
  * series sets changes (then a change of the series no longer rewrites it), and loses `estimated` when its amount changes.
  * Marking it paid (or back) keeps the flags as they were: the operation is simply no longer a plan.
+ * An operation of a series is never a transfer (C2): the link would make the transfer unreadable (`parseTransaction`), and
+ * a transfer moves balances the series does not own. Refused as `series_transfer` on `type`.
  */
 export function withSeries(next: LedgerTransaction, prior: LedgerTransaction): LedgerTransaction {
+  if (prior.seriesId !== undefined && next.type === 'transfer') throw new LedgerError('series_transfer', 'type')
   const out: LedgerTransaction = { ...next }
   delete out.seriesId
   delete out.occurrence

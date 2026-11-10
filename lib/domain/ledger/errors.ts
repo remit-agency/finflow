@@ -17,6 +17,8 @@ export type LedgerErrorCode =
   | 'tag_archived'
   /** The operations cannot become a transfer, or the transfer cannot be split (S10b). */
   | 'not_eligible'
+  /** A planned occurrence of a series cannot become a transfer (S11, C2). */
+  | 'series_transfer'
 
 /** An expected failure of a ledger operation. `field` names the offending input field, if any. */
 export class LedgerError extends Error {

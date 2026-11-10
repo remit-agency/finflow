@@ -187,6 +187,29 @@ describe('changing a series', () => {
   })
 })
 
+describe('a planned occurrence is never a transfer (C2)', () => {
+  it('an edit that turns it into a transfer is refused, and the operation and the balances stay as they were', async () => {
+    await seedAccount(db, ORG, 'cash', 'PLN', 0)
+    const { series } = await createSeries(deps, ORG, UID, RENT)
+    const id = `pl_${series.id}_2026-11-10`
+    const before = await txDoc(db, id)
+    expect(await code(updateTransaction(deps, ORG, UID, id, { type: 'transfer', toAccountId: 'cash', categoryId: null }))).toBe('series_transfer:type')
+    expect(await txDoc(db, id)).toEqual(before)
+    expect(await balanceOf(db, ORG, 'mil')).toBe(500_000)
+    expect(await balanceOf(db, ORG, 'cash')).toBe(0)
+    expect((await verifyLedger(deps, ORG)).ok).toBe(true)
+  })
+
+  it('a paid one is refused the same way', async () => {
+    await seedAccount(db, ORG, 'cash', 'PLN', 0)
+    const { series } = await createSeries(deps, ORG, UID, RENT)
+    const id = `pl_${series.id}_2026-11-10`
+    await updateTransaction(deps, ORG, UID, id, { status: 'actual', paymentDate: TODAY })
+    expect(await code(updateTransaction(deps, ORG, UID, id, { type: 'transfer', toAccountId: 'cash', categoryId: null }))).toBe('series_transfer:type')
+    expect(await txDoc(db, id)).toMatchObject({ type: 'expense', seriesId: series.id, status: 'actual' })
+  })
+})
+
 describe('deleting a series', () => {
   it('deletes the future unpaid plans by default and keeps the paid ones', async () => {
     const { series } = await createSeries(deps, ORG, UID, RENT)
