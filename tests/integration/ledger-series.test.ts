@@ -100,6 +100,34 @@ describe('creating a series (S11)', () => {
     expect(await readDoc(db, `organizations/${ORG}/counterparties/system_zus`)).toBeUndefined()
   })
 
+  it('a name key whose record is gone is absent: the S06 record is created and the key takes it (no 500)', async () => {
+    await db.doc(`organizations/${ORG}/counterpartyKeys/name_zus`).set({ counterpartyId: 'gone' })
+    const { series } = await createSeries(deps, ORG, UID, ZUS)
+    expect(series.counterpartyId).toBe('system_zus')
+    expect(await readDoc(db, `organizations/${ORG}/counterparties/system_zus`)).toMatchObject({ name: 'ZUS', kind: 'zus' })
+    expect(await readDoc(db, `organizations/${ORG}/counterpartyKeys/name_zus`)).toEqual({ counterpartyId: 'system_zus' })
+  })
+
+  it('a malformed name key is absent too: it is overwritten with the S06 record, not created again (no 500)', async () => {
+    await db.doc(`organizations/${ORG}/counterpartyKeys/name_zus`).set({ counterpartyId: 42 })
+    expect((await createSeries(deps, ORG, UID, ZUS)).series.counterpartyId).toBe('system_zus')
+    expect(await readDoc(db, `organizations/${ORG}/counterpartyKeys/name_zus`)).toEqual({ counterpartyId: 'system_zus' })
+    expect((await db.collection(`organizations/${ORG}/counterparties`).get()).size).toBe(1)
+  })
+
+  it('a name key that is not an id (a path) is absent as well (no 500)', async () => {
+    await db.doc(`organizations/${ORG}/counterpartyKeys/name_zus`).set({ counterpartyId: 'a/b' })
+    expect((await createSeries(deps, ORG, UID, ZUS)).series.counterpartyId).toBe('system_zus')
+  })
+
+  it('a preset whose archived record is replaced by the person’s own pick is planned with that pick (the way out)', async () => {
+    await seedCounterparty(db, ORG, 'system_zus', { archived: true })
+    await seedCounterparty(db, ORG, 'mine')
+    await db.doc(`organizations/${ORG}/counterpartyKeys/name_zus`).set({ counterpartyId: 'system_zus' })
+    const { series } = await createSeries(deps, ORG, UID, { ...ZUS, counterpartyId: 'mine' })
+    expect(await txDoc(db, `pl_${series.id}_2026-11-15`)).toMatchObject({ counterpartyId: 'mine', estimated: true })
+  })
+
   it('a preset whose system record is archived is refused, never planned without its counterparty (I1)', async () => {
     await seedCounterparty(db, ORG, 'system_zus', { archived: true })
     await db.doc(`organizations/${ORG}/counterpartyKeys/name_zus`).set({ counterpartyId: 'system_zus' })

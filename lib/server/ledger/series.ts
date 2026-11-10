@@ -6,6 +6,7 @@ import { buildTransaction } from '@/lib/domain/ledger/build'
 import { changeSet, combineChanges } from '@/lib/domain/ledger/change'
 import { parseAccount, parseTransaction, transactionToDoc } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
+import { isId } from '@/lib/domain/ledger/guards'
 import { rewriteDiffers } from '@/lib/domain/ledger/series'
 import type { LedgerAccount, LedgerTransaction } from '@/lib/domain/ledger/types'
 import { parseDone, parseSeries, seriesToDoc } from '@/lib/domain/recurring/doc'
@@ -167,8 +168,10 @@ function storedSeries(s: Series, orgId: string, uid: string, ts: Timestamp, old?
 
 interface PresetCounterparty {
   id: string
-  /** The company has neither the system record nor a record with its name: this transaction creates it. */
+  /** The company has neither the system record nor a live record with its name: this transaction creates the system record. */
   create: boolean
+  /** The name key exists but names no record of the company (or is malformed): the transaction rewrites it, it cannot create it. */
+  keyExists: boolean
 }
 
 /**
@@ -179,23 +182,32 @@ export function presetWantsCounterparty(preset: Preset, counterpartyId: string |
   return counterpartyId === undefined || counterpartyId === PRESET_DEFAULTS[preset].counterpartyId
 }
 
-/** The counterparty of a preset (S06 system record): by its fixed id, else the record that owns its name, else a new one. */
+/**
+ * The counterparty of a preset (S06 system record): by its fixed id, else the record its name key names, else a new one. A
+ * key that is malformed or names no record of the company is absent (the system record is created and the key takes it).
+ */
 async function presetCounterpartyIn(t: Transaction, db: Firestore, orgId: string, preset: Preset): Promise<PresetCounterparty> {
   const spec = presetCounterparty(preset)
   const own = await t.get(counterpartiesCol(db, orgId).doc(spec.id))
-  if (own.exists) return { id: spec.id, create: false }
+  if (own.exists) return { id: spec.id, create: false, keyExists: false }
   const key = await t.get(counterpartyKeysCol(db, orgId).doc(nameKey(spec.name)))
   const holder: unknown = key.exists ? key.get('counterpartyId') : undefined
-  if (typeof holder === 'string') return { id: holder, create: false }
-  return { id: spec.id, create: true }
+  if (isId(holder)) {
+    const record = await t.get(counterpartiesCol(db, orgId).doc(holder))
+    if (record.exists) return { id: holder, create: false, keyExists: true }
+  }
+  return { id: spec.id, create: true, keyExists: key.exists }
 }
 
 /** Creates the S06 system record of a preset with its name key and audit entry (as `seedExistingOrg` does). */
-function writeSystemCounterparty(t: Transaction, deps: LedgerDeps, orgId: string, uid: string, preset: Preset, ts: Timestamp): void {
+function writeSystemCounterparty(t: Transaction, deps: LedgerDeps, orgId: string, uid: string, preset: Preset, keyExists: boolean, ts: Timestamp): void {
   const spec = presetCounterparty(preset)
   const c = systemCounterparty(spec)
+  const key = counterpartyKeysCol(deps.db, orgId).doc(nameKey(spec.name))
   t.create(counterpartiesCol(deps.db, orgId).doc(spec.id), { ...counterpartyToDoc(c), orgId, createdAt: ts, updatedAt: ts })
-  t.create(counterpartyKeysCol(deps.db, orgId).doc(nameKey(spec.name)), { counterpartyId: spec.id })
+  // A key that is there (malformed or dangling) is taken over: a create would fail on the existing document.
+  if (keyExists) t.set(key, { counterpartyId: spec.id })
+  else t.create(key, { counterpartyId: spec.id })
   t.create(auditCol(deps.db, orgId).doc(), auditData(deps, 'counterparty.create', uid, spec.id, null, counterpartyToDoc(c)))
 }
 
@@ -227,7 +239,7 @@ export async function createSeries(deps: LedgerDeps, orgId: string, uid: string,
     const creates = fill.occurrences.map((o) => buildPlan(base, o, ctx, today))
     const series = withState(base, fill)
     const ts = Timestamp.fromDate(deps.now())
-    if (preset?.create === true && input.preset !== undefined) writeSystemCounterparty(t, deps, orgId, uid, input.preset, ts)
+    if (preset?.create === true && input.preset !== undefined) writeSystemCounterparty(t, deps, orgId, uid, input.preset, preset.keyExists, ts)
     t.create(ref, storedSeries(series, orgId, uid, ts))
     t.create(auditCol(db, orgId).doc(), auditData(deps, 'recurring.create', uid, ref.id, null, seriesToDoc(series)))
     writePlans(t, deps, orgId, uid, { creates, updates: [], deletes: [] }, ctx.baseCurrency, ts)
