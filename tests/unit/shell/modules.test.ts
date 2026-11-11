@@ -7,6 +7,9 @@ describe('MODULE_TABS', () => {
       ['transactions', '/org1/transactions'],
       ['recurring', '/org1/recurring'],
       ['analytics', '/org1/analytics/cashflow'],
+      ['invoices', '/org1/invoices'],
+      ['calendar', '/org1/analytics/calendar'],
+      ['rules', '/org1/rules'],
     ])
   })
 })
@@ -18,6 +21,11 @@ describe('activeModule', () => {
     ['/org1/analytics', 'analytics'],
     ['/org1/analytics/cashflow', 'analytics'],
     ['/org1/analytics/pl', 'analytics'],
+    ['/org1/analytics/balance/', 'analytics'],
+    ['/org1/analytics/calendar', 'calendar'],
+    ['/org1/analytics/calendar/', 'calendar'],
+    ['/org1/invoices', 'invoices'],
+    ['/org1/rules', 'rules'],
   ])('%s -> %s', (path, key) => {
     expect(activeModule(path, 'org1')).toBe(key)
   })

@@ -52,6 +52,34 @@ function accountButton(scope: Locator, name: string) {
 test.describe('app shell (emulators)', () => {
   test.skip(!process.env.FIREBASE_AUTH_EMULATOR_HOST || !process.env.FIRESTORE_EMULATOR_HOST, NEEDS_EMULATORS)
 
+  test('the top menu follows Finmap: Płatności, planned, Analityka, Faktury, Kalendarz, Reguły; each tab opens its page', async ({ page }) => {
+    const user = await registerViaUi(page, 'menu')
+    await waitForShell(page, user.companyName)
+    const tabs = page.getByRole('navigation', { name: 'Модулі' })
+    await expect(tabs.getByRole('link')).toHaveText(['Платежі', 'Планові платежі', 'Аналітика', 'Фактури', 'Календар', 'Правила автоматизації'])
+
+    await tabs.getByRole('link', { name: 'Фактури', exact: true }).click()
+    await page.waitForURL(new RegExp(`/${user.orgId}/invoices$`))
+    await expect(page.getByTestId('invoices-soon')).toBeVisible()
+    await expect(tabs.getByRole('link', { name: 'Фактури', exact: true })).toHaveAttribute('aria-current', 'page')
+
+    // «Календар» is the calendar that lives under Analytics: it is the active tab there, «Аналітика» is not.
+    await tabs.getByRole('link', { name: 'Календар', exact: true }).click()
+    await page.waitForURL(new RegExp(`/${user.orgId}/analytics/calendar$`))
+    await expect(tabs.getByRole('link', { name: 'Календар', exact: true })).toHaveAttribute('aria-current', 'page')
+    await expect(tabs.getByRole('link', { name: 'Аналітика', exact: true })).not.toHaveAttribute('aria-current', 'page')
+
+    await tabs.getByRole('link', { name: 'Правила автоматизації', exact: true }).click()
+    await page.waitForURL(new RegExp(`/${user.orgId}/rules$`))
+    await expect(page.getByRole('button', { name: 'Додати правило' })).toBeVisible()
+    await expect(tabs.getByRole('link', { name: 'Правила автоматизації', exact: true })).toHaveAttribute('aria-current', 'page')
+
+    // The old settings link lands on the tab.
+    await page.goto(`/${user.orgId}/settings/rules`)
+    await page.waitForURL(new RegExp(`/${user.orgId}/rules$`))
+    await expect(page.getByRole('button', { name: 'Додати правило' })).toBeVisible()
+  })
+
   test('module tabs follow the path; Tab and Enter navigate between them', async ({ page }) => {
     const user = await registerViaUi(page, 'tabs')
     await waitForShell(page, user.companyName)
@@ -229,7 +257,7 @@ test.describe('app shell (emulators)', () => {
     }
   })
 
-  test('settings: a separate screen whose left column is the menu of eight sections; the old URL redirects to Company with its query', async ({ page }) => {
+  test('settings: a separate screen whose left column is the menu of seven sections; the old URL redirects to Company with its query', async ({ page }) => {
     const user = await registerViaUi(page, 'settings')
     await waitForShell(page, user.companyName)
     const modules = page.getByRole('navigation', { name: 'Модулі' })
@@ -242,7 +270,7 @@ test.describe('app shell (emulators)', () => {
     // The settings menu replaces the accounts sidebar, and the module tabs are gone.
     const settingsColumn = page.getByRole('complementary', { name: 'Налаштування' })
     const menu = settingsColumn.getByRole('navigation', { name: 'Розділи налаштувань' })
-    await expect(menu.getByRole('link')).toHaveText(['Компанія', 'Мова', 'Категорії', 'Контрагенти', 'Теги', 'Правила', 'Банки', 'Підписка'])
+    await expect(menu.getByRole('link')).toHaveText(['Компанія', 'Мова', 'Категорії', 'Контрагенти', 'Теги', 'Банки', 'Підписка'])
     await expect(page.getByRole('navigation', { name: 'Розділи налаштувань' })).toHaveCount(1)
     await expect(accountsSidebar(page)).toHaveCount(0)
     await expect(modules).toHaveCount(0)
@@ -256,7 +284,6 @@ test.describe('app shell (emulators)', () => {
       { link: 'Категорії', path: 'categories', marker: page.getByText('Додати категорію', { exact: true }) },
       { link: 'Контрагенти', path: 'counterparties', marker: page.getByRole('button', { name: 'Додати контрагента' }) },
       { link: 'Теги', path: 'tags', marker: page.getByRole('button', { name: 'Додати тег' }) },
-      { link: 'Правила', path: 'rules', marker: page.getByRole('button', { name: 'Додати правило' }) },
       { link: 'Банки', path: 'banks', marker: page.getByRole('button', { name: 'Підключити банк' }) },
       { link: 'Підписка', path: 'subscription', marker: page.getByText(/trial plan/i) },
     ]

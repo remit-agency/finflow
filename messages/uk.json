@@ -127,7 +127,10 @@
     "modules": {
       "transactions": "Платежі",
       "analytics": "Аналітика",
-      "recurring": "Планові платежі"
+      "recurring": "Планові платежі",
+      "invoices": "Фактури",
+      "calendar": "Календар",
+      "rules": "Правила автоматизації"
     },
     "analyticsSections": {
       "cashflow": "Cash Flow",
@@ -140,7 +143,6 @@
       "language": "Мова",
       "categories": "Категорії",
       "counterparties": "Контрагенти",
-      "rules": "Правила",
       "banks": "Банки",
       "subscription": "Підписка",
       "tags": "Теги"
@@ -1100,6 +1102,10 @@
       "balanced": "Активи = Зобов’язання",
       "difference": "Різниця: {amount}"
     }
+  },
+  "invoices": {
+    "title": "Фактури",
+    "soon": "Модуль у розробці. Незабаром."
   },
   "recurring": {
     "title": "Планові платежі",

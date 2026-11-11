@@ -127,7 +127,10 @@
     "modules": {
       "transactions": "Płatności",
       "analytics": "Analityka",
-      "recurring": "Płatności planowane"
+      "recurring": "Płatności planowane",
+      "invoices": "Faktury",
+      "calendar": "Kalendarz",
+      "rules": "Reguły automatyzacji"
     },
     "analyticsSections": {
       "cashflow": "Przepływy pieniężne (Cash Flow)",
@@ -140,7 +143,6 @@
       "language": "Język",
       "categories": "Kategorie",
       "counterparties": "Kontrahenci",
-      "rules": "Reguły",
       "banks": "Banki",
       "subscription": "Subskrypcja",
       "tags": "Tagi"
@@ -1100,6 +1102,10 @@
       "balanced": "Aktywa = Pasywa",
       "difference": "Różnica: {amount}"
     }
+  },
+  "invoices": {
+    "title": "Faktury",
+    "soon": "Ten moduł jest w przygotowaniu. Wkrótce."
   },
   "recurring": {
     "title": "Płatności planowane",
