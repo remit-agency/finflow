@@ -2,9 +2,9 @@
 // What a report counts, in one shape for both paths (S12): read from the stored rollups, or recomputed from the operations
 // with the ledger's own rule (`contributions`). No second copy of the amount, base, transfer-day or `excluded` rules, so
 // the two paths can only differ where the stored rollups drifted from the operations.
-import { isDay, isMonth, monthsBetween, overlapDays } from '@/lib/domain/ledger/days'
+import { addDays, isDay, isMonth, monthsBetween, overlapDays } from '@/lib/domain/ledger/days'
 import { addInto, contributions, EXCLUDED_PREFIX, type RollupDocs, type RollupFlat } from '@/lib/domain/ledger/rollups'
-import type { Accrual, LedgerTransaction } from '@/lib/domain/ledger/types'
+import { MAX_ARRIVAL_DAYS, type Accrual, type LedgerTransaction } from '@/lib/domain/ledger/types'
 import type { CashCell, CategoryAmounts, ReportFacts, ReportKind } from './types'
 
 /** A period of UTC days, both included. */
@@ -122,6 +122,16 @@ export function selectRollupDocs(docs: RollupDocs, accounts: ReadonlySet<string>
     if (keep) out.set(id, flat)
   }
   return out
+}
+
+/**
+ * Whether an operation paid on `paymentDate` can change a report of `range`: its own day is in the period, or it is a
+ * transfer whose money may arrive in it (a transfer's arrival lies MAX_ARRIVAL_DAYS either side of its payment day). The
+ * payments the report reads beyond the period exist for transfers only; this is what decides an unreadable one counts.
+ */
+export function reachesPeriod(paymentDate: string, type: string, range: DayRange): boolean {
+  const margin = type === 'transfer' ? MAX_ARRIVAL_DAYS : 0
+  return paymentDate >= addDays(range.from, -margin) && paymentDate <= addDays(range.to, margin)
 }
 
 /** `value * num / den` in whole minor units, half away from zero; exact through BigInt. */

@@ -12,10 +12,14 @@ import type { LedgerDeps } from './deps'
 import { transactionsCol } from './paths'
 import type { Reader } from './reader'
 
-/** What the balance reads cost: the aggregate queries and the operation documents of the arrival correction. */
+/**
+ * What the balance reads cost: the aggregate queries and the operation documents of the arrival correction. `ids`, when given,
+ * collects the ids of those documents (a caller that counts distinct operations).
+ */
 export interface BalanceReadStats {
   docsRead: number
   aggregates: number
+  ids?: Set<string>
 }
 
 /**
@@ -39,6 +43,7 @@ async function arrivalShift(reader: Reader, deps: Pick<LedgerDeps, 'db'>, orgId:
   stats.docsRead += snap.size
   let shift = 0
   for (const d of snap.docs) {
+    stats.ids?.add(d.id)
     const tx = parseTransaction(d.id, d.data())
     if (tx) shift += arrivalShiftOf(tx, day)
   }

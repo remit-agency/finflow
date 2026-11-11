@@ -7,15 +7,16 @@ import { FieldPath, type Firestore, type Query, type QueryDocumentSnapshot } fro
 import { filterForAnalytics, includesExcluded } from '@/lib/domain/analytics-filter/filter'
 import { categoryTypesOf, type CategoryTypes } from '@/lib/domain/analytics-filter/kinds'
 import { matchesSharedChoices } from '@/lib/domain/journal/filter'
-import { addDays, monthsBetween } from '@/lib/domain/ledger/days'
+import { addDays, isDay, monthsBetween } from '@/lib/domain/ledger/days'
 import { parseAccount, parseTransaction } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
+import { MAX_PERIOD_MONTHS } from '@/lib/domain/ledger/input'
 import { addInto, cashCatDocId, cashDocId, excludedDocId, flatten, plDocId, type RollupDocs } from '@/lib/domain/ledger/rollups'
 import { MAX_ARRIVAL_DAYS, type LedgerAccount, type LedgerTransaction } from '@/lib/domain/ledger/types'
 import { buildCashFlowCore } from '@/lib/domain/reports/cashflow'
 import { parseReportCategory, type ReportCategory } from '@/lib/domain/reports/categories'
 import { ReportError } from '@/lib/domain/reports/errors'
-import { factsFromRollupDocs, operationRollups, selectRollupDocs, type DayRange } from '@/lib/domain/reports/facts'
+import { factsFromRollupDocs, operationRollups, reachesPeriod, selectRollupDocs, type DayRange } from '@/lib/domain/reports/facts'
 import { buildPLCore } from '@/lib/domain/reports/pl'
 import { reportSource } from '@/lib/domain/reports/query'
 import { ratesForReconciliation, reconcile, reconciliationDays, type ReconcileAccount } from '@/lib/domain/reports/reconcile'
@@ -42,12 +43,19 @@ export const REPORT_FIELDS = [
   'toAccountId', 'toAmountMinor', 'toCurrency', 'toDate', 'categoryId', 'counterpartyId', 'base', 'excluded',
 ] as const
 
-/** What one request read: operation documents, rollup documents, aggregate queries (count and sum). */
+/**
+ * What one request read. `operations` and `rollups` are the distinct documents the answer was built from (an operation that
+ * two queries return is one); `reads` is every document read, duplicates included: the cost the cap limits.
+ */
 export interface ReportReadStats {
   operations: number
   rollups: number
   aggregates: number
+  reads: number
 }
+
+/** The longest accrual period in days, both ends counted: a period has at most MAX_PERIOD_MONTHS months (S05 input rule). */
+const MAX_PERIOD_DAYS = MAX_PERIOD_MONTHS * 31
 
 export interface ReportContext {
   baseCurrency: string
@@ -102,9 +110,13 @@ export function accrualDaysQuery(db: Firestore, orgId: string, from: string, to:
   return transactionsCol(db, orgId).where('accrual.date', '>=', from).where('accrual.date', '<=', to)
 }
 
-/** Operations whose accrual period ends on or after `from` (the automatic single-field index of `accrual.to`); the start is checked in memory. */
-export function accrualPeriodsQuery(db: Firestore, orgId: string, from: string): Query {
-  return transactionsCol(db, orgId).where('accrual.to', '>=', from)
+/**
+ * Operations whose accrual period starts by `to` and at most a period's length before `from` (the automatic single-field index
+ * of `accrual.from`, no composite index). A period ends on or after `from` only if it starts that late, and a period starts
+ * after `to` in no month of the report; the end is checked in memory. Without the upper bound every later period was read.
+ */
+export function accrualPeriodsQuery(db: Firestore, orgId: string, from: string, to: string): Query {
+  return transactionsCol(db, orgId).where('accrual.from', '>=', addDays(from, -MAX_PERIOD_DAYS)).where('accrual.from', '<=', to)
 }
 
 /** One account's daily rollups of [from, to], or their `x_` twins, by document id (the built-in `__name__` index). */
@@ -149,14 +161,26 @@ async function readPlan(r: Reader, plan: readonly PlannedQuery[], counts: readon
   )
 }
 
-function parseOps(docs: readonly QueryDocumentSnapshot[], unreadable: Set<string>): LedgerTransaction[] {
-  const out: LedgerTransaction[] = []
+/** The operations of some documents read, and the documents that do not parse (their ids go to `seen` for the coverage). */
+function parseOps(docs: readonly QueryDocumentSnapshot[], seen: Set<string>): { ops: LedgerTransaction[]; malformed: QueryDocumentSnapshot[] } {
+  const ops: LedgerTransaction[] = []
+  const malformed: QueryDocumentSnapshot[] = []
   for (const d of docs) {
+    seen.add(d.id)
     const tx = parseTransaction(d.id, d.data())
-    if (tx) out.push(tx)
-    else unreadable.add(d.id)
+    if (tx) ops.push(tx)
+    else malformed.push(d)
   }
-  return out
+  return { ops, malformed }
+}
+
+/**
+ * A malformed payment cannot be placed by its parsed fields: its raw payment day and type decide whether it can change the
+ * report (`reachesPeriod`); without a day it is counted, never assumed away.
+ */
+function malformedPaymentReaches(data: Record<string, unknown>, range: DayRange): boolean {
+  const day = data.paymentDate
+  return typeof day === 'string' && isDay(day) ? reachesPeriod(day, String(data.type), range) : true
 }
 
 async function readRollups(r: Reader, db: Firestore, orgId: string, accountIds: readonly string[], range: DayRange, kind: ReportKind, cap: number, stats: ReportReadStats): Promise<RollupDocs> {
@@ -169,7 +193,9 @@ async function readRollups(r: Reader, db: Firestore, orgId: string, accountIds: 
   const docs: RollupDocs = new Map()
   for (const snaps of await readPlan(r, plan, counts)) for (const d of snaps) docs.set(d.id, flatten(d.data()))
   for (const s of await r.getAll(ids.map((id) => rollupsCol(db, orgId).doc(id)))) if (s.exists) docs.set(s.id, flatten(s.data()))
-  stats.rollups += counts.reduce((a, b) => a + b, 0) + ids.length
+  const read = counts.reduce((a, b) => a + b, 0) + ids.length
+  stats.rollups += read
+  stats.reads += read
   return docs
 }
 
@@ -196,7 +222,8 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
   const includeExcluded = includesExcluded(q.filters)
   const range: DayRange = { from: q.from, to: q.to }
   return readSnapshot(db, async (snapshotReader) => {
-    const stats: ReportReadStats = { operations: 0, rollups: 0, aggregates: 0 }
+    const stats: ReportReadStats = { operations: 0, rollups: 0, aggregates: 0, reads: 0 }
+    const operationIds = new Set<string>()
     const cap = opts.cap ?? REPORT_SCAN_CAP
     const context = await readContext(snapshotReader, db, orgId)
     // The company, its accounts and categories are not counted against the cap; every read after them is.
@@ -219,23 +246,33 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
       // arrives within MAX_ARRIVAL_DAYS of its payment day: those payments are read too, their days kept.
       const plan: PlannedQuery[] = [{ query: paymentsQuery(db, orgId, addDays(q.from, -MAX_ARRIVAL_DAYS), addDays(q.to, MAX_ARRIVAL_DAYS)), fields: REPORT_FIELDS }]
       if (kind === 'pl') {
-        plan.push({ query: accrualDaysQuery(db, orgId, q.from, q.to), fields: REPORT_FIELDS }, { query: accrualPeriodsQuery(db, orgId, q.from), fields: REPORT_FIELDS })
+        plan.push({ query: accrualDaysQuery(db, orgId, q.from, q.to), fields: REPORT_FIELDS }, { query: accrualPeriodsQuery(db, orgId, q.from, q.to), fields: REPORT_FIELDS })
       }
       const counts = await countPlan(r, plan, 0, cap, stats)
-      stats.operations += counts.reduce((a, b) => a + b, 0)
+      stats.reads += counts.reduce((a, b) => a + b, 0)
       const [paidDocs, byDay = [], byPeriod = []] = await readPlan(r, plan, counts)
-      const paid = parseOps(paidDocs, unreadable)
+      const paidRead = parseOps(paidDocs, operationIds)
+      const paid = paidRead.ops
+      for (const d of paidRead.malformed) if (malformedPaymentReaches(d.data(), range)) unreadable.add(d.id)
       const inScope = chosen.size === 0 ? paid : paid.filter((tx) => matchesSharedChoices(tx, { accountIds: q.filters.accountIds, counterpartyIds: [], tagIds: [] }))
       const scoped = operationRollups(inScope, base, range, { accounts: scopeIds, parts: ['cash'] })
       const reported = operationRollups(filterForAnalytics(paid, q.filters, context.categoryTypes).operations, base, range, {
         accounts: scopeIds,
         parts: kind === 'cashflow' ? ['cash', 'cashcat'] : ['cash'],
       })
-      for (const id of scoped.uncountable) unreadable.add(id)
+      const paidById = new Map(paid.map((tx) => [tx.id, tx]))
+      for (const id of scoped.uncountable) {
+        const tx = paidById.get(id)
+        if (tx && reachesPeriod(tx.paymentDate, tx.type, range)) unreadable.add(id)
+      }
       if (kind === 'pl') {
+        // Operations of the accrual queries: their accrual lies in the period by the query, so every unreadable one counts.
         const accrued = new Map<string, LedgerTransaction>()
-        for (const tx of parseOps(byDay, unreadable)) accrued.set(tx.id, tx)
-        for (const tx of parseOps(byPeriod, unreadable)) if (tx.accrual.mode === 'period' && tx.accrual.from <= q.to) accrued.set(tx.id, tx)
+        const byDayRead = parseOps(byDay, operationIds)
+        const byPeriodRead = parseOps(byPeriod, operationIds)
+        for (const d of [...byDayRead.malformed, ...byPeriodRead.malformed]) unreadable.add(d.id)
+        for (const tx of byDayRead.ops) accrued.set(tx.id, tx)
+        for (const tx of byPeriodRead.ops) if (tx.accrual.mode === 'period' && tx.accrual.from <= q.to && tx.accrual.to >= q.from) accrued.set(tx.id, tx)
         const recognised = operationRollups(filterForAnalytics([...accrued.values()], q.filters, context.categoryTypes).operations, base, range, { parts: ['pl'] })
         for (const id of recognised.uncountable) unreadable.add(id)
         addInto(reported.docs, recognised.docs)
@@ -245,10 +282,12 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
       uncountable = unreadable.size
     }
 
-    const balanceStats: BalanceReadStats = { docsRead: 0, aggregates: 0 }
+    // The arrival documents of the balances are operations too: the same set, so one that two reads return counts once.
+    const balanceStats: BalanceReadStats = { docsRead: 0, aggregates: 0, ids: operationIds }
     const balances = await balancesAt(r, deps, orgId, accounts, [days.openingDay, days.closingDay], today, balanceStats)
     stats.aggregates += balanceStats.aggregates
-    stats.operations += balanceStats.docsRead
+    stats.reads += balanceStats.docsRead
+    stats.operations = operationIds.size
     const coverage: Coverage = { source, operationsRead: stats.operations, rollupsRead: stats.rollups, uncountable }
     return { context, accounts, includeExcluded, scope, report, days, balances, coverage, stats }
   })

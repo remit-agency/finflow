@@ -95,7 +95,7 @@ interface Sample {
 }
 
 const bytesOf = (value: unknown): number => Buffer.byteLength(JSON.stringify(value), 'utf8')
-const sampleOf = (stats: ReportReadStats, value: unknown): Sample => ({ docs: stats.operations + stats.rollups, aggregates: stats.aggregates, bytes: bytesOf(value) })
+const sampleOf = (stats: ReportReadStats, value: unknown): Sample => ({ docs: stats.reads, aggregates: stats.aggregates, bytes: bytesOf(value) })
 
 /** Runs a workflow twice and prints what it cost; a refusal of the read limit is a result too (with its time). */
 async function measure(label: string, run: () => Promise<Sample>): Promise<void> {

@@ -17,9 +17,9 @@ export async function readBalances(deps: LedgerDeps, orgId: string, date: string
   const day = date < today ? date : today
   const read = await readSnapshot(deps.db, async (r) => {
     const context = await readContext(r, deps.db, orgId, false)
-    const balanceStats: BalanceReadStats = { docsRead: 0, aggregates: 0 }
+    const balanceStats: BalanceReadStats = { docsRead: 0, aggregates: 0, ids: new Set() }
     const balances = await balancesAt(r, deps, orgId, context.accounts, [day], today, balanceStats)
-    const stats: ReportReadStats = { operations: balanceStats.docsRead, rollups: 0, aggregates: balanceStats.aggregates }
+    const stats: ReportReadStats = { operations: balanceStats.ids?.size ?? 0, rollups: 0, aggregates: balanceStats.aggregates, reads: balanceStats.docsRead }
     return { context, balances, stats }
   })
   const base = read.context.baseCurrency

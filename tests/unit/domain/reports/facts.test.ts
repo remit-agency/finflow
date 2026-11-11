@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { contributions, type RollupFlat } from '@/lib/domain/ledger/rollups'
-import { accrualShare, factsFromRollupDocs, mulDivRound, operationRollups, parseRollupId, selectRollupDocs } from '@/lib/domain/reports/facts'
+import { accrualShare, factsFromRollupDocs, mulDivRound, operationRollups, parseRollupId, reachesPeriod, selectRollupDocs } from '@/lib/domain/reports/facts'
 import { op } from './fixtures'
 
 const OCT = { from: '2026-10-01', to: '2026-10-31' }
@@ -119,5 +119,16 @@ describe('selectRollupDocs', () => {
     const accounts = new Set(['main', 'vat'])
     expect([...selectRollupDocs(docs, accounts, OCT, 'cashflow').keys()]).toEqual(['cash_main_2026-10-01', 'x_cash_vat_2026-10-31', 'cashcat_2026-10'])
     expect([...selectRollupDocs(docs, accounts, OCT, 'pl').keys()]).toEqual(['cash_main_2026-10-01', 'x_cash_vat_2026-10-31', 'pl_2026-10'])
+  })
+})
+
+describe('reachesPeriod', () => {
+  it('an operation on a day of the period reaches it; a transfer reaches it within the arrival days either side', () => {
+    expect(reachesPeriod('2026-10-01', 'expense', OCT)).toBe(true)
+    expect(reachesPeriod('2026-09-30', 'expense', OCT)).toBe(false)
+    expect(reachesPeriod('2026-09-24', 'transfer', OCT)).toBe(true)
+    expect(reachesPeriod('2026-09-23', 'transfer', OCT)).toBe(false)
+    expect(reachesPeriod('2026-11-07', 'transfer', OCT)).toBe(true)
+    expect(reachesPeriod('2026-11-08', 'transfer', OCT)).toBe(false)
   })
 })

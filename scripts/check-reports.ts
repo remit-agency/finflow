@@ -71,7 +71,7 @@ async function checkOrg(deps: LedgerDeps, orgId: string): Promise<ReportsCheck> 
   await readDashboard(deps, orgId)
   // The shapes the reads above may not reach, each once; an empty answer is fine.
   await accrualDaysQuery(deps.db, orgId, month.from, month.to).select().limit(1).get()
-  await accrualPeriodsQuery(deps.db, orgId, month.from).select().limit(1).get()
+  await accrualPeriodsQuery(deps.db, orgId, month.from, month.to).select().limit(1).get()
   await paymentsQuery(deps.db, orgId, month.from, month.to).count().get()
   const compared = cashFlowOps !== null && plOps !== null
   const same = compared

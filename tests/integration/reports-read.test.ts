@@ -93,6 +93,31 @@ describe('Cash Flow on the server (S12)', () => {
     expect(reads.filter((kind) => kind === 'query' || kind === 'getAll')).toEqual([])
   })
 
+  it('the coverage counts each operation document once: the payments, the accrual days and the arrival reads together', async () => {
+    // Actual payments in the margin window: 5. Accrual days of October: the same 5 and the planned one (6): 11 reads, 6 documents.
+    const { report, stats } = await readPLReport(deps, ORG, OCT, { source: 'operations' })
+    expect(report.coverage).toMatchObject({ source: 'operations', operationsRead: 6 })
+    expect(stats).toMatchObject({ operations: 6, reads: 11 })
+  })
+
+  it('an accrual period that starts after the period is not read (no upper bound was set on the period query)', async () => {
+    await createTransaction(deps, ORG, UID, parseTransactionInput({
+      type: 'expense', status: 'planned', accountId: 'pln', amountMinor: 1_000, paymentDate: '2026-10-30', categoryId: 'k-ex',
+      accrual: { mode: 'period', from: '2029-01-01', to: '2029-12-31' },
+    }))
+    const { report } = await readPLReport(deps, ORG, OCT, { source: 'operations' })
+    expect(report.coverage.operationsRead).toBe(6)
+    expect(report.rows.find((r) => r.row === 'k-ex')?.total).toBe(12_000)
+  })
+
+  it('an unreadable payment counts as uncountable only when it can change the period', async () => {
+    // Malformed (no schemaVersion): before the period by 6 days, not a transfer, so it cannot reach October; and in October.
+    await testDb().doc(`organizations/${ORG}/transactions/bad-before`).set({ status: 'actual', type: 'expense', accountId: 'pln', paymentDate: '2026-09-25', amountMinor: 1 })
+    await testDb().doc(`organizations/${ORG}/transactions/bad-inside`).set({ status: 'actual', type: 'expense', accountId: 'pln', paymentDate: '2026-10-03', amountMinor: 1 })
+    const { report } = await readCashFlowReport(deps, ORG, OCT, { source: 'operations' })
+    expect(report.coverage).toMatchObject({ uncountable: 1 })
+  })
+
   it('a missing NBP rate leaves the reconciliation unvalued and names it; the figures of the report stay', async () => {
     const down = makeDeps(db, {
       resolveRate: async (from, to, date) => {
