@@ -8,7 +8,7 @@ import { matchesSharedChoices } from '@/lib/domain/journal/filter'
 import { addDays, monthBounds, monthOf } from '@/lib/domain/ledger/days'
 import { datedEffects } from '@/lib/domain/ledger/effects'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
-import { buildCashFlowCore } from '@/lib/domain/reports/cashflow'
+import { accountRowGap, buildCashFlowCore } from '@/lib/domain/reports/cashflow'
 import { factsFromRollupDocs, operationRollups, selectRollupDocs, type DayRange } from '@/lib/domain/reports/facts'
 import { buildPLCore } from '@/lib/domain/reports/pl'
 import { rateKey, ratesForReconciliation, reconcile, reconciliationDays } from '@/lib/domain/reports/reconcile'
@@ -107,6 +107,22 @@ describe('report properties', () => {
       expect(rec.discrepancyBase, `seed ${seed}`).toBe(0)
       const sum = (rec.openingBase ?? NaN) + rec.reportNetBase + (rec.excludedBase ?? 0) + rec.outsideFilterBase + (rec.transfersBase ?? NaN) + (rec.fxBase ?? NaN)
       expect(sum, `seed ${seed}`).toBe(rec.closingBase)
+    }
+  })
+
+  it('every account row of Cash Flow closes: opening + in - out + transfers + excluded = closing, for random companies and periods', () => {
+    for (let seed = 1; seed <= 120; seed++) {
+      const { ops } = companyOf(seed)
+      const r = rng(seed + 4000)
+      const months = wholeMonths(r)
+      const period: DayRange = { from: addDays(months.from, Math.floor(r() * 10)), to: months.to }
+      const days = reconciliationDays(period.from, period.to, TODAY)
+      const balances = new Map(
+        ACCOUNTS.map((a) => [a.id, { openingMinor: balanceAt(ops, a.id, a.openingMinor, days.openingDay), closingMinor: balanceAt(ops, a.id, a.openingMinor, days.closingDay) }]),
+      )
+      const facts = factsFromRollupDocs(operationRollups(ops, BASE, period, { parts: ['cash', 'cashcat'] }).docs)
+      const report = buildCashFlowCore(facts, { ...period, accountIds: IDS, includeExcluded: false, categoryTypes: TYPES, balances })
+      expect(report.accounts.map(accountRowGap), `seed ${seed}`).toEqual(IDS.map(() => 0))
     }
   })
 

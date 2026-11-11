@@ -18,7 +18,7 @@ import { parseReportCategory, type ReportCategory } from '@/lib/domain/reports/c
 import { ReportError } from '@/lib/domain/reports/errors'
 import { factsFromRollupDocs, operationRollups, reachesPeriod, selectRollupDocs, type DayRange } from '@/lib/domain/reports/facts'
 import { buildPLCore } from '@/lib/domain/reports/pl'
-import { reportSource } from '@/lib/domain/reports/query'
+import { hasNonAccountFilters, reportSource } from '@/lib/domain/reports/query'
 import { ratesForReconciliation, reconcile, reconciliationDays, type ReconcileAccount } from '@/lib/domain/reports/reconcile'
 import {
   REPORT_SCAN_CAP,
@@ -293,14 +293,19 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
   })
 }
 
-async function reconciliationOf(deps: LedgerDeps, read: FactsRead): Promise<Reconciliation> {
-  const base = read.context.baseCurrency
-  const accounts: ReconcileAccount[] = read.accounts.map((a) => ({
+/** The chosen accounts with their balances at the close of the opening day and of the closing day (one owner for both). */
+function balanceLines(read: FactsRead): ReconcileAccount[] {
+  return read.accounts.map((a) => ({
     accountId: a.id,
     currency: a.currency,
     openingMinor: read.balances.get(a.id)?.get(read.days.openingDay) ?? a.balanceMinor,
     closingMinor: read.balances.get(a.id)?.get(read.days.closingDay) ?? a.balanceMinor,
   }))
+}
+
+async function reconciliationOf(deps: LedgerDeps, read: FactsRead): Promise<Reconciliation> {
+  const base = read.context.baseCurrency
+  const accounts = balanceLines(read)
   // The rates come after the snapshot: they are not part of the equation's data and may wait for NBP.
   const rates = await quoteRates(deps.resolveRate, base, ratesForReconciliation(accounts, read.scope, read.days, base))
   return reconcile({ baseCurrency: base, days: read.days, accounts, scope: read.scope, report: read.report, includeExcluded: read.includeExcluded, rates })
@@ -308,12 +313,15 @@ async function reconciliationOf(deps: LedgerDeps, read: FactsRead): Promise<Reco
 
 export async function readCashFlowReport(deps: LedgerDeps, orgId: string, q: ReportQuery, opts: ReadReportOptions = {}): Promise<ReportRead<CashFlowReport>> {
   const read = await readFacts(deps, orgId, q, 'cashflow', opts)
+  // The rows show their balances when only accounts are chosen: then they close on the whole movement of each account.
+  const balances = hasNonAccountFilters(q.filters) ? undefined : new Map(balanceLines(read).map((a) => [a.accountId, { openingMinor: a.openingMinor, closingMinor: a.closingMinor }]))
   const core = buildCashFlowCore(read.report, {
     from: q.from,
     to: q.to,
     accountIds: read.accounts.map((a) => a.id),
     includeExcluded: read.includeExcluded,
     categoryTypes: read.context.categoryTypes,
+    balances,
   })
   const reconciliation = await reconciliationOf(deps, read)
   return {

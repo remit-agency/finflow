@@ -1265,6 +1265,7 @@
       "income": "Wpływy",
       "expense": "Wydatki",
       "transfers": "Przelewy",
+      "excluded": "Wyłączone z analityki",
       "closing": "Saldo końcowe"
     },
     "byCategory": {

@@ -3,7 +3,7 @@ import { EMPTY_ANALYTICS_FILTERS, filterForAnalytics, type AnalyticsFilters } fr
 import { categoryTypesOf } from '@/lib/domain/analytics-filter/kinds'
 import { NO_TAG } from '@/lib/domain/journal/filter'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
-import { buildCashFlowCore, rowOfStored } from '@/lib/domain/reports/cashflow'
+import { accountRowGap, buildCashFlowCore, rowOfStored } from '@/lib/domain/reports/cashflow'
 import { factsFromRollupDocs, operationRollups, type DayRange } from '@/lib/domain/reports/facts'
 import type { MoneyType } from '@/lib/domain/reports/types'
 import { op } from './fixtures'
@@ -96,11 +96,41 @@ describe('buildCashFlowCore', () => {
     expect(rowOfStored('income', 'cat-in', TYPES)).toBe('cat-in')
   })
 
-  it('one line per chosen account in its own currency, with its transfers in and out', () => {
+  it('one line per chosen account in its own currency, with its transfers in and out and its excluded net', () => {
     expect(cashFlow(OPS).accounts).toEqual([
-      { accountId: 'main', inMinor: 50_000, outMinor: 16_000, transferInMinor: 0, transferOutMinor: 30_000 },
-      { accountId: 'vat', inMinor: 0, outMinor: 1_500, transferInMinor: 30_000, transferOutMinor: 0 },
+      { accountId: 'main', inMinor: 50_000, outMinor: 16_000, transferInMinor: 0, transferOutMinor: 30_000, excludedNetMinor: -23_000, openingMinor: null, closingMinor: null },
+      { accountId: 'vat', inMinor: 0, outMinor: 1_500, transferInMinor: 30_000, transferOutMinor: 0, excludedNetMinor: 23_000, openingMinor: null, closingMinor: null },
     ])
+  })
+
+  it('a row with balances closes: opening + in - out + transfers + excluded = closing (the excluded VAT of the main account included)', () => {
+    const balances = new Map([
+      ['main', { openingMinor: 100_000, closingMinor: 81_000 }],
+      ['vat', { openingMinor: 0, closingMinor: 51_500 }],
+    ])
+    const report = buildCashFlowCore(factsFromRollupDocs(operationRollups(OPS, 'PLN', OCT, { parts: ['cash', 'cashcat'] }).docs), {
+      ...OCT,
+      accountIds: ACCOUNTS,
+      includeExcluded: false,
+      categoryTypes: TYPES,
+      balances,
+    })
+    expect(report.accounts.map((line) => accountRowGap(line))).toEqual([0, 0])
+    expect(report.accounts[0]).toMatchObject({ openingMinor: 100_000, closingMinor: 81_000, excludedNetMinor: -23_000 })
+  })
+
+  it('a row whose balances disagree with its movement shows the gap; without balances there is no row identity', () => {
+    const balances = new Map([['main', { openingMinor: 100_000, closingMinor: 81_500 }]])
+    expect(cashFlow(OPS).accounts.every((line) => line.openingMinor === null && accountRowGap(line) === null)).toBe(true)
+    const report = buildCashFlowCore(factsFromRollupDocs(operationRollups(OPS, 'PLN', OCT, { parts: ['cash', 'cashcat'] }).docs), {
+      ...OCT,
+      accountIds: ACCOUNTS,
+      includeExcluded: false,
+      categoryTypes: TYPES,
+      balances,
+    })
+    expect(accountRowGap(report.accounts[0])).toBe(500)
+    expect(accountRowGap(report.accounts[1])).toBeNull()
   })
 
   it('an amount in another currency counts by its base; the account line keeps the account currency', () => {
@@ -108,6 +138,8 @@ describe('buildCashFlowCore', () => {
     const facts = factsFromRollupDocs(operationRollups([eur], 'PLN', OCT, { parts: ['cash', 'cashcat'] }).docs)
     const report = buildCashFlowCore(facts, { ...OCT, accountIds: ['eur'], includeExcluded: false, categoryTypes: TYPES })
     expect(report.totals.incomeBase).toBe(21_000)
-    expect(report.accounts).toEqual([{ accountId: 'eur', inMinor: 5_000, outMinor: 0, transferInMinor: 0, transferOutMinor: 0 }])
+    expect(report.accounts).toEqual([
+      { accountId: 'eur', inMinor: 5_000, outMinor: 0, transferInMinor: 0, transferOutMinor: 0, excludedNetMinor: 0, openingMinor: null, closingMinor: null },
+    ])
   })
 })

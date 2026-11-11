@@ -4,6 +4,7 @@ import { parseTransactionInput } from '@/lib/domain/ledger/input'
 import type { ReportQuery } from '@/lib/domain/reports/types'
 import { FxError } from '@/lib/server/fx/types'
 import { verifyLedger } from '@/lib/server/ledger/verify'
+import { accountRowGap } from '@/lib/domain/reports/cashflow'
 import { createTransaction } from '@/lib/server/ledger/write'
 import { readCashFlowReport, readPLReport } from '@/lib/server/reports/read'
 import { ORG, UID, makeDeps, testDb } from './helpers'
@@ -45,6 +46,18 @@ describe('Cash Flow on the server (S12)', () => {
       transfersBase: 1_000, fxBase: 5_000, closingBase: 182_000, discrepancyBase: 0,
     })
     expect(reconciliation.accounts.find((a) => a.accountId === 'eur')).toMatchObject({ openingMinor: 10_000, closingMinor: 25_000, fxBase: 5_000 })
+  })
+
+  it('every account row closes on the emulator: opening + in - out + transfers + excluded = closing (the excluded VAT of pln included)', async () => {
+    const { report } = await readCashFlowReport(deps, ORG, OCT)
+    expect(report.accounts.map((line) => accountRowGap(line))).toEqual([0, 0])
+    // pln: 1000 zł at the close of 30 September; +500 - 120 - 230 (excluded) - 430 (transfer out) in October: 720 zł.
+    expect(report.accounts.find((line) => line.accountId === 'pln')).toMatchObject({ openingMinor: 100_000, closingMinor: 72_000, excludedNetMinor: -23_000 })
+  })
+
+  it('with a category filter the rows show the movement only: no balances to close', async () => {
+    const { report } = await readCashFlowReport(deps, ORG, { ...OCT, filters: { ...EMPTY_ANALYTICS_FILTERS, categoryIds: ['k-in'] } })
+    expect(report.accounts.every((line) => line.openingMinor === null && line.closingMinor === null)).toBe(true)
   })
 
   it('a concrete tag counts the excluded operation; the rest of the accounts is outside the filter', async () => {

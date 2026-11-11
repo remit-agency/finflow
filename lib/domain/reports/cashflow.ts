@@ -7,6 +7,7 @@ import { addDays, daysInRange, monthOf, monthsBetween } from '@/lib/domain/ledge
 import { NO_CATEGORY } from '@/lib/domain/ledger/rollups'
 import {
   CASHFLOW_DAY_BUCKETS_MAX_DAYS,
+  type AccountBalance,
   type AccountMovement,
   type CashFlowBucket,
   type CashFlowReport,
@@ -26,6 +27,18 @@ export interface CashFlowInput {
   includeExcluded: boolean
   /** The company's categories (`categoryTypesOf`). */
   categoryTypes: CategoryTypes
+  /** The balances of the accounts at the close of the day before the period and of its last day; absent: no balances shown. */
+  balances?: ReadonlyMap<string, AccountBalance>
+}
+
+/**
+ * The row identity of an account line that shows balances: how far its closing balance is from opening + in - out + transfers
+ * + excluded, in the account's currency (0 when the balances agree with the movement). Null when no balances are shown.
+ */
+export function accountRowGap(line: AccountMovement): number | null {
+  if (line.openingMinor === null || line.closingMinor === null) return null
+  const movement = line.inMinor - line.outMinor + line.transferInMinor - line.transferOutMinor + line.excludedNetMinor
+  return line.closingMinor - line.openingMinor - movement
 }
 
 export type CashFlowCore = Pick<CashFlowReport, 'granularity' | 'totals' | 'buckets' | 'accounts' | 'categories' | 'excluded' | 'includeExcluded' | 'excludedCounted'>
@@ -72,13 +85,24 @@ export function buildCashFlowCore(facts: ReportFacts, input: CashFlowInput): Cas
   let excludedCounted = false
 
   const accounts: AccountMovement[] = input.accountIds.map((accountId) => {
-    const line: AccountMovement = { accountId, inMinor: 0, outMinor: 0, transferInMinor: 0, transferOutMinor: 0 }
+    const balance = input.balances?.get(accountId)
+    const line: AccountMovement = {
+      accountId,
+      inMinor: 0,
+      outMinor: 0,
+      transferInMinor: 0,
+      transferOutMinor: 0,
+      excludedNetMinor: 0,
+      openingMinor: input.balances === undefined ? null : (balance?.openingMinor ?? null),
+      closingMinor: input.balances === undefined ? null : (balance?.closingMinor ?? null),
+    }
     const count = (cells: DayCells | undefined, isExcluded: boolean): void => {
       for (const [day, c] of cells ?? []) {
         if (day < input.from || day > input.to) continue
         if (isExcluded && !input.includeExcluded) {
           excluded.incomeBase += c.inBase
           excluded.expenseBase += c.outBase
+          line.excludedNetMinor += c.inMinor - c.outMinor + c.transferInMinor - c.transferOutMinor
           continue
         }
         line.inMinor += c.inMinor

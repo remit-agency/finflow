@@ -70,7 +70,7 @@ export function sampleCashFlow(): CashFlowReport {
       { key: '2026-10-01', incomeBase: 50_000, expenseBase: 12_000, netBase: 38_000, runningNetBase: 38_000 },
       { key: '2026-10-02', incomeBase: 0, expenseBase: 4_050, netBase: -4_050, runningNetBase: 33_950 },
     ],
-    accounts: [{ accountId: 'main', inMinor: 50_000, outMinor: 16_050, transferInMinor: 0, transferOutMinor: 0 }],
+    accounts: [{ accountId: 'main', inMinor: 50_000, outMinor: 16_050, transferInMinor: 0, transferOutMinor: 0, excludedNetMinor: -23_000, openingMinor: null, closingMinor: null }],
     categories: [
       { row: 'cat-in', type: 'income', amountBase: 50_000 },
       { row: 'cat-it', type: 'expense', amountBase: 12_000 },

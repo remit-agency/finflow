@@ -68,6 +68,10 @@ test.describe('server reports (emulators)', () => {
     await expect(page.getByTestId('report-source')).toHaveAttribute('data-source', 'rollups')
     await expect(page.getByTestId('cashflow-excluded-expense')).toContainText(zl(230))
     await expect(page.getByTestId('cf-account-row')).toHaveCount(2)
+    // The row of «Konto A» closes: 1000 + 500 in - 120 out - 100 transferred - 230 excluded = 1050.
+    const accountA = page.getByTestId('cf-account-row').filter({ hasText: 'Konto A' })
+    await expect(accountA.getByTestId('cf-account-excluded')).toContainText(zl(-230))
+    await expect(accountA).toContainText(zl(1050))
     const categories = page.getByTestId('cf-category-row')
     await expect(categories).toHaveCount(2)
     await expect(categories.filter({ hasText: 'Faktury e2e' })).toContainText(zl(500))

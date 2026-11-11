@@ -1265,6 +1265,7 @@
       "income": "Money in",
       "expense": "Money out",
       "transfers": "Transfers",
+      "excluded": "Excluded from analytics",
       "closing": "Closing balance"
     },
     "byCategory": {

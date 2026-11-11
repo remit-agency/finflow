@@ -87,13 +87,27 @@ export interface CashFlowBucket {
   runningNetBase: number
 }
 
-/** What the report counted on one account, in the account's currency. */
+/** The balances of an account at the close of the opening and of the closing day, in the account's currency. */
+export interface AccountBalance {
+  openingMinor: number
+  closingMinor: number
+}
+
+/**
+ * What the report counted on one account, in the account's currency. The row closes when balances are shown:
+ * opening + in - out + transfers + excluded = closing (`accountRowGap`).
+ */
 export interface AccountMovement {
   accountId: string
   inMinor: number
   outMinor: number
   transferInMinor: number
   transferOutMinor: number
+  /** The operations excluded from analytics, net (money in minus money out, transfers too); 0 when a concrete tag counts them. */
+  excludedNetMinor: number
+  /** Null when no balances are shown: a filter other than the accounts makes the row a part of the movement only. */
+  openingMinor: number | null
+  closingMinor: number | null
 }
 
 /** A report row: a category id, or the uncategorised row of its type (`_none:income`, `_none:expense`, `kindRowOf`). */

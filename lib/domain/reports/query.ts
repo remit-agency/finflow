@@ -1,7 +1,7 @@
 // lib/domain/reports/query.ts
 // The address of a report (S12): the period and the S10f filters under the journal's names. The browser writes it with
 // `reportQueryToParams`; the server reads it strictly (`parseReportQuery`): what the lenient S10f reader would drop is a 400.
-import { activeAnalyticsFilterCount, analyticsFiltersToParams, parseAnalyticsFilters } from '@/lib/domain/analytics-filter/filter'
+import { activeAnalyticsFilterCount, analyticsFiltersToParams, parseAnalyticsFilters, type AnalyticsFilters } from '@/lib/domain/analytics-filter/filter'
 import { daysInRange, isDay, monthBounds, monthOf } from '@/lib/domain/ledger/days'
 import { ReportError } from './errors'
 import { EXPORT_FORMATS, MAX_REPORT_DAYS, REPORT_KINDS, type ExportFormat, type ReportKind, type ReportQuery, type ReportSource } from './types'
@@ -57,6 +57,14 @@ export function reportQueryToParams(q: ReportQuery): URLSearchParams {
 /** The period starts on the 1st of its month and ends on the last day of its month. */
 export function isWholeMonths(from: string, to: string): boolean {
   return from.endsWith('-01') && monthBounds(monthOf(to)).last === to
+}
+
+/**
+ * A filter other than the accounts (a type, a category, a counterparty or a tag): the figures are then a part of the accounts'
+ * movement, so a row shows its movement without its balances (the rows of Cash Flow close only on the whole movement).
+ */
+export function hasNonAccountFilters(f: AnalyticsFilters): boolean {
+  return f.types.length > 0 || f.categoryIds.length > 0 || f.counterpartyIds.length > 0 || f.tagIds.length > 0
 }
 
 /** The rollups hold no counterparty, tag or account breakdown of the categories and no part of a month. */
