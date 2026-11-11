@@ -43,6 +43,17 @@ describe('fetchNbpTables', () => {
     expect(tables[1]).toEqual({ no: '207/A/NBP/2026', effectiveDate: '2026-10-23', rates: { EUR: 4.4, USD: 3.9 } })
   })
 
+  it('NBP_API_BASE points the request at another origin (the e2e stub); a trailing slash is fine', async () => {
+    vi.stubEnv('NBP_API_BASE', 'http://127.0.0.1:4012/')
+    try {
+      const f = respond(200, body)
+      await fetchNbpTables('2026-10-01', '2026-10-26', f)
+      expect(f.mock.calls[0][0]).toBe('http://127.0.0.1:4012/api/exchangerates/tables/A/2026-10-01/2026-10-26/?format=json')
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it('accepts tables dated exactly on the range ends', async () => {
     const edge = [
       { table: 'A', no: '1/A/NBP/2026', effectiveDate: '2026-10-01', rates: [{ code: 'EUR', mid: 4 }] },

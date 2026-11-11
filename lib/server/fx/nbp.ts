@@ -2,8 +2,15 @@ import 'server-only'
 import { isDay } from '@/lib/domain/ledger/days'
 import { FxError, type NbpTable } from '@/lib/server/fx/types'
 
-const BASE = 'https://api.nbp.pl/api/exchangerates/tables/A'
+const NBP_ORIGIN = 'https://api.nbp.pl'
+const TABLES_PATH = '/api/exchangerates/tables/A'
 const TIMEOUT_MS = 8000
+
+/** `NBP_API_BASE` points the e2e run at the stub (tests/e2e/helpers/nbp-stub.mjs); unset means the real NBP. Tests only. */
+function tablesBase(): string {
+  const origin = process.env.NBP_API_BASE?.replace(/\/+$/, '') || NBP_ORIGIN
+  return `${origin}${TABLES_PATH}`
+}
 
 type FetchLike = (url: string, init?: { signal?: AbortSignal; cache?: RequestCache }) => Promise<Response>
 
@@ -45,7 +52,7 @@ export async function fetchNbpTables(
 ): Promise<NbpTable[]> {
   let res: Response
   try {
-    res = await fetchImpl(`${BASE}/${fromDay}/${toDay}/?format=json`, {
+    res = await fetchImpl(`${tablesBase()}/${fromDay}/${toDay}/?format=json`, {
       signal: AbortSignal.timeout(TIMEOUT_MS),
       cache: 'no-store',
     })
