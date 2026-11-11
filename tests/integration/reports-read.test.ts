@@ -275,4 +275,24 @@ describe('P&L on the server (S12)', () => {
     expect(stats.operations).toBe(7)
     expect(report.coverage).toMatchObject({ uncountable: 0, operationsRead: 6 })
   })
+
+  it('a period longer than the ledger accepts (stored past the input rule) is uncountable in the P&L, never silently dropped', async () => {
+    for (let i = 0; i < 3; i++) {
+      await createTransaction(deps, ORG, UID, parseTransactionInput({
+        type: 'expense', status: 'planned', accountId: 'pln', amountMinor: 1_000, paymentDate: '2026-11-02', categoryId: 'k-ex',
+        accrual: { mode: 'period', from: '2026-11-01', to: '2026-11-30' },
+      }))
+    }
+    await createTransaction(deps, ORG, UID, parseTransactionInput({
+      type: 'expense', accountId: 'pln', amountMinor: 1_200, paymentDate: '2026-10-03', categoryId: 'k-ex',
+      accrual: { mode: 'period', from: '2026-10-01', to: '2029-09-30' },
+    }))
+    // Forty months from October 2026: the input rule allows at most 36, so only the stored data can hold this.
+    const stored = await testDb().collection(`organizations/${ORG}/transactions`).where('accrual.to', '==', '2029-09-30').get()
+    expect(stored.size).toBe(1)
+    await stored.docs[0].ref.update({ 'accrual.to': '2030-01-31' })
+    const { report } = await readPLReport(deps, ORG, OCT, { source: 'operations' })
+    expect(report.coverage.uncountable).toBe(1)
+    expect(report.rows.find((r) => r.row === 'k-ex')?.total).toBe(12_000)
+  })
 })

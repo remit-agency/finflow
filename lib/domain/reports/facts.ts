@@ -3,6 +3,7 @@
 // with the ledger's own rule (`contributions`). No second copy of the amount, base, transfer-day or `excluded` rules, so
 // the two paths can only differ where the stored rollups drifted from the operations.
 import { addDays, isDay, isMonth, monthsBetween, overlapDays } from '@/lib/domain/ledger/days'
+import { MAX_PERIOD_MONTHS } from '@/lib/domain/ledger/input'
 import { addInto, contributions, EXCLUDED_PREFIX, type RollupDocs, type RollupFlat } from '@/lib/domain/ledger/rollups'
 import { MAX_ARRIVAL_DAYS, type Accrual, type LedgerTransaction } from '@/lib/domain/ledger/types'
 import type { CashCell, CategoryAmounts, ReportFacts, ReportKind } from './types'
@@ -173,7 +174,8 @@ export interface OperationRollupOptions {
  * The rollup documents the operations would add, restricted to the period: the days of the period (`cash_`, the money in
  * of a transfer on its arrival day), the operations paid in the period (`cashcat_`), and the share of the period of each
  * accrual month (`pl_`, `accrualShare`). Planned operations add nothing; an operation that cannot be counted (another
- * currency without base amounts) is listed in `uncountable`, never counted as zero.
+ * currency without base amounts, or a P&L share of a period longer than MAX_PERIOD_MONTHS) is listed in `uncountable`,
+ * never counted as zero.
  */
 export function operationRollups(
   ops: readonly LedgerTransaction[],
@@ -192,6 +194,9 @@ export function operationRollups(
       uncountable.push(tx.id)
       continue
     }
+    // A P&L share cannot be placed for a period longer than the ledger accepts: that part is named, the other parts still count.
+    const longPeriod = tx.accrual.mode === 'period' && monthsBetween(tx.accrual.from, tx.accrual.to).length > MAX_PERIOD_MONTHS
+    let plNotPlaced = false
     const kept: RollupDocs = new Map()
     for (const [id, flat] of own) {
       const ref = parseRollupId(id)
@@ -203,11 +208,16 @@ export function operationRollups(
       } else if (ref.kind === 'cashcat') {
         if (tx.paymentDate >= range.from && tx.paymentDate <= range.to) kept.set(id, flat)
       } else {
+        if (longPeriod) {
+          plNotPlaced = true
+          continue
+        }
         const { inside, whole } = accrualShare(tx.accrual, ref.month, range)
         if (inside > 0) kept.set(id, inside === whole ? flat : scaled(flat, inside, whole))
       }
     }
     addInto(docs, kept)
+    if (plNotPlaced) uncountable.push(tx.id)
   }
   return { docs, uncountable }
 }

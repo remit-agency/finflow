@@ -77,6 +77,17 @@ describe('operationRollups', () => {
     expect(result.docs.size).toBe(0)
   })
 
+  it('an accrual period longer than MAX_PERIOD_MONTHS is uncountable for the P&L (named, never dropped); its cash is still counted', () => {
+    // 40 months from October 2026: the parser accepts such a period in stored data, the ledger input never writes one.
+    const long = op({ type: 'expense', accountId: 'main', amountMinor: 61_000, paymentDate: '2026-10-12', accrual: { mode: 'period', from: '2026-10-01', to: '2030-01-31' } })
+    const pl = operationRollups([long], 'PLN', OCT, { parts: ['pl'] })
+    expect(pl.uncountable).toEqual([long.id])
+    expect(pl.docs.size).toBe(0)
+    const cash = operationRollups([long], 'PLN', OCT, { parts: ['cash'] })
+    expect(cash.uncountable).toEqual([])
+    expect(cash.docs.size).toBe(1)
+  })
+
   it('for whole months the P&L part is what the ledger stores', () => {
     const lease = op({ type: 'expense', accountId: 'main', amountMinor: 61_000, paymentDate: '2026-10-12', accrual: { mode: 'period', from: '2026-09-15', to: '2026-11-14' } })
     const stored = new Map([...contributions(lease, 'PLN')].filter(([id]) => id.startsWith('pl_')))
