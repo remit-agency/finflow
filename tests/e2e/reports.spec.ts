@@ -177,8 +177,20 @@ test.describe('server reports (emulators)', () => {
     )
     await page.goto(`/${user.orgId}/analytics/cashflow`)
     await waitForShell(page, user.companyName)
-    await expect(page.getByTestId('report-too-large')).toHaveText(`Звіту потрібно більше даних, ніж сервер читає разом (ліміт ${formatNumber(10_000, 'uk')}). Звузьте період або рахунки чи зніміть фільтри.`)
+    await expect(page.getByTestId('report-too-large')).toHaveText(`Звіту потрібно більше даних, ніж сервер читає разом (ліміт ${formatNumber(10_000, 'uk')}). Оберіть коротший період або менше рахунків.`)
     await expect(page.getByTestId('cashflow-total-income')).toHaveCount(0)
+  })
+
+  test('a refusal for too many requests says to wait a moment, not that the report failed', async ({ page }) => {
+    const user = await registerViaUi(page, 'rp-busy', 'PLN')
+    await waitForShell(page, user.companyName)
+    await page.route('**/api/orgs/*/reports/cashflow?**', (route) =>
+      route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'rate_limited' }) }),
+    )
+    await page.goto(`/${user.orgId}/analytics/cashflow`)
+    await waitForShell(page, user.companyName)
+    await expect(page.getByTestId('report-busy')).toHaveText(/Забагато запитів/)
+    await expect(page.getByTestId('report-error')).toHaveCount(0)
   })
 
   test('an export the server refuses for its size says why, not only «could not build the file»', async ({ page }) => {
@@ -190,7 +202,7 @@ test.describe('server reports (emulators)', () => {
     await page.goto(`/${user.orgId}/analytics/cashflow`)
     await waitForShell(page, user.companyName)
     await page.getByRole('button', { name: 'Експорт CSV', exact: true }).click()
-    await expect(page.getByText(`Звіту потрібно більше даних, ніж сервер читає разом (ліміт ${formatNumber(10_000, 'uk')}). Звузьте період або рахунки чи зніміть фільтри.`)).toBeVisible()
+    await expect(page.getByText(`Звіту потрібно більше даних, ніж сервер читає разом (ліміт ${formatNumber(10_000, 'uk')}). Оберіть коротший період або менше рахунків.`)).toBeVisible()
   })
 
   test('the Balance reads the server balances on the chosen day', async ({ page, request }) => {
