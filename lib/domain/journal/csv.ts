@@ -64,6 +64,19 @@ export function buildCsv(header: string[], rows: string[][]): string {
   return `﻿${lines.join('\r\n')}\r\n`
 }
 
+/**
+ * Several tables in one file (the sheets of a report, S12): each under its title row, an empty line between them; the
+ * cells, the delimiter, the BOM and the line ends of `buildCsv`.
+ */
+export function buildCsvSections(sections: ReadonlyArray<{ title: string; header: string[]; rows: string[][] }>): string {
+  const lines = sections.flatMap((s, i) => [
+    ...(i === 0 ? [] : ['']),
+    csvCell(s.title),
+    ...[s.header, ...s.rows].map((cells) => cells.map(csvCell).join(DELIMITER)),
+  ])
+  return `﻿${lines.join('\r\n')}\r\n`
+}
+
 export function exportRow({ tx, balanceAfterMinor }: JournalRow, ctx: ExportContext): string[] {
   const accrual = tx.accrual.mode === 'date' ? { from: tx.accrual.date, to: tx.accrual.date } : { from: tx.accrual.from, to: tx.accrual.to }
   const sign = tx.type === 'income' ? 1 : -1
