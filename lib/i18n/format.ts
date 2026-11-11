@@ -45,3 +45,8 @@ export function formatDate(date: Date, locale: Locale, options: Intl.DateTimeFor
 export function formatWeekday(date: Date, locale: Locale, weekday: 'short' | 'long' = 'short'): string {
   return new Intl.DateTimeFormat(INTL_LOCALE[locale], { weekday, timeZone: 'UTC' }).format(date)
 }
+
+/** The decimal sign of amounts in a file (CSV): a comma in Polish and Ukrainian, a point in English. */
+export function decimalSignOf(locale: Locale): ',' | '.' {
+  return locale === 'en' ? '.' : ','
+}

@@ -5,6 +5,7 @@ import {
   buildClearedSessionCookie,
   buildSessionCookie,
   isSecureCookieEnv,
+  readCookie,
   readSessionCookie,
 } from '@/lib/server/session-cookie'
 
@@ -98,5 +99,13 @@ describe('isSecureCookieEnv', () => {
     vi.stubEnv('NODE_ENV', 'production')
     expect(buildSessionCookie('v')).toContain('; Secure')
     expect(buildClearedSessionCookie()).toContain('; Secure')
+  })
+})
+
+describe('readCookie', () => {
+  it('any cookie by name; empty or missing is null', () => {
+    expect(readCookie(headers('theme=dark; NEXT_LOCALE=pl; __session=tok'), 'NEXT_LOCALE')).toBe('pl')
+    expect(readCookie(headers('NEXT_LOCALE='), 'NEXT_LOCALE')).toBeNull()
+    expect(readCookie(headers(), 'NEXT_LOCALE')).toBeNull()
   })
 })

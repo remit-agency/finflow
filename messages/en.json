@@ -127,7 +127,8 @@
     "modules": {
       "transactions": "Payments",
       "analytics": "Analytics",
-      "recurring": "Planned payments"
+      "recurring": "Planned payments",
+      "dashboard": "Money now"
     },
     "analyticsSections": {
       "cashflow": "Cash Flow",
@@ -976,6 +977,12 @@
         "currentMonth": "Current month",
         "quarter": "Quarter",
         "year": "Year"
+      },
+      "asOfOptions": {
+        "today": "Today",
+        "prevMonthEnd": "End of last month",
+        "prevQuarterEnd": "End of last quarter",
+        "prevYearEnd": "End of last year"
       }
     },
     "filters": {
@@ -1018,7 +1025,8 @@
         "search": "Search accounts"
       },
       "partly": "partly selected"
-    }
+    },
+    "exportXlsx": "Export XLSX"
   },
   "periods": {
     "menuHeader": "BY TRANSACTION DATE",
@@ -1240,5 +1248,112 @@
       "done": "Series deleted"
     },
     "cancel": "Cancel"
+  },
+  "reports": {
+    "source": {
+      "rollups": "Counted from the rollups",
+      "operations": "Counted from the operations of the period: {count}"
+    },
+    "uncountable": "Operations without an amount in the company currency, not counted: {count}",
+    "tooLarge": "Too many operations for this report: more than {cap}. Narrow the period or clear the filters.",
+    "error": "Could not load the report.",
+    "retry": "Try again",
+    "exportFailed": "Could not build the file.",
+    "excluded": {
+      "title": "Excluded from analytics",
+      "hint": "Operations tagged «exclude from analytics»: they move the balances but stay out of the figures of the report"
+    },
+    "byAccount": {
+      "title": "By account",
+      "account": "Account",
+      "opening": "Opening balance",
+      "income": "Money in",
+      "expense": "Money out",
+      "transfers": "Transfers",
+      "closing": "Closing balance"
+    },
+    "byCategory": {
+      "title": "By category",
+      "empty": "No money in or out in this period."
+    },
+    "reconciliation": {
+      "title": "Reconciliation with the balances",
+      "opening": "Opening balance on {date}",
+      "net": "Net movement in the report",
+      "excluded": "Excluded from analytics",
+      "included": "Operations excluded from analytics are already in the figures of the report: a tag is chosen",
+      "outside": "Operations outside the filter",
+      "transfers": "Transfers between accounts",
+      "fx": "Exchange difference",
+      "closing": "Closing balance on {date}",
+      "discrepancy": "Discrepancy",
+      "ok": "Reconciled",
+      "unvalued": "No NBP rate ({currencies}): not reconciled",
+      "rate": "{currency}: {rate} (NBP, {date})",
+      "pending": "The NBP rate of today may still change"
+    },
+    "dashboard": {
+      "title": "Money now",
+      "subtitle": "Balances of all accounts",
+      "total": "Total in {currency}",
+      "byCurrency": "By currency",
+      "accounts": "Accounts",
+      "rate": "NBP rate {rate} of {date}",
+      "noRate": "No NBP rate: left out of the total",
+      "incomplete": "Without the accounts in {currencies}: no NBP rate",
+      "lastSync": "From the bank: {date}",
+      "neverSynced": "Not yet updated from the bank",
+      "empty": "No accounts yet"
+    },
+    "export": {
+      "sheets": {
+        "report": "Report",
+        "categories": "By category",
+        "reconciliation": "Reconciliation"
+      },
+      "columns": {
+        "month": "Month",
+        "day": "Day",
+        "income": "Money in",
+        "expense": "Money out",
+        "net": "Net",
+        "running": "Running total",
+        "category": "Category",
+        "type": "Type",
+        "amount": "Amount",
+        "total": "Total",
+        "line": "Line",
+        "account": "Account",
+        "currency": "Currency",
+        "opening": "Opening balance",
+        "closing": "Closing balance",
+        "fx": "Exchange difference"
+      },
+      "types": {
+        "income": "Money in",
+        "expense": "Money out"
+      },
+      "rows": {
+        "total": "Total",
+        "totalIncome": "Total income",
+        "totalExpense": "Total expenses",
+        "profit": "Profit / loss",
+        "excludedIncome": "Excluded from analytics: income",
+        "excludedExpense": "Excluded from analytics: expenses",
+        "noCategory": "No category"
+      },
+      "lines": {
+        "opening": "Opening balance",
+        "net": "Net movement in the report",
+        "excluded": "Excluded from analytics",
+        "included": "Operations excluded from analytics are already in the figures",
+        "outside": "Operations outside the filter",
+        "transfers": "Transfers between accounts",
+        "fx": "Exchange difference",
+        "closing": "Closing balance",
+        "discrepancy": "Discrepancy",
+        "unvalued": "No NBP rate:"
+      }
+    }
   }
 }

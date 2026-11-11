@@ -90,7 +90,7 @@ export function formatMonthLabel(year: number, month: number, locale: Locale): s
 }
 
 /** «12 жов» / «12 Oct» (a day bucket): lowercase month in Ukrainian and Polish, as the month name is written there. */
-function formatDayLabel(date: Date, locale: Locale): string {
+export function formatDayLabel(date: Date, locale: Locale): string {
   const month = shortMonthName(date.getUTCFullYear(), date.getUTCMonth(), locale)
   return `${date.getUTCDate()} ${locale === 'en' ? month : month.toLowerCase()}`
 }

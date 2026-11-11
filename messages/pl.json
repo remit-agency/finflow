@@ -127,7 +127,8 @@
     "modules": {
       "transactions": "Płatności",
       "analytics": "Analityka",
-      "recurring": "Płatności planowane"
+      "recurring": "Płatności planowane",
+      "dashboard": "Pieniądze teraz"
     },
     "analyticsSections": {
       "cashflow": "Przepływy pieniężne (Cash Flow)",
@@ -976,6 +977,12 @@
         "currentMonth": "Bieżący miesiąc",
         "quarter": "Kwartał",
         "year": "Rok"
+      },
+      "asOfOptions": {
+        "today": "Dziś",
+        "prevMonthEnd": "Koniec poprzedniego miesiąca",
+        "prevQuarterEnd": "Koniec poprzedniego kwartału",
+        "prevYearEnd": "Koniec poprzedniego roku"
       }
     },
     "filters": {
@@ -1018,7 +1025,8 @@
         "search": "Szukaj kont"
       },
       "partly": "częściowo wybrane"
-    }
+    },
+    "exportXlsx": "Eksport XLSX"
   },
   "periods": {
     "menuHeader": "WG DATY OPERACJI",
@@ -1240,5 +1248,112 @@
       "done": "Seria usunięta"
     },
     "cancel": "Anuluj"
+  },
+  "reports": {
+    "source": {
+      "rollups": "Policzono z zestawień",
+      "operations": "Policzono z operacji okresu: {count}"
+    },
+    "uncountable": "Nie policzono operacji bez kwoty w walucie firmy: {count}",
+    "tooLarge": "Za dużo operacji dla tego raportu: ponad {cap}. Zawęź okres albo usuń filtry.",
+    "error": "Nie udało się wczytać raportu.",
+    "retry": "Spróbuj ponownie",
+    "exportFailed": "Nie udało się przygotować pliku.",
+    "excluded": {
+      "title": "Wyłączone z analityki",
+      "hint": "Operacje z tagiem «nie uwzględniaj w analityce»: zmieniają salda, ale nie wchodzą do liczb raportu"
+    },
+    "byAccount": {
+      "title": "Według kont",
+      "account": "Konto",
+      "opening": "Saldo początkowe",
+      "income": "Wpływy",
+      "expense": "Wydatki",
+      "transfers": "Przelewy",
+      "closing": "Saldo końcowe"
+    },
+    "byCategory": {
+      "title": "Według kategorii",
+      "empty": "Brak wpływów i wydatków w tym okresie."
+    },
+    "reconciliation": {
+      "title": "Uzgodnienie z saldami",
+      "opening": "Saldo początkowe na {date}",
+      "net": "Przepływ netto z raportu",
+      "excluded": "Wyłączone z analityki",
+      "included": "Operacje wyłączone z analityki są już w liczbach raportu: wybrano tag",
+      "outside": "Operacje poza filtrem",
+      "transfers": "Przelewy między kontami",
+      "fx": "Różnice kursowe",
+      "closing": "Saldo końcowe na {date}",
+      "discrepancy": "Rozbieżność",
+      "ok": "Zgadza się",
+      "unvalued": "Brak kursu NBP ({currencies}): nie uzgodniono",
+      "rate": "{currency}: {rate} (NBP, {date})",
+      "pending": "Dzisiejszy kurs NBP może się jeszcze zmienić"
+    },
+    "dashboard": {
+      "title": "Pieniądze teraz",
+      "subtitle": "Salda wszystkich kont",
+      "total": "Razem w {currency}",
+      "byCurrency": "Według walut",
+      "accounts": "Konta",
+      "rate": "Kurs NBP {rate} z {date}",
+      "noRate": "Brak kursu NBP: nie wliczono do sumy",
+      "incomplete": "Bez kont w {currencies}: brak kursu NBP",
+      "lastSync": "Z banku: {date}",
+      "neverSynced": "Jeszcze nie pobrano z banku",
+      "empty": "Nie ma jeszcze kont"
+    },
+    "export": {
+      "sheets": {
+        "report": "Raport",
+        "categories": "Według kategorii",
+        "reconciliation": "Uzgodnienie"
+      },
+      "columns": {
+        "month": "Miesiąc",
+        "day": "Dzień",
+        "income": "Wpływy",
+        "expense": "Wydatki",
+        "net": "Różnica",
+        "running": "Narastająco",
+        "category": "Kategoria",
+        "type": "Typ",
+        "amount": "Kwota",
+        "total": "Razem",
+        "line": "Pozycja",
+        "account": "Konto",
+        "currency": "Waluta",
+        "opening": "Saldo początkowe",
+        "closing": "Saldo końcowe",
+        "fx": "Różnice kursowe"
+      },
+      "types": {
+        "income": "Wpływy",
+        "expense": "Wydatki"
+      },
+      "rows": {
+        "total": "Razem",
+        "totalIncome": "Razem przychody",
+        "totalExpense": "Razem koszty",
+        "profit": "Zysk / strata",
+        "excludedIncome": "Wyłączone z analityki: przychody",
+        "excludedExpense": "Wyłączone z analityki: koszty",
+        "noCategory": "Bez kategorii"
+      },
+      "lines": {
+        "opening": "Saldo początkowe",
+        "net": "Przepływ netto z raportu",
+        "excluded": "Wyłączone z analityki",
+        "included": "Operacje wyłączone z analityki są już w liczbach raportu",
+        "outside": "Operacje poza filtrem",
+        "transfers": "Przelewy między kontami",
+        "fx": "Różnice kursowe",
+        "closing": "Saldo końcowe",
+        "discrepancy": "Rozbieżność",
+        "unvalued": "Brak kursu NBP:"
+      }
+    }
   }
 }
