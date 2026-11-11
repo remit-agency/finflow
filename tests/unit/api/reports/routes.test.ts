@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EMPTY_ANALYTICS_FILTERS } from '@/lib/domain/analytics-filter/filter'
 import { ReportError } from '@/lib/domain/reports/errors'
+import { HttpError } from '@/lib/server/http-error'
+import { enforceRateLimit, REPORT_LIMITS } from '@/lib/server/rate-limit-guard'
 import { reports } from '@/lib/server/reports'
 import { resetFakeAdmin } from '@/tests/unit/helpers/fake-admin'
 import { GET as balancesRoute } from '@/app/api/orgs/[orgId]/reports/balances/route'
@@ -16,6 +18,10 @@ vi.mock('@/lib/server/firebase-admin', async () => {
 vi.mock('@/lib/server/reports', () => ({
   reports: { cashflow: vi.fn(), pl: vi.fn(), balances: vi.fn(), dashboard: vi.fn(), exportFile: vi.fn() },
 }))
+vi.mock('@/lib/server/rate-limit-guard', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/server/rate-limit-guard')>('@/lib/server/rate-limit-guard')
+  return { ...actual, enforceRateLimit: vi.fn(async () => {}) }
+})
 
 const base = '/api/orgs/org-acme/reports'
 const PERIOD = 'from=2026-01-01&to=2026-12-31'
@@ -63,6 +69,32 @@ describe('authorization of every report route', () => {
       expect(res.status).toBe(200)
       expect(res.headers.get('Cache-Control')).toBe('no-store')
     })
+  })
+})
+
+describe('rate limit (the caller, every report route)', () => {
+  beforeEach(() => {
+    vi.mocked(enforceRateLimit).mockReset().mockResolvedValue(undefined)
+  })
+
+  describe.each(ROUTES)('$name', ({ mock, call }) => {
+    it('counts a valid request against the reports limit of the caller', async () => {
+      expect((await call('token-alice')).status).toBe(200)
+      expect(enforceRateLimit).toHaveBeenCalledWith('user-alice', 'reports', REPORT_LIMITS)
+    })
+
+    it('answers 429 over the limit and reads nothing', async () => {
+      vi.mocked(enforceRateLimit).mockRejectedValueOnce(new HttpError(429, 'rate_limited'))
+      const res = await call('token-alice')
+      expect(res.status).toBe(429)
+      expect(await res.json()).toEqual({ error: 'rate_limited' })
+      expect(reports[mock]).not.toHaveBeenCalled()
+    })
+  })
+
+  it('a bad parameter is refused before the request is counted', async () => {
+    expect((await cashflowRoute(req(`${base}/cashflow?from=2026-01-01`), ctx())).status).toBe(400)
+    expect(enforceRateLimit).not.toHaveBeenCalled()
   })
 })
 

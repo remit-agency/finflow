@@ -3,6 +3,7 @@ import { LOCALE_COOKIE } from '@/lib/i18n/config'
 import { resolveLocale } from '@/lib/i18n/negotiate'
 import { requireOrgRole, requireUser } from '@/lib/server/auth'
 import { errorResponse } from '@/lib/server/http-error'
+import { enforceRateLimit, REPORT_LIMITS } from '@/lib/server/rate-limit-guard'
 import { reports } from '@/lib/server/reports'
 import { toReportHttpError } from '@/lib/server/reports/http'
 import { readCookie } from '@/lib/server/session-cookie'
@@ -21,6 +22,7 @@ export async function GET(req: Request, { params }: Ctx) {
     const { orgId } = await params
     await requireOrgRole(uid, orgId, ['owner', 'accountant', 'viewer'])
     const { kind, format, query } = parseExportRequest(new URL(req.url).searchParams)
+    await enforceRateLimit(uid, 'reports', REPORT_LIMITS)
     const locale = resolveLocale({ cookie: readCookie(req.headers, LOCALE_COOKIE), acceptLanguage: req.headers.get('accept-language') })
     const file = await reports.exportFile(orgId, kind, format, query, locale)
     return new Response(file.body, {
