@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { onLedgerChanged } from '@/lib/api/ledger-events'
-import { fetchBalances, fetchCashFlow, fetchDashboard, fetchPL, viewOfFailure, type ServerView } from '@/lib/api/reports-client'
+import { fetchBalances, fetchCashFlow, fetchPL, viewOfFailure, type ServerView } from '@/lib/api/reports-client'
 import { parseReportQuery, reportQueryToParams } from '@/lib/domain/reports/query'
-import type { BalancesReport, CashFlowReport, DashboardReport, PLReport, ReportQuery } from '@/lib/domain/reports/types'
+import type { BalancesReport, CashFlowReport, PLReport, ReportQuery } from '@/lib/domain/reports/types'
 
 /** Several changes in a row (an undo of many) read the report once. */
 const REFRESH_DEBOUNCE_MS = 300
@@ -34,7 +34,6 @@ const readBalancesOf = (key: string, signal: AbortSignal): Promise<BalancesRepor
   const [orgId, date] = partsOf(key)
   return fetchBalances(orgId, date, signal)
 }
-const readDashboardOf = (key: string, signal: AbortSignal): Promise<DashboardReport> => fetchDashboard(partsOf(key)[0], signal)
 
 /** A counter that a change in this browser bumps (debounced): every server read below reads again. */
 function useLedgerRound(): [number, () => void] {
@@ -88,9 +87,4 @@ export function usePLReport(orgId: string, query: ReportQuery | null): ServerRea
 export function useBalances(orgId: string, date: string): ServerRead<BalancesReport> {
   const [round, refresh] = useLedgerRound()
   return { view: useServerRead(keyOf(orgId, date), round, readBalancesOf), refresh }
-}
-
-export function useDashboard(orgId: string): ServerRead<DashboardReport> {
-  const [round, refresh] = useLedgerRound()
-  return { view: useServerRead(keyOf(orgId, ''), round, readDashboardOf), refresh }
 }

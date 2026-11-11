@@ -1,5 +1,5 @@
 // lib/domain/reports/balances.ts
-// The balances at the close of a day (the dashboard «Гроші зараз» and the Balance page, S12): every account in its own
+// The balances at the close of a day (the Balance page, S12): every account in its own
 // currency and in the company currency at the last NBP table of that day; a currency without a rate is left out of the
 // total and the answer says it is not complete.
 import { mulRate } from '@/lib/domain/ledger/money'

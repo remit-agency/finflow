@@ -1,7 +1,7 @@
 // tests/e2e/reports.spec.ts
 // Server reports (S12): Cash Flow from the rollups with the reconciliation and the «Виключено з аналітики» line; a concrete
 // tag counts the excluded operation from the operations; the P&L spreads an accrual period over months; CSV and XLSX come
-// from the server; the dashboard «Гроші зараз» values an EUR account at the NBP stub's rate; a refusal of the read limit
+// from the server; the Balance values an EUR account at the NBP stub's rate; a refusal of the read limit
 // says so; the Balance reads the server balances. Days come from today; expectations from the same rules as the code.
 import { readFileSync } from 'node:fs'
 import { strFromU8, unzipSync } from 'fflate'
@@ -149,21 +149,15 @@ test.describe('server reports (emulators)', () => {
     for (const name of ['Звіт', 'За категоріями', 'Звірка']) expect(workbook).toContain(`name="${name}"`)
   })
 
-  test('«Гроші зараз»: /<org> opens it; the balances of today and the total in PLN with an EUR account at the NBP rate', async ({ page, request }) => {
-    const user = await registerViaUi(page, 'rp-dash', 'PLN')
+  test('the Balance values an EUR account at the NBP rate: 200 EUR at 4,30 is 860 zł on top of the złoty account', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'rp-eur', 'PLN')
     await waitForShell(page, user.companyName)
     await seedLedgerAccount(request, user.orgId, 'acc-a', { name: 'Konto A', balance: 1000, currency: 'PLN' })
     await seedLedgerAccount(request, user.orgId, 'acc-eur', { name: 'Konto EUR', balance: 200, currency: 'EUR' })
-    await page.goto(`/${user.orgId}`)
-    await page.waitForURL(new RegExp(`/${user.orgId}/dashboard$`))
+    // The NBP stub (tests/e2e/helpers/nbp-stub.mjs) publishes EUR at 4.30 every weekday.
+    await page.goto(`/${user.orgId}/analytics/balance`)
     await waitForShell(page, user.companyName)
-    await expect(page.getByRole('heading', { level: 1, name: 'Гроші зараз' })).toBeVisible()
-    await expect(page.getByRole('navigation', { name: 'Модулі' }).getByRole('link', { name: 'Гроші зараз' })).toHaveAttribute('aria-current', 'page')
-    // The NBP stub (tests/e2e/helpers/nbp-stub.mjs) publishes EUR at 4.30 every weekday: 200 € is 860 zł.
-    await expect(page.getByTestId('dashboard-total')).toContainText(zl(1860))
-    await expect(page.getByTestId('dashboard-account')).toHaveCount(2)
-    await expect(page.getByTestId('dashboard-account').filter({ hasText: 'Konto EUR' })).toContainText(zl(860))
-    await expect(page.getByTestId('dashboard-currency').filter({ hasText: 'EUR' })).toContainText('4,3000')
+    await expect(page.getByTestId('balance-money-total')).toContainText(zl(1860))
     // A single segment that cannot be a company stays a 404 (no redirect into the shell).
     expect((await page.goto('/not.a.company'))?.status()).toBe(404)
   })

@@ -1,5 +1,5 @@
 // Read-only check for the S12 rollout (server reports). Per company it builds this month's Cash Flow and P&L from the
-// rollups and from the operations, the balances of yesterday and the dashboard, the way the routes do, and runs once each
+// rollups and from the operations, and the balances of yesterday, the way the routes do, and runs once each
 // query shape S12 adds (operations by accrual day and by accrual period, the count of the payments), so a missing index
 // shows up as FAILED_PRECONDITION with its creation link. Rates come through a read-only view of the NBP cache: nothing is
 // written, not even fxTables.
@@ -19,7 +19,7 @@ import { fetchNbpTables } from '@/lib/server/fx/nbp'
 import { createResolver } from '@/lib/server/fx/resolver'
 import { firestoreFxStore } from '@/lib/server/fx/store'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
-import { readBalances, readDashboard } from '@/lib/server/reports/balances'
+import { readBalances } from '@/lib/server/reports/balances'
 import { accrualDaysQuery, accrualEndsQuery, accrualStartsQuery, paymentsQuery, readCashFlowReport, readPLReport } from '@/lib/server/reports/read'
 import { todayUtcDay } from '@/lib/utils/today'
 import { assertReadinessTarget, parseCheckJournalArgs } from './lib/check-journal-args'
@@ -68,7 +68,6 @@ async function checkOrg(deps: LedgerDeps, orgId: string): Promise<ReportsCheck> 
   const cashFlowOps = await unlessOverLimit(readCashFlowReport(deps, orgId, month, { source: 'operations' }))
   const plOps = await unlessOverLimit(readPLReport(deps, orgId, month, { source: 'operations' }))
   const balances = await readBalances(deps, orgId, addDays(today, -1))
-  await readDashboard(deps, orgId)
   // The shapes the reads above may not reach, each once; an empty answer is fine.
   await accrualDaysQuery(deps.db, orgId, month.from, month.to).select().limit(1).get()
   // Both shapes of the accrual periods: the report reads the cheaper one, which depends on the history.

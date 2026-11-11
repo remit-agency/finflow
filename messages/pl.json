@@ -127,8 +127,7 @@
     "modules": {
       "transactions": "Płatności",
       "analytics": "Analityka",
-      "recurring": "Płatności planowane",
-      "dashboard": "Pieniądze teraz"
+      "recurring": "Płatności planowane"
     },
     "analyticsSections": {
       "cashflow": "Przepływy pieniężne (Cash Flow)",
@@ -1293,18 +1292,8 @@
       "rate": "{currency}: {rate} (NBP, {date})",
       "pending": "Dzisiejszy kurs NBP może się jeszcze zmienić"
     },
-    "dashboard": {
-      "title": "Pieniądze teraz",
-      "subtitle": "Salda wszystkich kont",
-      "total": "Razem w {currency}",
-      "byCurrency": "Według walut",
-      "accounts": "Konta",
-      "rate": "Kurs NBP {rate} z {date}",
-      "noRate": "Brak kursu NBP: nie wliczono do sumy",
-      "incomplete": "Bez kont w {currencies}: brak kursu NBP",
-      "lastSync": "Z banku: {date}",
-      "neverSynced": "Jeszcze nie pobrano z banku",
-      "empty": "Nie ma jeszcze kont"
+    "balance": {
+      "incomplete": "Bez kont w {currencies}: brak kursu NBP"
     },
     "export": {
       "sheets": {

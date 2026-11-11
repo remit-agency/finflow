@@ -3,7 +3,7 @@
 // which the server builds and the browser only names and saves.
 import { ReportError, type PeriodProblem } from '@/lib/domain/reports/errors'
 import { reportQueryToParams } from '@/lib/domain/reports/query'
-import type { BalancesReport, CashFlowReport, DashboardReport, ExportFormat, PLReport, ReportKind, ReportQuery } from '@/lib/domain/reports/types'
+import type { BalancesReport, CashFlowReport, ExportFormat, PLReport, ReportKind, ReportQuery } from '@/lib/domain/reports/types'
 import { downloadBlob } from '@/lib/utils/download'
 import { LedgerApiError, readApiError } from './ledger-client'
 
@@ -37,10 +37,6 @@ export function fetchPL(orgId: string, query: ReportQuery, signal?: AbortSignal)
 
 export function fetchBalances(orgId: string, date: string, signal?: AbortSignal): Promise<BalancesReport> {
   return getJson(`${reportsPath(orgId)}/balances?${new URLSearchParams({ date })}`, signal)
-}
-
-export function fetchDashboard(orgId: string, signal?: AbortSignal): Promise<DashboardReport> {
-  return getJson(`${reportsPath(orgId)}/dashboard`, signal)
 }
 
 /** The file is built by the server from the same report the page shows; `filename` is the page's (it knows the period's name). */

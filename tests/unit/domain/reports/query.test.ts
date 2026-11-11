@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { EMPTY_ANALYTICS_FILTERS, type AnalyticsFilters } from '@/lib/domain/analytics-filter/filter'
 import { ReportError } from '@/lib/domain/reports/errors'
 import {
-  assertNoParams,
   isWholeMonths,
   parseBalancesDate,
   parseExportRequest,
@@ -109,11 +108,6 @@ describe('the parameters of the other routes', () => {
     expect(parseBalancesDate(params('date=2026-10-31'))).toBe('2026-10-31')
     expect(refusal(() => parseBalancesDate(params('')))).toBe('invalid_input:date')
     expect(refusal(() => parseBalancesDate(params('date=2026-10-31&x=1')))).toBe('invalid_input:x')
-  })
-
-  it('the dashboard takes no parameter', () => {
-    expect(refusal(() => assertNoParams(params('')))).toBe('none')
-    expect(refusal(() => assertNoParams(params('a=1')))).toBe('invalid_input:a')
   })
 
   it('the export names the report and the format next to the query', () => {

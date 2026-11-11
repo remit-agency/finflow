@@ -4,7 +4,6 @@ import { MODULE_TABS, activeModule, isJournalPath } from '@/lib/shell/modules'
 describe('MODULE_TABS', () => {
   it('has only the shipped modules, in order', () => {
     expect(MODULE_TABS.map((t) => [t.key, t.href('org1')])).toEqual([
-      ['dashboard', '/org1/dashboard'],
       ['transactions', '/org1/transactions'],
       ['recurring', '/org1/recurring'],
       ['analytics', '/org1/analytics/cashflow'],
@@ -14,7 +13,6 @@ describe('MODULE_TABS', () => {
 
 describe('activeModule', () => {
   it.each([
-    ['/org1/dashboard', 'dashboard'],
     ['/org1/transactions', 'transactions'],
     ['/org1/recurring', 'recurring'],
     ['/org1/analytics', 'analytics'],

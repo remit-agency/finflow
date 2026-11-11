@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LedgerApiError } from '@/lib/api/ledger-client'
-import { downloadReport, fetchBalances, fetchCashFlow, fetchDashboard, fetchPL, viewOfFailure } from '@/lib/api/reports-client'
+import { downloadReport, fetchBalances, fetchCashFlow, fetchPL, viewOfFailure } from '@/lib/api/reports-client'
 import { EMPTY_ANALYTICS_FILTERS } from '@/lib/domain/analytics-filter/filter'
 import { ReportError } from '@/lib/domain/reports/errors'
 import type { ReportQuery } from '@/lib/domain/reports/types'
@@ -33,9 +33,6 @@ describe('reports client', () => {
     fetchMock.mockResolvedValue(json({ date: '2026-10-31' }))
     await fetchBalances('org1', '2026-10-31')
     expect(fetchMock.mock.calls[2][0]).toBe('/api/orgs/org1/reports/balances?date=2026-10-31')
-    fetchMock.mockResolvedValue(json({ date: '2026-10-27' }))
-    await fetchDashboard('org1')
-    expect(fetchMock.mock.calls[3][0]).toBe('/api/orgs/org1/reports/dashboard')
   })
 
   it('a period the parser refuses is its own view, and the view says why: the end before the start, or a period too long', () => {

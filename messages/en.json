@@ -127,8 +127,7 @@
     "modules": {
       "transactions": "Payments",
       "analytics": "Analytics",
-      "recurring": "Planned payments",
-      "dashboard": "Money now"
+      "recurring": "Planned payments"
     },
     "analyticsSections": {
       "cashflow": "Cash Flow",
@@ -1293,18 +1292,8 @@
       "rate": "{currency}: {rate} (NBP, {date})",
       "pending": "The NBP rate of today may still change"
     },
-    "dashboard": {
-      "title": "Money now",
-      "subtitle": "Balances of all accounts",
-      "total": "Total in {currency}",
-      "byCurrency": "By currency",
-      "accounts": "Accounts",
-      "rate": "NBP rate {rate} of {date}",
-      "noRate": "No NBP rate: left out of the total",
-      "incomplete": "Without the accounts in {currencies}: no NBP rate",
-      "lastSync": "From the bank: {date}",
-      "neverSynced": "Not yet updated from the bank",
-      "empty": "No accounts yet"
+    "balance": {
+      "incomplete": "Without the accounts in {currencies}: no NBP rate"
     },
     "export": {
       "sheets": {

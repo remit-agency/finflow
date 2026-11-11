@@ -111,7 +111,6 @@ test.describe('API guards', () => {
       '/api/orgs/x/reports/cashflow?from=2026-01-01&to=2026-12-31',
       '/api/orgs/x/reports/pl?from=2026-01-01&to=2026-12-31',
       '/api/orgs/x/reports/balances?date=2026-10-31',
-      '/api/orgs/x/reports/dashboard',
       '/api/orgs/x/reports/export?report=cashflow&format=xlsx&from=2026-01-01&to=2026-12-31',
     ]) {
       const res = await request.get(path)
