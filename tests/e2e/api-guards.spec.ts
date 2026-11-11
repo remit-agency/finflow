@@ -105,6 +105,20 @@ test.describe('API guards', () => {
     }
   })
 
+  // S12: the report routes refuse a request without a session cookie, before they read any data.
+  test('report endpoints require a session cookie (401)', async ({ request }) => {
+    for (const path of [
+      '/api/orgs/x/reports/cashflow?from=2026-01-01&to=2026-12-31',
+      '/api/orgs/x/reports/pl?from=2026-01-01&to=2026-12-31',
+      '/api/orgs/x/reports/balances?date=2026-10-31',
+      '/api/orgs/x/reports/dashboard',
+      '/api/orgs/x/reports/export?report=cashflow&format=xlsx&from=2026-01-01&to=2026-12-31',
+    ]) {
+      const res = await request.get(path)
+      expect(res.status(), path).toBe(401)
+    }
+  })
+
   test('Enable Banking callback rejects a forged state before exchanging the code (400)', async ({ request }) => {
     // The pre-S00 format: unsigned base64url JSON with just an orgId.
     const forged = Buffer.from(JSON.stringify({ orgId: 'victim-org' })).toString('base64url')
