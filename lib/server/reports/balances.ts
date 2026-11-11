@@ -23,7 +23,7 @@ export async function readBalances(deps: LedgerDeps, orgId: string, date: string
     return { context, balances, stats }
   })
   const base = read.context.baseCurrency
-  const rates = await quoteRates(deps.resolveRate, base, balanceRates(read.context.accounts, day, base))
+  const { book: rates } = await quoteRates(deps.resolveRate, base, balanceRates(read.context.accounts, day, base))
   const atDay = new Map(read.context.accounts.map((a) => [a.id, read.balances.get(a.id)?.get(day) ?? a.balanceMinor]))
   return { report: balancesReport({ date: day, baseCurrency: base, accounts: read.context.accounts, balances: atDay, rates }), stats: read.stats }
 }

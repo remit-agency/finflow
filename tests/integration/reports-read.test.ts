@@ -156,6 +156,26 @@ describe('Cash Flow on the server (S12)', () => {
       { currency: 'EUR', date: '2026-10-28' },
     ])
   })
+
+  it('a report that needs more NBP months than the bound is answered: the rates past it are not asked, counted and unvalued', async () => {
+    const asked: string[] = []
+    const counting = makeDeps(db, {
+      resolveRate: async (from, to, date) => {
+        if (from !== to) asked.push(date)
+        return steppedRate(from, to, date)
+      },
+    })
+    // One month of tables: the opening valuation (the table of September) is asked; the closing one and the transfer of October are not.
+    const { report } = await readCashFlowReport(counting, ORG, OCT, { rateMonths: 1 })
+    expect(report.totals.netBase).toBe(59_000)
+    expect(asked).toEqual(['2026-10-01'])
+    expect(report.reconciliation).toMatchObject({ valued: false, discrepancyBase: null })
+    expect(report.reconciliation.unrequestedRates).toEqual([
+      { currency: 'EUR', date: '2026-10-20' },
+      { currency: 'EUR', date: '2026-10-28' },
+    ])
+    expect(report.reconciliation.missingRates).toEqual(report.reconciliation.unrequestedRates)
+  })
 })
 
 describe('P&L on the server (S12)', () => {

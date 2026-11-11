@@ -47,14 +47,14 @@ export const LABELS: ExportLabels = {
   },
   lines: {
     opening: 'Opening balance', net: 'Net movement in the report', excluded: 'Excluded from analytics', included: 'The excluded operations are already in the figures',
-    outside: 'Operations outside the filter', transfers: 'Transfers between accounts', fx: 'Exchange difference', closing: 'Closing balance', discrepancy: 'Discrepancy', unvalued: 'No NBP rate:',
+    outside: 'Operations outside the filter', transfers: 'Transfers between accounts', fx: 'Exchange difference', closing: 'Closing balance', discrepancy: 'Discrepancy', unvalued: 'No NBP rate:', unrequested: 'Rates not asked of NBP:',
   },
 }
 
 /** One PLN account «main» from 1000 zł: 500 in, 160.50 out, 230 excluded, so 1109.50 at the end. */
 export function sampleReconciliation(): Reconciliation {
   return {
-    openingDay: '2026-09-30', closingDay: '2026-10-02', valued: true, missingRates: [],
+    openingDay: '2026-09-30', closingDay: '2026-10-02', valued: true, missingRates: [], unrequestedRates: [],
     openingBase: 100_000, reportNetBase: 33_950, excludedBase: -23_000, excludedIncluded: false, outsideFilterBase: 0,
     transfersBase: 0, fxBase: 0, closingBase: 110_950, discrepancyBase: 0,
     accounts: [{ accountId: 'main', currency: 'PLN', openingMinor: 100_000, closingMinor: 110_950, movementMinor: 10_950, openingBase: 100_000, closingBase: 110_950, transfersBase: 0, fxBase: 0 }],

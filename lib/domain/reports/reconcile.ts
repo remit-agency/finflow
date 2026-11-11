@@ -43,24 +43,29 @@ function byNeed(a: RateNeed, b: RateNeed): number {
   return a.date < b.date ? -1 : a.date > b.date ? 1 : 0
 }
 
-/** Each rate the reconciliation needs: the opening and closing valuation of every foreign account and each day it transferred. */
+/**
+ * Each rate the reconciliation needs: the opening and closing valuation of every foreign account, then each day it transferred
+ * (each group in date order). The valuations come first: when a report needs more NBP month tables than it asks, the transfers
+ * are the rates left unvalued, not the balances the equation is made of.
+ */
 export function ratesForReconciliation(
   accounts: readonly ReconcileAccount[],
   scope: ReportFacts,
   days: { openingDay: string; closingDay: string },
   baseCurrency: string,
 ): RateNeed[] {
-  const needs = new Map<string, RateNeed>()
-  const need = (currency: string, date: string): void => {
-    needs.set(rateKey(currency, date), { currency, date })
-  }
+  const valuations = new Map<string, RateNeed>()
+  const transfers = new Map<string, RateNeed>()
   for (const a of accounts) {
     if (a.currency === baseCurrency) continue
-    need(a.currency, valuationDate(days.openingDay))
-    need(a.currency, valuationDate(days.closingDay))
-    for (const [day, c] of cellsOf(scope, a.accountId)) if (c.transferInMinor !== 0 || c.transferOutMinor !== 0) need(a.currency, day)
+    for (const date of [valuationDate(days.openingDay), valuationDate(days.closingDay)]) valuations.set(rateKey(a.currency, date), { currency: a.currency, date })
+    for (const [day, c] of cellsOf(scope, a.accountId)) {
+      if (c.transferInMinor !== 0 || c.transferOutMinor !== 0) transfers.set(rateKey(a.currency, day), { currency: a.currency, date: day })
+    }
   }
-  return [...needs.values()].sort(byNeed)
+  const inOrder = (m: Map<string, RateNeed>): RateNeed[] => [...m.values()].sort(byNeed)
+  const transferOnly = inOrder(transfers).filter((n) => !valuations.has(rateKey(n.currency, n.date)))
+  return [...inOrder(valuations), ...transferOnly]
 }
 
 function netBase(byAccount: Map<string, DayCells>, accounts: ReadonlySet<string>): number {
@@ -70,6 +75,12 @@ function netBase(byAccount: Map<string, DayCells>, accounts: ReadonlySet<string>
     for (const c of cells.values()) sum += c.inBase - c.outBase
   }
   return sum
+}
+
+/** The rates the reconciliation is missing that NBP was asked for and did not give (the missing ones but the unrequested). */
+export function ratesNbpDidNotGive(r: Pick<Reconciliation, 'missingRates' | 'unrequestedRates'>): RateNeed[] {
+  const notAsked = new Set(r.unrequestedRates.map((n) => rateKey(n.currency, n.date)))
+  return r.missingRates.filter((n) => !notAsked.has(rateKey(n.currency, n.date)))
 }
 
 export interface ReconcileInput {
@@ -83,10 +94,12 @@ export interface ReconcileInput {
   report: ReportFacts
   includeExcluded: boolean
   rates: RateBook
+  /** Rates the caller did not ask NBP for (past its month bound): missing like the others, and named apart from them. */
+  unrequestedRates: readonly RateNeed[]
 }
 
 export function reconcile(input: ReconcileInput): Reconciliation {
-  const { baseCurrency, days, scope, report, rates, includeExcluded } = input
+  const { baseCurrency, days, scope, report, rates, includeExcluded, unrequestedRates } = input
   const ids = new Set(input.accounts.map((a) => a.accountId))
   const missing = new Map<string, RateNeed>()
   const value = (minor: number, currency: string, date: string): number | null => {
@@ -157,6 +170,7 @@ export function reconcile(input: ReconcileInput): Reconciliation {
     closingDay: days.closingDay,
     valued: missing.size === 0,
     missingRates: [...missing.values()].sort(byNeed),
+    unrequestedRates: [...unrequestedRates].sort(byNeed),
     openingBase,
     reportNetBase,
     excludedBase,

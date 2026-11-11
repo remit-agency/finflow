@@ -70,6 +70,8 @@ export type ReadKind = 'query' | 'aggregate' | 'getAll'
 export interface ReadReportOptions {
   /** Tests and the rollout check: another read limit, or one path forced. */
   cap?: number
+  /** Tests: another bound on the NBP month tables of the reconciliation (MAX_RATE_MONTHS by default). */
+  rateMonths?: number
   source?: ReportSource
   /** Tests: told of every read before it is made (a refusal must make no document read). */
   onRead?: (kind: ReadKind) => void
@@ -355,12 +357,21 @@ function balanceLines(read: FactsRead): ReconcileAccount[] {
   }))
 }
 
-async function reconciliationOf(deps: LedgerDeps, read: FactsRead): Promise<Reconciliation> {
+async function reconciliationOf(deps: LedgerDeps, read: FactsRead, rateMonths: number | undefined): Promise<Reconciliation> {
   const base = read.context.baseCurrency
   const accounts = balanceLines(read)
   // The rates come after the snapshot: they are not part of the equation's data and may wait for NBP.
-  const rates = await quoteRates(deps.resolveRate, base, ratesForReconciliation(accounts, read.scope, read.days, base))
-  return reconcile({ baseCurrency: base, days: read.days, accounts, scope: read.scope, report: read.report, includeExcluded: read.includeExcluded, rates })
+  const quoted = await quoteRates(deps.resolveRate, base, ratesForReconciliation(accounts, read.scope, read.days, base), rateMonths)
+  return reconcile({
+    baseCurrency: base,
+    days: read.days,
+    accounts,
+    scope: read.scope,
+    report: read.report,
+    includeExcluded: read.includeExcluded,
+    rates: quoted.book,
+    unrequestedRates: quoted.unrequested,
+  })
 }
 
 export async function readCashFlowReport(deps: LedgerDeps, orgId: string, q: ReportQuery, opts: ReadReportOptions = {}): Promise<ReportRead<CashFlowReport>> {
@@ -375,7 +386,7 @@ export async function readCashFlowReport(deps: LedgerDeps, orgId: string, q: Rep
     categoryTypes: read.context.categoryTypes,
     balances,
   })
-  const reconciliation = await reconciliationOf(deps, read)
+  const reconciliation = await reconciliationOf(deps, read, opts.rateMonths)
   return {
     report: { kind: 'cashflow', from: q.from, to: q.to, currency: read.context.baseCurrency, ...core, reconciliation, coverage: read.coverage },
     stats: read.stats,
@@ -386,7 +397,7 @@ export async function readCashFlowReport(deps: LedgerDeps, orgId: string, q: Rep
 export async function readPLReport(deps: LedgerDeps, orgId: string, q: ReportQuery, opts: ReadReportOptions = {}): Promise<ReportRead<PLReport>> {
   const read = await readFacts(deps, orgId, q, 'pl', opts)
   const core = buildPLCore(read.report, { from: q.from, to: q.to, includeExcluded: read.includeExcluded, categoryTypes: read.context.categoryTypes })
-  const reconciliation = await reconciliationOf(deps, read)
+  const reconciliation = await reconciliationOf(deps, read, opts.rateMonths)
   return {
     report: { kind: 'pl', from: q.from, to: q.to, currency: read.context.baseCurrency, ...core, reconciliation, coverage: read.coverage },
     stats: read.stats,

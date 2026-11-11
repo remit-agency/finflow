@@ -1250,7 +1250,7 @@
       "operations": "Policzono z operacji okresu: {count}"
     },
     "uncountable": "Nie policzono operacji bez kwoty w walucie firmy: {count}",
-    "tooLarge": "Raport wymaga więcej danych, niż serwer odczytuje naraz (limit {cap}). Zawęź okres lub konta albo usuń filtry.",
+    "tooLarge": "Raport wymaga więcej danych, niż serwer odczytuje naraz (limit {cap}). Wybierz krótszy okres lub mniej kont.",
     "periodTooLong": "Okres jest za długi: raport obejmuje do {days} dni. Wybierz krótszy okres.",
     "error": "Nie udało się wczytać raportu.",
     "retry": "Spróbuj ponownie",
@@ -1286,6 +1286,7 @@
       "discrepancy": "Rozbieżność",
       "ok": "Zgadza się",
       "unvalued": "Brak kursu NBP ({currencies}): nie uzgodniono",
+      "unrequested": "Nie pobrano {count} kursów z NBP: okres wymaga więcej niż {months} miesięcy kursów. Wybierz krótszy okres, aby je uzgodnić.",
       "rate": "{currency}: {rate} (NBP, {date})",
       "pending": "Dzisiejszy kurs NBP może się jeszcze zmienić"
     },
@@ -1349,7 +1350,8 @@
         "fx": "Różnice kursowe",
         "closing": "Saldo końcowe",
         "discrepancy": "Rozbieżność",
-        "unvalued": "Brak kursu NBP:"
+        "unvalued": "Brak kursu NBP:",
+        "unrequested": "Kursy nie pobrane z NBP:"
       }
     }
   }

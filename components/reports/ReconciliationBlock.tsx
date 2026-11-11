@@ -3,7 +3,8 @@
 import { useTranslations } from 'next-intl'
 import { fromDay } from '@/lib/domain/ledger/days'
 import { fromMinor } from '@/lib/domain/ledger/money'
-import type { Reconciliation } from '@/lib/domain/reports/types'
+import { ratesNbpDidNotGive } from '@/lib/domain/reports/reconcile'
+import { MAX_RATE_MONTHS, type Reconciliation } from '@/lib/domain/reports/types'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { cn } from '@/lib/utils'
 
@@ -34,7 +35,7 @@ export function ReconciliationBlock({ reconciliation: r, currency }: { reconcili
   if (r.rates.length > 0) lines.push({ id: 'fx', label: t('fx'), value: r.fxBase })
   lines.push({ id: 'closing', label: t('closing', { date: day(r.closingDay) }), value: r.closingBase, tone: 'strong' })
   if (r.discrepancyBase !== null && r.discrepancyBase !== 0) lines.push({ id: 'discrepancy', label: t('discrepancy'), value: r.discrepancyBase, tone: 'bad' })
-  const missing = [...new Set(r.missingRates.map((m) => m.currency))].join(', ')
+  const missing = [...new Set(ratesNbpDidNotGive(r).map((m) => m.currency))].join(', ')
   const pending = r.rates.some((x) => x.closing !== null && !x.closing.final)
   return (
     <section aria-labelledby="reconciliation-title" data-testid="reconciliation" className="rounded-panel border border-line bg-surface">
@@ -52,7 +53,12 @@ export function ReconciliationBlock({ reconciliation: r, currency }: { reconcili
       <div className="space-y-1 border-t border-line px-6 py-3 text-xs text-ink-muted">
         {r.discrepancyBase === 0 && <p data-testid="recon-ok" className="font-medium text-income">{t('ok')}</p>}
         {r.excludedIncluded && <p data-testid="recon-included">{t('included')}</p>}
-        {!r.valued && <p data-testid="recon-unvalued" className="text-expense">{t('unvalued', { currencies: missing })}</p>}
+        {ratesNbpDidNotGive(r).length > 0 && <p data-testid="recon-unvalued" className="text-expense">{t('unvalued', { currencies: missing })}</p>}
+        {r.unrequestedRates.length > 0 && (
+          <p data-testid="recon-unrequested" className="text-expense">
+            {t('unrequested', { count: number(r.unrequestedRates.length), months: number(MAX_RATE_MONTHS) })}
+          </p>
+        )}
         {r.rates.map((x) =>
           x.closing === null ? null : (
             <p key={x.currency} data-testid="recon-rate">

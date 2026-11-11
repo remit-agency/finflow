@@ -14,6 +14,12 @@ export const CASHFLOW_DAY_BUCKETS_MAX_DAYS = 31
 export const MAX_REPORT_DAYS = 3660
 
 /**
+ * The NBP month tables one report may ask for (a table covers a month, the resolver caches it, S04). A report that needs more
+ * values the rest as unvalued and says so (`Reconciliation.unrequestedRates`): it is answered, never refused.
+ */
+export const MAX_RATE_MONTHS = 60
+
+/**
  * Documents one report request may read (operations, arrival documents and rollups; every read counts, duplicates too). The
  * counts of all its queries come before the first read, and a request above the cap is `too_many_operations`, never a
  * partial figure. Measured on the emulator (PROGRESS.md, S12, Task 15; synthetic data, production not measured): a filtered
@@ -177,7 +183,10 @@ export interface Reconciliation {
   closingDay: string
   /** False when a rate is missing: the lines that need it are null and `missingRates` says which. */
   valued: boolean
+  /** The rates the lines need and do not have: NBP could not give them, or they were not asked (`unrequestedRates`). */
   missingRates: RateNeed[]
+  /** The part of `missingRates` not asked of NBP at all: the report needs more than MAX_RATE_MONTHS month tables. */
+  unrequestedRates: RateNeed[]
   openingBase: number | null
   /** Income minus expense the report counts (the Cash Flow totals). */
   reportNetBase: number

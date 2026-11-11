@@ -9,7 +9,7 @@ import { readCashFlowReport, readPLReport } from './read'
 /**
  * The reports (S12) bound to the production Firestore, NBP rates and the Warsaw clock. They read the ledger and write nothing
  * of it; a report may fetch NBP tables the resolver has not cached yet (it writes them to its `fxTables` cache, S04), so the
- * routes count each user's requests against REPORT_LIMITS and a request asks NBP for at most MAX_RATE_LOOKUPS rates.
+ * routes count each user's requests against REPORT_LIMITS and a request asks NBP for the month tables of at most MAX_RATE_MONTHS.
  */
 export const reports = {
   cashflow: async (orgId: string, query: ReportQuery) => (await readCashFlowReport(ledgerDeps(), orgId, query)).report,

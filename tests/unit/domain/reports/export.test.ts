@@ -85,6 +85,23 @@ describe('cashFlowSheets', () => {
       ['No NBP rate:', 'EUR'],
     ])
   })
+
+  it('rates the report did not ask NBP for are their own line (how many); only the rates NBP did not give name a currency', () => {
+    const limited = sampleCashFlow()
+    const notAsked = { currency: 'EUR', date: '2026-10-03' }
+    limited.reconciliation = {
+      ...limited.reconciliation,
+      valued: false,
+      missingRates: [notAsked],
+      unrequestedRates: [notAsked],
+      fxBase: null,
+      discrepancyBase: null,
+      rates: [{ currency: 'EUR', opening: null, closing: null }],
+    }
+    const rows = cashFlowSheets(limited, ctx)[2].rows
+    expect(rows.some((row) => row[0] === 'Rates not asked of NBP:' && row[1] === '1')).toBe(true)
+    expect(rows.some((row) => row[0] === 'No NBP rate:')).toBe(false)
+  })
 })
 
 describe('plSheets', () => {

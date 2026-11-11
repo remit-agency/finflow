@@ -1250,7 +1250,7 @@
       "operations": "Counted from the operations of the period: {count}"
     },
     "uncountable": "Operations without an amount in the company currency, not counted: {count}",
-    "tooLarge": "This report needs more data than the server reads at once (limit {cap}). Narrow the period or the accounts, or clear the filters.",
+    "tooLarge": "This report needs more data than the server reads at once (limit {cap}). Choose a shorter period or fewer accounts.",
     "periodTooLong": "The period is too long: a report covers up to {days} days. Choose a shorter period.",
     "error": "Could not load the report.",
     "retry": "Try again",
@@ -1286,6 +1286,7 @@
       "discrepancy": "Discrepancy",
       "ok": "Reconciled",
       "unvalued": "No NBP rate ({currencies}): not reconciled",
+      "unrequested": "{count} rates were not asked of NBP: the period needs more than {months} NBP months. Choose a shorter period to reconcile them.",
       "rate": "{currency}: {rate} (NBP, {date})",
       "pending": "The NBP rate of today may still change"
     },
@@ -1349,7 +1350,8 @@
         "fx": "Exchange difference",
         "closing": "Closing balance",
         "discrepancy": "Discrepancy",
-        "unvalued": "No NBP rate:"
+        "unvalued": "No NBP rate:",
+        "unrequested": "Rates not asked of NBP:"
       }
     }
   }

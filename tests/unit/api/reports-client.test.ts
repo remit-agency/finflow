@@ -48,7 +48,8 @@ describe('reports client', () => {
     expect(e).toBeInstanceOf(LedgerApiError)
     expect(e).toMatchObject({ status: 422, code: 'too_many_operations', details: { cap: 10_000 } })
     expect(viewOfFailure(e)).toEqual({ status: 'too_large', cap: 10_000 })
-    expect(viewOfFailure(new LedgerApiError(422, 'too_many_rates', { cap: 400 }))).toEqual({ status: 'too_large', cap: 400 })
+    // An NBP refusal of the old kind is not a state of the report any more: it is an error.
+    expect(viewOfFailure(new LedgerApiError(422, 'too_many_rates', { cap: 400 }))).toEqual({ status: 'error' })
     expect(viewOfFailure(new LedgerApiError(500, 'internal'))).toEqual({ status: 'error' })
     expect(viewOfFailure(new TypeError('offline'))).toEqual({ status: 'error' })
   })

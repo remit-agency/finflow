@@ -102,7 +102,7 @@ describe('report properties', () => {
         openingMinor: balanceAt(ops, a.id, a.openingMinor, days.openingDay),
         closingMinor: balanceAt(ops, a.id, a.openingMinor, days.closingDay),
       }))
-      const rec = reconcile({ baseCurrency: BASE, days, accounts, scope, report, includeExcluded: chosen.includeExcluded, rates: bookFor(ratesForReconciliation(accounts, scope, days, BASE)) })
+      const rec = reconcile({ baseCurrency: BASE, days, accounts, scope, report, includeExcluded: chosen.includeExcluded, rates: bookFor(ratesForReconciliation(accounts, scope, days, BASE)), unrequestedRates: [] })
       expect(rec.valued, `seed ${seed}`).toBe(true)
       // The equation itself: discrepancy 0 is opening + net + excluded + outside + transfers + fx = closing, to the minor unit.
       expect(rec.discrepancyBase, `seed ${seed}`).toBe(0)

@@ -1,10 +1,10 @@
 // lib/domain/reports/errors.ts
-export type ReportErrorCode = 'invalid_input' | 'too_many_operations' | 'too_many_rates'
+export type ReportErrorCode = 'invalid_input' | 'too_many_operations'
 
 /**
- * An expected refusal of a report: a bad parameter (`field`), a period with more documents than `cap` (`too_many_operations`),
- * or more distinct NBP rates than `cap` are needed to value it (`too_many_rates`). All of them are decided before any read
- * of the document or any NBP request that the refusal would have spent.
+ * An expected refusal of a report: a bad parameter (`field`), or a period with more documents than `cap`
+ * (`too_many_operations`). Both are decided before any document is read. The NBP rates never refuse
+ * a report: those past MAX_RATE_MONTHS are left unvalued and named (`Reconciliation.unrequestedRates`).
  */
 export class ReportError extends Error {
   public readonly code: ReportErrorCode

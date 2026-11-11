@@ -40,10 +40,11 @@ describe('reconciliationDays', () => {
 describe('ratesForReconciliation', () => {
   it('the opening and closing valuation days and each transfer day of a foreign account; nothing for the company currency', () => {
     const scope = factsOf(OPS, ['pln', 'eur'])
+    // The valuations (opening, closing) first, then the transfer days: a bounded NBP request leaves the transfers unvalued first.
     expect(ratesForReconciliation([PLN, EUR], scope, DAYS, 'PLN')).toEqual([
       { currency: 'EUR', date: '2026-10-01' },
-      { currency: 'EUR', date: '2026-10-20' },
       { currency: 'EUR', date: '2026-10-28' },
+      { currency: 'EUR', date: '2026-10-20' },
     ])
     expect(ratesForReconciliation([PLN], scope, DAYS, 'PLN')).toEqual([])
   })
@@ -52,7 +53,7 @@ describe('ratesForReconciliation', () => {
 describe('reconcile', () => {
   it('adds up across currencies: the EUR account has its exchange difference, the transfer is in PLN at the NBP rate of its day', () => {
     const scope = factsOf(OPS, ['pln', 'eur'])
-    const r = reconcile({ baseCurrency: 'PLN', days: DAYS, accounts: [PLN, EUR], scope, report: scope, includeExcluded: false, rates: RATES })
+    const r = reconcile({ baseCurrency: 'PLN', days: DAYS, accounts: [PLN, EUR], scope, report: scope, includeExcluded: false, rates: RATES, unrequestedRates: [] })
     expect(r).toMatchObject({
       openingDay: '2026-09-30',
       closingDay: '2026-10-27',
@@ -78,19 +79,19 @@ describe('reconcile', () => {
   it('a concrete tag: the excluded operations are in the report, the rest of the accounts is outside the filter', () => {
     const scope = factsOf(OPS, ['pln', 'eur'])
     const report = factsOf(OPS.filter((tx) => tx.tags.includes('vat')), ['pln', 'eur'])
-    const r = reconcile({ baseCurrency: 'PLN', days: DAYS, accounts: [PLN, EUR], scope, report, includeExcluded: true, rates: RATES })
+    const r = reconcile({ baseCurrency: 'PLN', days: DAYS, accounts: [PLN, EUR], scope, report, includeExcluded: true, rates: RATES, unrequestedRates: [] })
     expect(r).toMatchObject({ reportNetBase: -23_000, excludedBase: null, excludedIncluded: true, outsideFilterBase: 59_000, discrepancyBase: 0 })
   })
 
   it('one account: its transfers with the other accounts are a line of their own', () => {
     const scope = factsOf(OPS.filter((tx) => tx.accountId === 'eur' || tx.toAccountId === 'eur'), ['eur'])
-    const r = reconcile({ baseCurrency: 'PLN', days: DAYS, accounts: [EUR], scope, report: scope, includeExcluded: false, rates: RATES })
+    const r = reconcile({ baseCurrency: 'PLN', days: DAYS, accounts: [EUR], scope, report: scope, includeExcluded: false, rates: RATES, unrequestedRates: [] })
     expect(r).toMatchObject({ openingBase: 40_000, reportNetBase: 21_000, excludedBase: 0, outsideFilterBase: 0, transfersBase: 44_000, fxBase: 5_000, closingBase: 110_000, discrepancyBase: 0 })
   })
 
   it('a balance that does not agree with the movement is «Розбіжність», not an exchange difference', () => {
     const scope = factsOf(OPS, ['pln', 'eur'])
-    const off = (accounts: ReconcileAccount[]) => reconcile({ baseCurrency: 'PLN', days: DAYS, accounts, scope, report: scope, includeExcluded: false, rates: RATES })
+    const off = (accounts: ReconcileAccount[]) => reconcile({ baseCurrency: 'PLN', days: DAYS, accounts, scope, report: scope, includeExcluded: false, rates: RATES, unrequestedRates: [] })
     const pln = off([{ ...PLN, closingMinor: 72_100 }, EUR])
     expect([pln.discrepancyBase, pln.fxBase]).toEqual([100, 5_000])
     // 10 cents of EUR too many: 250.10 € at 4.40 is 1100.44 zł against the 1100.00 the movement explains.
@@ -102,7 +103,7 @@ describe('reconcile', () => {
     const scope = factsOf(OPS, ['pln', 'eur'])
     const rates = new Map(RATES)
     rates.delete(rateKey('EUR', '2026-10-20'))
-    const r = reconcile({ baseCurrency: 'PLN', days: DAYS, accounts: [PLN, EUR], scope, report: scope, includeExcluded: false, rates })
+    const r = reconcile({ baseCurrency: 'PLN', days: DAYS, accounts: [PLN, EUR], scope, report: scope, includeExcluded: false, rates, unrequestedRates: [] })
     expect(r).toMatchObject({
       valued: false,
       missingRates: [{ currency: 'EUR', date: '2026-10-20' }],
@@ -119,7 +120,18 @@ describe('reconcile', () => {
   it('a company in PLN only needs no rate and is exactly the equation of the spec', () => {
     const ops = OPS.filter((tx) => tx.currency === 'PLN' && tx.type !== 'transfer')
     const scope = factsOf(ops, ['pln'])
-    const r = reconcile({ baseCurrency: 'PLN', days: DAYS, accounts: [{ ...PLN, closingMinor: 115_000 }], scope, report: scope, includeExcluded: false, rates: new Map() })
+    const r = reconcile({ baseCurrency: 'PLN', days: DAYS, accounts: [{ ...PLN, closingMinor: 115_000 }], scope, report: scope, includeExcluded: false, rates: new Map(), unrequestedRates: [] })
     expect(r).toMatchObject({ valued: true, openingBase: 100_000, reportNetBase: 38_000, excludedBase: -23_000, transfersBase: 0, fxBase: 0, closingBase: 115_000, discrepancyBase: 0, rates: [] })
+  })
+
+  it('rates the caller did not ask NBP for are missing like any other, and counted apart: the figures of the report stay', () => {
+    const scope = factsOf(OPS, ['pln', 'eur'])
+    const rates = new Map(RATES)
+    rates.delete(rateKey('EUR', '2026-10-20'))
+    const notAsked = { currency: 'EUR', date: '2026-10-20' }
+    const r = reconcile({ baseCurrency: 'PLN', days: DAYS, accounts: [PLN, EUR], scope, report: scope, includeExcluded: false, rates, unrequestedRates: [notAsked] })
+    expect(r).toMatchObject({ valued: false, reportNetBase: 59_000, discrepancyBase: null })
+    expect(r.missingRates).toEqual([notAsked])
+    expect(r.unrequestedRates).toEqual([notAsked])
   })
 })

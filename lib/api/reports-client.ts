@@ -44,11 +44,11 @@ export async function downloadReport(orgId: string, kind: ReportKind, format: Ex
 }
 
 /**
- * A report that needs more than the server reads at once (more documents, or more NBP rates than it values) is a state of its own
- * («звузьте період»); anything else is an error.
+ * A report that needs more documents than the server reads at once is a state of its own («звузьте період»); anything else is an
+ * error. (The NBP rates never refuse a report: the reconciliation names the ones it left out.)
  */
 export function viewOfFailure(e: unknown): ServerView<never> {
-  if (e instanceof LedgerApiError && e.status === 422 && (e.code === 'too_many_operations' || e.code === 'too_many_rates')) {
+  if (e instanceof LedgerApiError && e.status === 422 && e.code === 'too_many_operations') {
     const cap = Number(e.details?.cap)
     return { status: 'too_large', cap: Number.isFinite(cap) ? cap : 0 }
   }

@@ -5,6 +5,7 @@
 import { buildCsvSections, formatAmount } from '@/lib/domain/journal/csv'
 import type { KindCategory } from '@/lib/domain/analytics-filter/kinds'
 import { categoryTreeRows, rowRank } from './categories'
+import { ratesNbpDidNotGive } from './reconcile'
 import type { CashFlowReport, CategoryLine, MoneyType, PLReport, Reconciliation } from './types'
 
 /** A text, or an amount in minor units (a number in XLSX, the language's decimal sign in CSV). */
@@ -38,7 +39,7 @@ export interface ExportLabels {
   }
   types: { income: string; expense: string }
   rows: { total: string; totalIncome: string; totalExpense: string; profit: string; excludedIncome: string; excludedExpense: string; noCategory: string }
-  lines: { opening: string; net: string; excluded: string; included: string; outside: string; transfers: string; fx: string; closing: string; discrepancy: string; unvalued: string }
+  lines: { opening: string; net: string; excluded: string; included: string; outside: string; transfers: string; fx: string; closing: string; discrepancy: string; unvalued: string; unrequested: string }
 }
 
 export interface ExportContext {
@@ -84,7 +85,9 @@ export function reconciliationSheet(rec: Reconciliation, currency: string, ctx: 
   if (rec.rates.length > 0) rows.push([lines.fx, money(rec.fxBase)])
   rows.push([lines.closing, money(rec.closingBase)])
   if (rec.discrepancyBase !== 0) rows.push([lines.discrepancy, money(rec.discrepancyBase)])
-  if (!rec.valued) rows.push([lines.unvalued, [...new Set(rec.missingRates.map((m) => m.currency))].join(', ')])
+  const notGiven = ratesNbpDidNotGive(rec)
+  if (notGiven.length > 0) rows.push([lines.unvalued, [...new Set(notGiven.map((m) => m.currency))].join(', ')])
+  if (rec.unrequestedRates.length > 0) rows.push([lines.unrequested, String(rec.unrequestedRates.length)])
   rows.push([])
   rows.push([
     columns.account,
