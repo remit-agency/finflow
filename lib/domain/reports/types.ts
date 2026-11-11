@@ -14,11 +14,15 @@ export const CASHFLOW_DAY_BUCKETS_MAX_DAYS = 31
 export const MAX_REPORT_DAYS = 3660
 
 /**
- * Documents (operations and rollups together) one report request may read; above it the answer is `too_many_operations`,
- * never a partial figure. From the function's resources: an operation read with the selected fields is under 1 KB, so a
- * request holds at most about 10 MB of decoded data (the Vercel function has 2 GB) and, at an estimated 2 000 to 5 000
- * documents a second for a Firestore query stream, takes at most about 5 s; a year of a company with 800 operations a
- * month fits. The S12 plan measures it on the emulator (Task 15).
+ * Documents one report request may read (operations, arrival documents and rollups; every read counts, duplicates too). The
+ * counts of all its queries come before the first read, and a request above the cap is `too_many_operations`, never a
+ * partial figure. Measured on the emulator (PROGRESS.md, S12, Task 15; synthetic data, production not measured): a filtered
+ * Cash Flow of a year read 9 828 documents for 12 000 operations, just under the cap; a filtered P&L reads its payments
+ * (the period ±7 days) and its accrual days and periods, about 1.6 documents per operation of the company (4 805 for 3 000),
+ * so it refuses a year above roughly 6 000 operations. The no-filter path reads one rollup per account-day with movement
+ * plus its `x_` twin, not one per operation (1 582 documents for 12 000 operations), so it is refused only by many
+ * accounts moving on many days (see PROGRESS.md, S12 follow-ups). The memory is not the limit: an operation read is
+ * under 1 KB, so the cap holds about 10 MB of decoded data.
  */
 export const REPORT_SCAN_CAP = 10_000
 
