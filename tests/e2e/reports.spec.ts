@@ -177,7 +177,7 @@ test.describe('server reports (emulators)', () => {
     )
     await page.goto(`/${user.orgId}/analytics/cashflow`)
     await waitForShell(page, user.companyName)
-    await expect(page.getByTestId('report-too-large')).toHaveText(`Забагато операцій для цього звіту: більше ${formatNumber(10_000, 'uk')}. Звузьте період або зніміть фільтри.`)
+    await expect(page.getByTestId('report-too-large')).toHaveText(`Звіту потрібно більше даних, ніж сервер читає разом (ліміт ${formatNumber(10_000, 'uk')}). Звузьте період або рахунки чи зніміть фільтри.`)
     await expect(page.getByTestId('cashflow-total-income')).toHaveCount(0)
   })
 

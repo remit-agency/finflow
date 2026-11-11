@@ -1250,7 +1250,7 @@
       "operations": "Counted from the operations of the period: {count}"
     },
     "uncountable": "Operations without an amount in the company currency, not counted: {count}",
-    "tooLarge": "Too many operations for this report: more than {cap}. Narrow the period or clear the filters.",
+    "tooLarge": "This report needs more data than the server reads at once (limit {cap}). Narrow the period or the accounts, or clear the filters.",
     "error": "Could not load the report.",
     "retry": "Try again",
     "exportFailed": "Could not build the file.",

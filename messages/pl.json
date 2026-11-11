@@ -1250,7 +1250,7 @@
       "operations": "Policzono z operacji okresu: {count}"
     },
     "uncountable": "Nie policzono operacji bez kwoty w walucie firmy: {count}",
-    "tooLarge": "Za dużo operacji dla tego raportu: ponad {cap}. Zawęź okres albo usuń filtry.",
+    "tooLarge": "Raport wymaga więcej danych, niż serwer odczytuje naraz (limit {cap}). Zawęź okres lub konta albo usuń filtry.",
     "error": "Nie udało się wczytać raportu.",
     "retry": "Spróbuj ponownie",
     "exportFailed": "Nie udało się przygotować pliku.",

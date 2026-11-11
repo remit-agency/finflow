@@ -42,9 +42,12 @@ export async function downloadReport(orgId: string, kind: ReportKind, format: Ex
   downloadBlob(filename, await res.blob())
 }
 
-/** A period with more operations than the server reads is a state of its own («звузьте період»); anything else is an error. */
+/**
+ * A report that needs more than the server reads at once (more documents, or more NBP rates than it values) is a state of its own
+ * («звузьте період»); anything else is an error.
+ */
 export function viewOfFailure(e: unknown): ServerView<never> {
-  if (e instanceof LedgerApiError && e.status === 422 && e.code === 'too_many_operations') {
+  if (e instanceof LedgerApiError && e.status === 422 && (e.code === 'too_many_operations' || e.code === 'too_many_rates')) {
     const cap = Number(e.details?.cap)
     return { status: 'too_large', cap: Number.isFinite(cap) ? cap : 0 }
   }
