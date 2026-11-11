@@ -96,7 +96,8 @@ describe('Cash Flow on the server (S12)', () => {
     const reads: string[] = []
     await expect(readPLReport(deps, ORG, tagged, { cap: 10, onRead: (kind) => reads.push(kind) })).rejects.toMatchObject({ code: 'too_many_operations', cap: 10 })
     expect(reads.filter((kind) => kind === 'query' || kind === 'getAll')).toEqual([])
-    expect(reads).toEqual(['aggregate', 'aggregate', 'aggregate'])
+    // Four counts before the refusal: the payments, the accrual days and both shapes of the accrual periods (one is then read).
+    expect(reads).toEqual(['aggregate', 'aggregate', 'aggregate', 'aggregate'])
     expect((await readPLReport(deps, ORG, tagged, { cap: 11 })).report.totals.expenseBase).toBe(23_000)
   })
 
@@ -169,5 +170,52 @@ describe('P&L on the server (S12)', () => {
     const pl = (await readPLReport(deps, ORG, OCT)).report
     const cashFlow = (await readCashFlowReport(deps, ORG, OCT)).report
     expect(pl.reconciliation).toEqual(cashFlow.reconciliation)
+  })
+
+  it('a period that starts years before the period and ends inside it is found by the operations path', async () => {
+    await createTransaction(deps, ORG, UID, parseTransactionInput({
+      type: 'expense', accountId: 'pln', amountMinor: 31_000, paymentDate: '2026-10-03', categoryId: 'k-ex',
+      accrual: { mode: 'period', from: '2024-01-01', to: '2026-10-15' },
+    }))
+    const fromRollups = await readPLReport(deps, ORG, OCT)
+    const fromOperations = await readPLReport(deps, ORG, OCT, { source: 'operations' })
+    expect(withoutCoverage(fromOperations.report)).toEqual(withoutCoverage(fromRollups.report))
+    expect(fromOperations.report.rows.find((r) => r.row === 'k-ex')?.total).toBeGreaterThan(12_000)
+  })
+
+  it('a period that starts inside the period and ends years after it is found by the operations path', async () => {
+    await createTransaction(deps, ORG, UID, parseTransactionInput({
+      type: 'expense', accountId: 'pln', amountMinor: 31_000, paymentDate: '2026-10-21', categoryId: 'k-ex',
+      accrual: { mode: 'period', from: '2026-10-20', to: '2028-06-30' },
+    }))
+    const fromRollups = await readPLReport(deps, ORG, OCT)
+    const fromOperations = await readPLReport(deps, ORG, OCT, { source: 'operations' })
+    expect(withoutCoverage(fromOperations.report)).toEqual(withoutCoverage(fromRollups.report))
+    expect(fromOperations.report.rows.find((r) => r.row === 'k-ex')?.total).toBeGreaterThan(12_000)
+  })
+
+  it('the operations path reads the cheaper period shape: a history of periods that ended before the period costs no read', async () => {
+    const before = (await readPLReport(deps, ORG, OCT, { source: 'operations' })).stats.reads
+    for (let i = 0; i < 40; i++) {
+      await createTransaction(deps, ORG, UID, parseTransactionInput({
+        type: 'expense', accountId: 'pln', amountMinor: 1_000, paymentDate: '2026-09-15', categoryId: 'k-ex',
+        accrual: { mode: 'period', from: '2026-08-01', to: '2026-08-31' },
+      }))
+    }
+    // A cap of the reads before the history: the history is not read, so the answer is not refused.
+    const after = await readPLReport(deps, ORG, OCT, { source: 'operations', cap: before })
+    expect(after.stats.reads).toBe(before)
+  })
+
+  it('the operations path reads the cheaper period shape: a history of periods that start after the period costs no read', async () => {
+    const before = (await readPLReport(deps, ORG, OCT, { source: 'operations' })).stats.reads
+    for (let i = 0; i < 40; i++) {
+      await createTransaction(deps, ORG, UID, parseTransactionInput({
+        type: 'expense', status: 'planned', accountId: 'pln', amountMinor: 1_000, paymentDate: '2026-11-02', categoryId: 'k-ex',
+        accrual: { mode: 'period', from: '2026-11-01', to: '2026-11-30' },
+      }))
+    }
+    const after = await readPLReport(deps, ORG, OCT, { source: 'operations', cap: before })
+    expect(after.stats.reads).toBe(before)
   })
 })

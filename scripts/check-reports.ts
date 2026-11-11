@@ -20,7 +20,7 @@ import { createResolver } from '@/lib/server/fx/resolver'
 import { firestoreFxStore } from '@/lib/server/fx/store'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import { readBalances, readDashboard } from '@/lib/server/reports/balances'
-import { accrualDaysQuery, accrualPeriodsQuery, paymentsQuery, readCashFlowReport, readPLReport } from '@/lib/server/reports/read'
+import { accrualDaysQuery, accrualEndsQuery, accrualStartsQuery, paymentsQuery, readCashFlowReport, readPLReport } from '@/lib/server/reports/read'
 import { todayUtcDay } from '@/lib/utils/today'
 import { assertReadinessTarget, parseCheckJournalArgs } from './lib/check-journal-args'
 import { reportsCheckLine, reportsSummaryLine, sumReportsChecks, type ReportsCheck } from './lib/check-reports'
@@ -71,7 +71,9 @@ async function checkOrg(deps: LedgerDeps, orgId: string): Promise<ReportsCheck> 
   await readDashboard(deps, orgId)
   // The shapes the reads above may not reach, each once; an empty answer is fine.
   await accrualDaysQuery(deps.db, orgId, month.from, month.to).select().limit(1).get()
-  await accrualPeriodsQuery(deps.db, orgId, month.from, month.to).select().limit(1).get()
+  // Both shapes of the accrual periods: the report reads the cheaper one, which depends on the history.
+  await accrualStartsQuery(deps.db, orgId, month.from, month.to).select().limit(1).get()
+  await accrualEndsQuery(deps.db, orgId, month.from, month.to).select().limit(1).get()
   await paymentsQuery(deps.db, orgId, month.from, month.to).count().get()
   const compared = cashFlowOps !== null && plOps !== null
   const same = compared

@@ -111,12 +111,18 @@ export function accrualDaysQuery(db: Firestore, orgId: string, from: string, to:
 }
 
 /**
- * Operations whose accrual period starts by `to` and at most a period's length before `from` (the automatic single-field index
- * of `accrual.from`, no composite index). A period ends on or after `from` only if it starts that late, and a period starts
- * after `to` in no month of the report; the end is checked in memory. Without the upper bound every later period was read.
+ * The two single-field shapes of the operations whose accrual period overlaps the report (no composite index). A period of at
+ * most MAX_PERIOD_MONTHS overlaps [from, to] only if it starts in `[from - MAX_PERIOD_DAYS, to]` and only if it ends in
+ * `[from, to + MAX_PERIOD_DAYS]`, so either shape finds every overlapping period and the overlap is checked in memory. Which
+ * one reads less depends on the history (periods that ended before the report, or that start after it), so both are counted
+ * in the pre-count and the cheaper one is read (`choosePeriodShape`).
  */
-export function accrualPeriodsQuery(db: Firestore, orgId: string, from: string, to: string): Query {
+export function accrualStartsQuery(db: Firestore, orgId: string, from: string, to: string): Query {
   return transactionsCol(db, orgId).where('accrual.from', '>=', addDays(from, -MAX_PERIOD_DAYS)).where('accrual.from', '<=', to)
+}
+
+export function accrualEndsQuery(db: Firestore, orgId: string, from: string, to: string): Query {
+  return transactionsCol(db, orgId).where('accrual.to', '>=', from).where('accrual.to', '<=', addDays(to, MAX_PERIOD_DAYS))
 }
 
 /** One account's daily rollups of [from, to], or their `x_` twins, by document id (the built-in `__name__` index). */
@@ -143,15 +149,18 @@ interface PlannedQuery {
 }
 
 /**
- * Counts every query of the plan, plus `extra` documents the plan reads by id, and refuses when the total passes the cap:
- * before any document is read. The counts run in the request's snapshot, so the reads that follow return what was counted.
- * Completeness comes from what was examined, never from a hope.
+ * The count of each query, in the request's snapshot: aggregate reads, no document. The reads that follow return what was
+ * counted, so completeness comes from what was examined, never from a hope.
  */
-async function countPlan(r: Reader, plan: readonly PlannedQuery[], extra: number, cap: number, stats: ReportReadStats): Promise<number[]> {
-  const counts = await Promise.all(plan.map(async (p) => (await r.aggregate(p.query.count())).data().count))
-  stats.aggregates += plan.length
-  if (counts.reduce((a, b) => a + b, extra) > cap) throw new ReportError('too_many_operations', { cap })
+async function countQueries(r: Reader, queries: readonly Query[], stats: ReportReadStats): Promise<number[]> {
+  const counts = await Promise.all(queries.map(async (q) => (await r.aggregate(q.count())).data().count))
+  stats.aggregates += queries.length
   return counts
+}
+
+/** Refuses a request whose reads, as counted, pass the cap: before any document is read. */
+function assertWithinCap(reads: number, cap: number): void {
+  if (reads > cap) throw new ReportError('too_many_operations', { cap })
 }
 
 /** Reads what `countPlan` counted: each query with its counted limit, so no document beyond the count is read. */
@@ -189,7 +198,8 @@ async function readRollups(r: Reader, db: Firestore, orgId: string, accountIds: 
     const id = kind === 'cashflow' ? cashCatDocId(month) : plDocId(month)
     return [id, excludedDocId(id)]
   })
-  const counts = await countPlan(r, plan, ids.length, cap, stats)
+  const counts = await countQueries(r, plan.map((p) => p.query), stats)
+  assertWithinCap(counts.reduce((a, b) => a + b, ids.length), cap)
   const docs: RollupDocs = new Map()
   for (const snaps of await readPlan(r, plan, counts)) for (const d of snaps) docs.set(d.id, flatten(d.data()))
   for (const s of await r.getAll(ids.map((id) => rollupsCol(db, orgId).doc(id)))) if (s.exists) docs.set(s.id, flatten(s.data()))
@@ -244,11 +254,22 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
       const unreadable = new Set<string>()
       // Every query of the request is counted before the first document is read (a refusal reads nothing). A transfer's money
       // arrives within MAX_ARRIVAL_DAYS of its payment day: those payments are read too, their days kept.
-      const plan: PlannedQuery[] = [{ query: paymentsQuery(db, orgId, addDays(q.from, -MAX_ARRIVAL_DAYS), addDays(q.to, MAX_ARRIVAL_DAYS)), fields: REPORT_FIELDS }]
+      const paidPlan: PlannedQuery = { query: paymentsQuery(db, orgId, addDays(q.from, -MAX_ARRIVAL_DAYS), addDays(q.to, MAX_ARRIVAL_DAYS)), fields: REPORT_FIELDS }
+      const plan: PlannedQuery[] = [paidPlan]
+      let counts: number[]
       if (kind === 'pl') {
-        plan.push({ query: accrualDaysQuery(db, orgId, q.from, q.to), fields: REPORT_FIELDS }, { query: accrualPeriodsQuery(db, orgId, q.from, q.to), fields: REPORT_FIELDS })
+        // The accrual periods come by the cheaper of their two shapes: both are counted, only that one is read.
+        const dayPlan: PlannedQuery = { query: accrualDaysQuery(db, orgId, q.from, q.to), fields: REPORT_FIELDS }
+        const starts = accrualStartsQuery(db, orgId, q.from, q.to)
+        const ends = accrualEndsQuery(db, orgId, q.from, q.to)
+        const [paidCount, dayCount, startsCount, endsCount] = await countQueries(r, [paidPlan.query, dayPlan.query, starts, ends], stats)
+        const period = startsCount <= endsCount ? { query: starts, count: startsCount } : { query: ends, count: endsCount }
+        plan.push(dayPlan, { query: period.query, fields: REPORT_FIELDS })
+        counts = [paidCount, dayCount, period.count]
+      } else {
+        counts = await countQueries(r, [paidPlan.query], stats)
       }
-      const counts = await countPlan(r, plan, 0, cap, stats)
+      assertWithinCap(counts.reduce((a, b) => a + b, 0), cap)
       stats.reads += counts.reduce((a, b) => a + b, 0)
       const [paidDocs, byDay = [], byPeriod = []] = await readPlan(r, plan, counts)
       const paidRead = parseOps(paidDocs, operationIds)

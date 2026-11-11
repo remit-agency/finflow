@@ -6,7 +6,7 @@
 // process and its peak resident memory (MB). Emulator timings are estimates, not production timings.
 import { performance } from 'node:perf_hooks'
 import { initializeApp } from 'firebase-admin/app'
-import { getFirestore, type Firestore } from 'firebase-admin/firestore'
+import { getFirestore, type Firestore, type Query } from 'firebase-admin/firestore'
 import { EMPTY_ANALYTICS_FILTERS } from '@/lib/domain/analytics-filter/filter'
 import { addDays, monthBounds, monthOf, toDay } from '@/lib/domain/ledger/days'
 import { accountToDoc } from '@/lib/domain/ledger/doc'
@@ -20,7 +20,7 @@ import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import { transactionsCol } from '@/lib/server/ledger/paths'
 import { createTransaction } from '@/lib/server/ledger/write'
 import { readBalances, readDashboard } from '@/lib/server/reports/balances'
-import { readCashFlowReport, readPLReport, type ReportReadStats } from '@/lib/server/reports/read'
+import { accrualEndsQuery, accrualStartsQuery, readCashFlowReport, readPLReport, type ReportReadStats } from '@/lib/server/reports/read'
 import { todayUtcDay } from '@/lib/utils/today'
 
 const ORG = 'measure-s12'
@@ -83,6 +83,11 @@ async function seed(db: Firestore, deps: LedgerDeps, count: number, today: strin
         : roll < 0.3
           ? { type: 'income', accountId: account, amountMinor, paymentDate, categoryId: income[Math.floor(r() * income.length)] }
           : { type: 'expense', accountId: account, amountMinor, paymentDate, categoryId: expense[Math.floor(r() * expense.length)], ...(r() < 0.05 ? { tags: ['vat'] } : {}) }
+    // A quarter of the expenses accrue over their own calendar month (the period shapes of the P&L, S12 fix 1).
+    if (body.type === 'expense' && r() < 0.25) {
+      const { first, last } = monthBounds(monthOf(paymentDate))
+      body.accrual = { mode: 'period', from: first, to: last }
+    }
     await createTransaction(deps, ORG, UID, parseTransactionInput(body))
     if ((i + 1) % 500 === 0) console.log(`seeded ${i + 1} of ${count}`)
   }
@@ -153,11 +158,24 @@ async function main(): Promise<void> {
   const pls: Array<[string, ReportQuery]> = [
     ['P&L, this year, no filter', year],
     ['P&L, this year, tag VAT', tagged(year)],
+    ['P&L, this month, tag VAT', tagged(month)],
   ]
   for (const [label, q] of pls) {
     await measure(`after: ${label}`, async () => {
       const { report, stats } = await readPLReport(deps, ORG, q)
       return sampleOf(stats, report)
+    })
+  }
+  // The accrual period shapes on their own: the read the P&L makes is the cheaper of the first two (its `docs` above).
+  const shapes: Array<[string, ReportQuery, (db: Firestore, q: ReportQuery) => Query]> = [
+    ['accrual periods, this month: starts in window', month, (d, q) => accrualStartsQuery(d, ORG, q.from, q.to)],
+    ['accrual periods, this month: ends in window', month, (d, q) => accrualEndsQuery(d, ORG, q.from, q.to)],
+    ['accrual periods, this month: before S12 fix 1 (accrual.to >= from, unbounded)', month, (d, q) => transactionsCol(d, ORG).where('accrual.to', '>=', q.from)],
+  ]
+  for (const [label, q, query] of shapes) {
+    await measure(label, async () => {
+      const snap = await query(db, q).get()
+      return { docs: snap.size, aggregates: 0, bytes: 0 }
     })
   }
   await measure('after: balances 30 days ago', async () => {
