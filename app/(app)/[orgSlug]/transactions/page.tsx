@@ -13,11 +13,11 @@ import { JournalFiltersBar } from '@/components/transactions/JournalFilters'
 import { SelectionBar, type BulkField } from '@/components/transactions/SelectionBar'
 import { TransactionList } from '@/components/transactions/TransactionList'
 import { PlanMatches } from '@/components/transactions/PlanMatches'
+import { UpcomingPayments } from '@/components/transactions/UpcomingPayments'
 import { TransferSuggestionsBanner, TransferSuggestionsDialog } from '@/components/transactions/TransferSuggestions'
 import { bulkChange, bulkDelete, undoBulkChange, undoBulkDelete } from '@/lib/api/journal-actions'
 import { collectMatching, SELECT_ALL_LIMIT } from '@/lib/api/journal-matching'
 import { confirmPairs, convertToTransfers, mergeIntoTransfer, undoTransfers } from '@/lib/api/transfers-client'
-import { hasActiveFilters } from '@/lib/domain/journal/filter'
 import { mostFrequentCode, selectionSummary, type BulkPatch } from '@/lib/domain/journal/selection'
 import { fromMinor } from '@/lib/domain/ledger/money'
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
@@ -38,7 +38,7 @@ import { PAGE_CONTAINER } from '@/lib/ui/layout'
 import { undoToast } from '@/lib/ui/undo-toast'
 import { cn } from '@/lib/utils'
 import { groupTransactionsByDate } from '@/lib/utils/date'
-import { viewFromParams, viewToParams, type JournalView } from '@/lib/utils/journal-url'
+import { journalFiltersActive, viewFromParams, viewToParams, type JournalView } from '@/lib/utils/journal-url'
 import { todayDay, todayUtcDay } from '@/lib/utils/today'
 import type { Transaction } from '@/types'
 
@@ -406,6 +406,8 @@ export default function TransactionsPage() {
 
       {canEdit && suggestions.pairs.length > 0 && <TransferSuggestionsBanner count={suggestions.pairs.length} onOpen={openSuggestions} />}
       {canEdit && <PlanMatches orgId={orgId} accounts={accounts} />}
+      {/* The planned payments are this block, not rows of the list, while the list shows what happened (status «Факт»). */}
+      {filters.status === 'actual' && <UpcomingPayments orgId={orgId} accounts={accounts} canEdit={canEdit} accountId={selectedAccountId ?? undefined} today={todayDay()} />}
 
       {canEdit && selectedRows.length > 0 && (
         <SelectionBar
@@ -435,7 +437,7 @@ export default function TransactionsPage() {
         tags={tags}
         orgId={orgId}
         loading={loading}
-        filtered={hasActiveFilters(filters)}
+        filtered={journalFiltersActive(filters)}
         balances={balances}
         canSelect={canEdit}
         selection={selection}

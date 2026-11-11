@@ -93,7 +93,7 @@ test.describe('recurring shots', () => {
         await dialog.getByRole('button', { name: messages.recurring.editor.cancel }).click()
         await expect(dialog).toBeHidden()
 
-        await page.goto(`/${org}/transactions`)
+        await page.goto(`/${org}/transactions?status=all`)
         await waitForShell(page, user.companyName)
         const banner = page.getByTestId('plan-matches')
         await expect(banner).toBeVisible()

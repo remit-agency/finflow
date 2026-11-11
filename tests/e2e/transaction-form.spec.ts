@@ -190,7 +190,10 @@ test.describe('transaction form (emulators)', () => {
     expect(doc.fields.status).toEqual({ stringValue: 'planned' })
     await expect(accountRow(page, 'Konto PLN')).toContainText(balanceText('1 000', '00'))
 
-    // The journal lists it as planned (chip, dimmed row) and keeps it out of the day sum: the day's header has no amount.
+    // A payment 30 days ahead is not in the default list (what happened) nor in the «Майбутні платежі» block (the next 7 days):
+    // with every status chosen the journal lists it as planned (chip, dimmed row) and keeps it out of the day sum.
+    await page.goto(`/${user.orgId}/transactions?status=all`)
+    await waitForShell(page, user.companyName)
     const row = page.getByRole('row').filter({ hasText: 'Przyszły wydatek' })
     await expect(row).toHaveAttribute('data-status', 'planned')
     await expect(row.getByText('План', { exact: true })).toBeVisible()
@@ -205,6 +208,8 @@ test.describe('transaction form (emulators)', () => {
     await expect.poll(async () => (await transactions(request, user)).length).toBe(1)
     await expect(accountRow(page, 'Konto PLN')).toContainText(balanceText('1 000', '00'))
 
+    await page.goto(`/${user.orgId}/transactions?status=all`)
+    await waitForShell(page, user.companyName)
     const dialog = await openRow(page, 'Plan do zapłaty')
     await dialog.getByRole('button', { name: 'Позначити сплаченою', exact: true }).click()
     await expect(dialog.getByRole('radiogroup', { name: 'Статус' }).getByRole('radio', { name: 'Факт' })).toHaveAttribute(

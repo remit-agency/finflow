@@ -63,3 +63,24 @@ export function buildOverview(input: OverviewInput): RecurringOverview {
     truncated: input.truncated,
   }
 }
+
+/** The journal's «Майбутні платежі» block (S12d): what is overdue and what falls in the next UPCOMING_DAYS days. */
+export interface UpcomingBlock {
+  /** Overdue first (oldest first), then the next days. */
+  rows: PlannedRow[]
+  /** The title's number: every overdue operation (the overview lists at most LIST_ROWS of them) and the next days. */
+  count: number
+}
+
+/**
+ * The rows of the journal block from the overview. With an account selected in the sidebar only that account's operations
+ * count, as in the list below. An overdue total the overview did not list in full still counts in full without an account.
+ */
+export function upcomingBlock(overview: Pick<RecurringOverview, 'overdue' | 'overdueCount' | 'upcoming'>, today: string, accountId?: string): UpcomingBlock {
+  const end = addDays(today, UPCOMING_DAYS - 1)
+  const keep = (r: PlannedRow): boolean => accountId === undefined || r.accountId === accountId
+  const overdue = overview.overdue.filter(keep)
+  const soon = overview.upcoming.filter((r) => r.paymentDate <= end && keep(r))
+  const overdueTotal = accountId === undefined ? Math.max(overview.overdueCount, overdue.length) : overdue.length
+  return { rows: [...overdue, ...soon], count: overdueTotal + soon.length }
+}
