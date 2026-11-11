@@ -45,6 +45,21 @@ describe('parseReportQuery', () => {
     expect(refusal(() => parseReportQuery(params('from=2020-01-01&to=2030-01-08')))).toBe('invalid_input:to')
   })
 
+  it('names the reason of a period refusal: an end before the start, or a period too long', () => {
+    // A refusal without a period reason (a missing day) has none: 'other'.
+    const reasonOf = (fn: () => unknown): string => {
+      try {
+        fn()
+        return 'none'
+      } catch (e) {
+        return e instanceof ReportError && e.reason !== undefined ? e.reason : 'other'
+      }
+    }
+    expect(reasonOf(() => parseReportQuery(params('from=2026-10-02&to=2026-10-01')))).toBe('order')
+    expect(reasonOf(() => parseReportQuery(params('from=2020-01-01&to=2030-01-08')))).toBe('too_long')
+    expect(reasonOf(() => parseReportQuery(params('to=2026-10-01')))).toBe('other')
+  })
+
   it('refuses an unknown or repeated parameter', () => {
     expect(refusal(() => parseReportQuery(params('from=2026-10-01&to=2026-10-31&q=x')))).toBe('invalid_input:q')
     expect(refusal(() => parseReportQuery(params('from=2026-10-01&from=2026-10-02&to=2026-10-31')))).toBe('invalid_input:from')

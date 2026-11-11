@@ -15,7 +15,7 @@ vi.mock('@/lib/api/reports-client', () => ({
   viewOfFailure: vi.fn(),
 }))
 
-// Nine years and a half: longer than the 3 660 days a report covers.
+// Ten years and a half: longer than the 3 660 days a report covers.
 const TOO_LONG = reportQueryToParams({ from: '2016-01-01', to: '2026-06-30', filters: EMPTY_ANALYTICS_FILTERS }).toString()
 const key = (params: string) => `org-acme|${params}`
 
@@ -27,5 +27,12 @@ describe('report readers of the hooks', () => {
     await expect(cashFlow).rejects.toBeInstanceOf(ReportError)
     const pl = readPLOf(key(TOO_LONG), signal)
     await expect(pl).rejects.toBeInstanceOf(ReportError)
+  })
+
+  it('the rejection says which period refusal it is: too long, or the end before the start', async () => {
+    const signal = new AbortController().signal
+    await expect(readCashFlowOf(key(TOO_LONG), signal)).rejects.toMatchObject({ reason: 'too_long' })
+    const backwards = reportQueryToParams({ from: '2026-10-02', to: '2026-10-01', filters: EMPTY_ANALYTICS_FILTERS }).toString()
+    await expect(readPLOf(key(backwards), signal)).rejects.toMatchObject({ reason: 'order' })
   })
 })

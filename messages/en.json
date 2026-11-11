@@ -1252,6 +1252,7 @@
     "uncountable": "Operations without an amount in the company currency, not counted: {count}",
     "tooLarge": "This report needs more data than the server reads at once (limit {cap}). Choose a shorter period or fewer accounts.",
     "periodTooLong": "The period is too long: a report covers up to {days} days. Choose a shorter period.",
+    "periodOrder": "The period ends before it starts. Choose the dates again.",
     "error": "Could not load the report.",
     "retry": "Try again",
     "exportFailed": "Could not build the file.",

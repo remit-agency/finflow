@@ -29,8 +29,9 @@ export function parseReportQuery(p: URLSearchParams, extra: readonly string[] = 
   const from = single(p, 'from')
   const to = single(p, 'to')
   if (!isDay(from)) bad('from')
-  if (!isDay(to) || to < from) bad('to')
-  if (daysInRange(from, to) > MAX_REPORT_DAYS) bad('to')
+  if (!isDay(to)) bad('to')
+  if (to < from) throw new ReportError('invalid_input', { field: 'to', reason: 'order' })
+  if (daysInRange(from, to) > MAX_REPORT_DAYS) throw new ReportError('invalid_input', { field: 'to', reason: 'too_long' })
   for (const key of FILTER_PARAMS) single(p, key)
   const filters = parseAnalyticsFilters(p)
   const kept: Record<(typeof FILTER_PARAMS)[number], number> = {

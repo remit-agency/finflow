@@ -38,8 +38,11 @@ describe('reports client', () => {
     expect(fetchMock.mock.calls[3][0]).toBe('/api/orgs/org1/reports/dashboard')
   })
 
-  it('a period the parser refuses is its own view («звузьте період»), not an error', () => {
-    expect(viewOfFailure(new ReportError('invalid_input', { field: 'to' }))).toEqual({ status: 'invalid' })
+  it('a period the parser refuses is its own view, and the view says why: the end before the start, or a period too long', () => {
+    expect(viewOfFailure(new ReportError('invalid_input', { field: 'to', reason: 'order' }))).toEqual({ status: 'invalid', reason: 'order' })
+    expect(viewOfFailure(new ReportError('invalid_input', { field: 'to', reason: 'too_long' }))).toEqual({ status: 'invalid', reason: 'too_long' })
+    // A refusal that names no period reason is not a period notice.
+    expect(viewOfFailure(new ReportError('invalid_input', { field: 'types' }))).toEqual({ status: 'error' })
   })
 
   it('a refusal is a LedgerApiError with its code and details; the read limit becomes its own view', async () => {

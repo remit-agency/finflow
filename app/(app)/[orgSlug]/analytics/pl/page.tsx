@@ -62,7 +62,7 @@ export default function PLPage() {
       </div>
 
       {view.status === 'too_large' && <ReportNotice kind="too_large" cap={view.cap} />}
-      {view.status === 'invalid' && <ReportNotice kind="invalid" />}
+      {view.status === 'invalid' && <ReportNotice kind="invalid" reason={view.reason} />}
       {view.status === 'error' && <ReportNotice kind="error" onRetry={refresh} />}
 
       {report && rows.length > 0 && <PLSummaryCharts rows={rows} />}
