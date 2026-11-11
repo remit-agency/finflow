@@ -11,6 +11,16 @@ const ctx: ExportContext = {
   categories: CATEGORIES,
 }
 
+describe('the CSV of a subcategory named like a formula', () => {
+  it('is defused after its indent: the guard reads the name, so no cell starts with «=» after the spaces', () => {
+    const named = { ...ctx, rowName: (row: string) => (row === 'cat-cloud' ? '=HYPERLINK("https://example.test")' : ctx.rowName(row)) }
+    const [, categories] = cashFlowSheets(sampleCashFlow(), named)
+    const csv = sheetsToCsv([categories], '.')
+    expect(csv).toContain("    '=HYPERLINK")
+    expect(csv).not.toContain(' =HYPERLINK')
+  })
+})
+
 describe('cashFlowSheets', () => {
   it('the report, by category and the reconciliation, with the numbers of the report', () => {
     const [report, categories, reconciliation] = cashFlowSheets(sampleCashFlow(), ctx)

@@ -52,9 +52,14 @@ export function formatAmount(minor: number, decimal: ',' | '.'): string {
 const PLAIN_NUMBER = /^-?\d+([.,]\d+)?$/
 
 /** Quotes where needed and defuses spreadsheet formulas (a cell that starts with = + - @ or a tab). */
+/**
+ * A text a spreadsheet would read as a formula gets a `'` in front. The check looks past leading spaces (the indent of a
+ * subcategory in a report), and the apostrophe goes after them: the spaces stay where they were.
+ */
 export function csvCell(value: string): string {
-  const defuse = /^[=+\-@\t\r]/.test(value) && !PLAIN_NUMBER.test(value)
-  const safe = defuse ? `'${value}` : value
+  const core = value.replace(/^ +/, '')
+  const defuse = /^[=+\-@\t\r]/.test(core) && !PLAIN_NUMBER.test(core)
+  const safe = defuse ? `${value.slice(0, value.length - core.length)}'${core}` : value
   return /[;"\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
 }
 
