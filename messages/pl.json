@@ -438,6 +438,11 @@
       "splitFailed": "Nie udało się rozdzielić przelewu",
       "arrival": "wpływ {date}"
     },
+    "upcoming": {
+      "title": "Przyszłe płatności",
+      "window": "(najbliższe {days} dni)",
+      "all": "Wszystkie płatności planowane"
+    },
     "plans": {
       "banner": "Znaleziono dopasowania do płatności planowanych: {count}",
       "bannerOpen": "Przejrzyj",

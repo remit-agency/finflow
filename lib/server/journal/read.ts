@@ -106,7 +106,9 @@ export async function readJournalPage(deps: LedgerDeps, orgId: string, opts: Rea
   const ctx: FilterContext = { accountName: (id) => accounts.get(id)?.name, counterpartyName: (id) => counterpartyNames.get(id) }
 
   const base = baseQuery(deps, orgId, filters)
-  const scan = needsScan(filters)
+  // A status alone (the journal's default «Факт», S12d) only drops the planned operations in passing: it reads what the page
+  // needs, not a scan chunk. Every other filter is sparse and scans.
+  const sparse = needsScan({ ...filters, status: undefined })
   const rows: JournalRow[] = []
   // `lastKey` is the last VALID position (what the next cursor encodes); `position` is the last document read, valid or
   // not, so a document that cannot be placed never makes the next query return it again.
@@ -118,7 +120,7 @@ export async function readJournalPage(deps: LedgerDeps, orgId: string, opts: Rea
 
   while (rows.length < limit && scanned < cap && more) {
     // The chunk never goes past the cap, so one request reads at most `cap` documents for the scan.
-    const size = scan ? Math.min(SCAN_CHUNK, cap - scanned) : Math.min(SCAN_CHUNK, limit - rows.length)
+    const size = sparse ? Math.min(SCAN_CHUNK, cap - scanned) : Math.min(SCAN_CHUNK, limit - rows.length, cap - scanned)
     // The incoming cursor is a key; inside one request the query continues from the document itself.
     const from: Query = position ? base.startAfter(position) : opts.cursor ? after(base, opts.cursor) : base
     const snap = await from.limit(size).get()

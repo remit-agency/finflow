@@ -11,14 +11,14 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Segmented } from '@/components/ui/segmented'
 import type { Counterparty } from '@/lib/domain/counterparties/types'
-import { EMPTY_FILTERS, hasActiveFilters, NO_TAG, type JournalFilters } from '@/lib/domain/journal/filter'
+import { NO_TAG, type JournalFilters } from '@/lib/domain/journal/filter'
 import { toMinor, fromMinor } from '@/lib/domain/ledger/money'
 import type { TxType } from '@/lib/domain/ledger/types'
 import type { Tag } from '@/lib/domain/tags/types'
 import { useIsPhone } from '@/lib/hooks/useIsPhone'
 import { useCategoryName } from '@/lib/i18n/useCategoryName'
 import { cn } from '@/lib/utils'
-import { JOURNAL_PERIOD_PRESETS, type JournalView } from '@/lib/utils/journal-url'
+import { DEFAULT_JOURNAL_FILTERS, JOURNAL_PERIOD_PRESETS, journalFiltersActive, type JournalView } from '@/lib/utils/journal-url'
 import type { Account, Category } from '@/types'
 
 const FIELD_CLASS = 'h-9 rounded-control border-line bg-surface'
@@ -122,13 +122,13 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
     (draft) => set({ maxMinor: parseAmountMinor(draft) }),
   )
 
-  const active = hasActiveFilters(filters)
+  const active = journalFiltersActive(filters)
   // «Очистити» clears everything the bar shows, the account too (the page passes that on to the sidebar selection).
   const clear = () => {
     search.cancel()
     minField.cancel()
     maxField.cancel()
-    apply({ filters: { ...EMPTY_FILTERS }, period: { preset: 'allTime' } })
+    apply({ filters: { ...DEFAULT_JOURNAL_FILTERS }, period: { preset: 'allTime' } })
   }
 
   const toggleType = (type: TxType) =>
@@ -233,9 +233,9 @@ export function JournalFiltersBar({ view, onChange, accounts, incomeCategories, 
               value={filters.status ?? 'all'}
               onChange={(value) => set({ status: value === 'all' ? undefined : value })}
               options={[
-                { value: 'all', label: t('statusAll') },
                 { value: 'actual', label: t('statusActual') },
                 { value: 'planned', label: t('statusPlanned') },
+                { value: 'all', label: t('statusAll') },
               ]}
             />
 

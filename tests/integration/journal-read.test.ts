@@ -100,6 +100,31 @@ beforeEach(async () => {
   await createTransaction(deps, ORG, UID, parseTransactionInput({ type: 'income', accountId: 'a10', amountMinor: 500, paymentDate: DAY(3) }))
 })
 
+describe('readJournalPage with the status «Факт» (the journal\'s default view, S12d)', () => {
+  it('lists the actual operations only, in listing order, with the same balances as the unfiltered list', async () => {
+    const stored = await allStored()
+    const actual = stored.filter((s) => s.tx.status === 'actual')
+    expect(stored.length).toBeGreaterThan(actual.length) // the scenario has planned operations
+    const rows = await readAll({ ...EMPTY_FILTERS, status: 'actual' })
+    expect(rows.map((r) => r.tx.id)).toEqual(actual.map((s) => s.tx.id))
+    const everything = new Map((await readAll(EMPTY_FILTERS)).map((r) => [r.tx.id, r.balanceAfterMinor]))
+    for (const row of rows) expect(row.balanceAfterMinor, row.tx.id).toBe(everything.get(row.tx.id))
+  })
+
+  it('reads about a page of documents, not a scan chunk: the planned operations in front of the page are dropped in passing', async () => {
+    const stored = await allStored()
+    // `allStored` is in listing order (newest first): the planned operations are dated in November, ahead of every actual one.
+    const planned = stored.findIndex((s) => s.tx.status === 'actual')
+    expect(planned).toBeGreaterThan(0)
+    const page = await readJournalPage(deps, ORG, { filters: { ...EMPTY_FILTERS, status: 'actual' }, cursor: null, limit: 10 })
+    expect(page.rows).toHaveLength(10)
+    // The same documents read without the filter: the planned ones and the ten actual ones (the balances read the same too).
+    const same = await readJournalPage(deps, ORG, { filters: EMPTY_FILTERS, cursor: null, limit: planned + 10 })
+    expect(same.rows.slice(planned).map((r) => r.tx.id)).toEqual(page.rows.map((r) => r.tx.id))
+    expect(page.stats.docsRead).toBeLessThanOrEqual(same.stats.docsRead)
+  })
+})
+
 describe('readJournalPage', () => {
   it('pages through everything once, in listing order, with the balance after each operation', async () => {
     const stored = await allStored()

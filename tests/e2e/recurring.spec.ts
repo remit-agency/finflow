@@ -86,7 +86,7 @@ test.describe('planned payments (emulators)', () => {
     if (zusPaymentDayFrom(today) <= addDays(today, LIST_DAYS - 1)) await expect(page.getByTestId('plan-estimated').first()).toBeVisible()
     else await expect(page.getByTestId('plan-estimated')).toHaveCount(0)
 
-    await page.goto(`/${user.orgId}/transactions`)
+    await page.goto(`/${user.orgId}/transactions?status=all`)
     const plans = rowsOf(page).filter({ hasText: 'План' })
     await expect(plans.first()).toBeVisible()
     expect(await plans.count()).toBeGreaterThanOrEqual(3)
@@ -97,7 +97,7 @@ test.describe('planned payments (emulators)', () => {
     const user = await setup(page, request, 'rc-match')
     await seedSeries(page, user.orgId, rentToday(50_000))
     await seedBankOperation(page, request, user.orgId, { key: 'e2erent0001', type: 'expense', accountId: 'acc-a', amountMinor: 50_000, paymentDate: todayDay(), remittance: 'Czynsz listopad' })
-    await page.goto(`/${user.orgId}/transactions`)
+    await page.goto(`/${user.orgId}/transactions?status=all`)
     await expect(rowsOf(page)).toHaveCount(5)
 
     const banner = page.getByTestId('plan-matches')
@@ -122,12 +122,60 @@ test.describe('planned payments (emulators)', () => {
   test('an overdue plan has «Прострочено» in the journal and in the strip', async ({ page, request }) => {
     const user = await setup(page, request, 'rc-overdue')
     await seedPlanned(page, user.orgId, { type: 'expense', accountId: 'acc-a', amountMinor: 12_000, paymentDate: dayFromToday(-3), description: 'Faktura prąd' })
-    await page.goto(`/${user.orgId}/transactions`)
+    await page.goto(`/${user.orgId}/transactions?status=all`)
     await expect(rowsOf(page).filter({ hasText: 'Faktura prąd' }).getByTestId('overdue-chip')).toHaveText('Прострочено')
 
     await page.goto(`/${user.orgId}/recurring`)
     await expect(page.getByTestId('recurring-overdue')).toHaveText('Прострочено: 1')
     await expect(page.getByTestId('planned-row').filter({ hasText: 'Faktura prąd' }).getByTestId('plan-overdue')).toBeVisible()
+  })
+
+  test('the planned payments are a closed block above the journal: opens with the arrow, pays a plan from it, and the list is what happened', async ({ page, request }) => {
+    const user = await setup(page, request, 'rc-block')
+    await seedPlanned(page, user.orgId, { type: 'expense', accountId: 'acc-a', amountMinor: 12_000, paymentDate: dayFromToday(-3), description: 'Faktura prąd' })
+    await seedPlanned(page, user.orgId, { type: 'expense', accountId: 'acc-a', amountMinor: 30_000, paymentDate: dayFromToday(2), description: 'Hosting' })
+    await seedPlanned(page, user.orgId, { type: 'expense', accountId: 'acc-a', amountMinor: 99_000, paymentDate: dayFromToday(20), description: 'Daleki wydatek' })
+    await page.goto(`/${user.orgId}/transactions`)
+
+    // Closed by default: the title counts the overdue and the next 7 days; the list below has no planned row at all.
+    const block = page.getByTestId('upcoming')
+    await expect(block).toContainText('Майбутні платежі')
+    await expect(page.getByTestId('upcoming-count')).toHaveText('2')
+    const toggle = page.getByTestId('upcoming-toggle')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(page.getByTestId('upcoming-row')).toHaveCount(0)
+    await expect(rowsOf(page)).toHaveCount(0)
+
+    // The arrow opens it: the overdue one first, then the next days; the plan 20 days ahead is not in it.
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const rows = page.getByTestId('upcoming-row')
+    await expect(rows).toHaveCount(2)
+    await expect(rows.nth(0)).toContainText('Faktura prąd')
+    await expect(rows.nth(0).getByTestId('upcoming-overdue')).toHaveText('Прострочено')
+    await expect(rows.nth(1)).toContainText('Hosting')
+    await expect(block).not.toContainText('Daleki wydatek')
+
+    // The choice is remembered in this browser.
+    await page.reload()
+    await expect(page.getByTestId('upcoming-toggle')).toHaveAttribute('aria-expanded', 'true')
+
+    // «Позначити сплаченою» from the block: the plan leaves it (count 1) and is an actual operation in the list.
+    await page.getByTestId('upcoming-row').filter({ hasText: 'Hosting' }).getByRole('button', { name: 'Позначити сплаченою' }).click()
+    await expect(toast(page, 'Позначено сплаченою')).toBeVisible()
+    await expect(page.getByTestId('upcoming-count')).toHaveText('1')
+    await expect(page.getByTestId('upcoming-row')).toHaveCount(1)
+    await expect(rowsOf(page).filter({ hasText: 'Hosting' })).toHaveCount(1)
+    expect(await balanceMinor(request, user.orgId, 'acc-a')).toBe(70_000)
+
+    // Every status brings the planned rows into the list and the block steps aside.
+    await page.goto(`/${user.orgId}/transactions?status=all`)
+    await expect(rowsOf(page).filter({ hasText: 'Daleki wydatek' })).toHaveCount(1)
+    await expect(page.getByTestId('upcoming')).toHaveCount(0)
+    // «План» shows only the planned ones.
+    await page.goto(`/${user.orgId}/transactions?status=planned`)
+    await expect(rowsOf(page)).toHaveCount(2)
+    await expect(rowsOf(page).filter({ hasText: 'Hosting' })).toHaveCount(0)
   })
 
   test('«Пропустити» takes one plan off and «Скасувати» brings it back', async ({ page, request }) => {
@@ -157,7 +205,7 @@ test.describe('planned payments (emulators)', () => {
     await expect(dialog).toBeHidden()
     await expect(toast(page, 'Серію змінено')).toBeVisible()
 
-    await page.goto(`/${user.orgId}/transactions`)
+    await page.goto(`/${user.orgId}/transactions?status=all`)
     await expect(rowsOf(page)).toHaveCount(4)
     await expect(rowsOf(page).filter({ hasText: '600' })).toHaveCount(4)
   })
@@ -176,7 +224,7 @@ test.describe('planned payments (emulators)', () => {
     await expect(toast(page, 'Серію призупинено')).toBeVisible()
     await expect(seriesRow(page, 'Czynsz').getByTestId('series-state')).toHaveText('Призупинена')
 
-    await page.goto(`/${user.orgId}/transactions`)
+    await page.goto(`/${user.orgId}/transactions?status=all`)
     await expect(rowsOf(page)).toHaveCount(4)
 
     await page.goto(`/${user.orgId}/recurring`)
@@ -218,7 +266,7 @@ test.describe('planned payments (emulators)', () => {
     await expect(toast(page, 'Серію видалено')).toBeVisible()
     await expect(seriesRow(page, 'Czynsz')).toHaveCount(0)
 
-    await page.goto(`/${user.orgId}/transactions`)
+    await page.goto(`/${user.orgId}/transactions?status=all`)
     await expect(rowsOf(page)).toHaveCount(4)
 
     // A second series, deleted with its future plans (the default of the dialog).
@@ -233,7 +281,7 @@ test.describe('planned payments (emulators)', () => {
     await expect(second).toBeHidden()
     await expect(toast(page, 'Серію видалено')).toBeVisible()
     // The first series' four plans stay; the second series' four are gone.
-    await page.goto(`/${user.orgId}/transactions`)
+    await page.goto(`/${user.orgId}/transactions?status=all`)
     await expect(rowsOf(page)).toHaveCount(4)
   })
 
@@ -266,7 +314,7 @@ test.describe('planned payments (emulators)', () => {
     await expect(rows).toHaveCount(before - 1)
     await expect.poll(() => balanceMinor(request, user.orgId, 'acc-a')).toBe(50_000)
 
-    await page.goto(`/${user.orgId}/transactions`)
+    await page.goto(`/${user.orgId}/transactions?status=all`)
     await expect(rowsOf(page)).toHaveCount(4)
     expect(await balanceMinor(request, user.orgId, 'acc-a')).toBe(50_000)
   })

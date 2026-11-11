@@ -438,6 +438,11 @@
       "splitFailed": "Could not split the transfer",
       "arrival": "arrived {date}"
     },
+    "upcoming": {
+      "title": "Upcoming payments",
+      "window": "(next {days} days)",
+      "all": "All planned payments"
+    },
     "plans": {
       "banner": "Matches with planned payments found: {count}",
       "bannerOpen": "Review",

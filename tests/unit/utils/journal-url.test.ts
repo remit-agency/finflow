@@ -1,12 +1,39 @@
 import { describe, expect, it } from 'vitest'
 import { EMPTY_FILTERS } from '@/lib/domain/journal/filter'
-import { DEFAULT_JOURNAL_PERIOD, viewFromParams, viewToParams } from '@/lib/utils/journal-url'
+import { DEFAULT_JOURNAL_FILTERS, DEFAULT_JOURNAL_PERIOD, journalFiltersActive, viewFromParams, viewToParams } from '@/lib/utils/journal-url'
 
 const NOW = new Date('2026-10-28T12:00:00Z')
 
 describe('journal url', () => {
-  it('an empty query is all time with no filters', () => {
-    expect(viewFromParams(new URLSearchParams(), NOW)).toEqual({ filters: EMPTY_FILTERS, period: DEFAULT_JOURNAL_PERIOD })
+  it('an empty query is all time, status «Факт» (what happened), no other filters', () => {
+    expect(viewFromParams(new URLSearchParams(), NOW)).toEqual({ filters: DEFAULT_JOURNAL_FILTERS, period: DEFAULT_JOURNAL_PERIOD })
+    expect(DEFAULT_JOURNAL_FILTERS).toEqual({ ...EMPTY_FILTERS, status: 'actual' })
+  })
+  it('the status of the address: nothing or unknown is «Факт», planned is planned, all is every status', () => {
+    const status = (q: string) => viewFromParams(new URLSearchParams(q), NOW).filters.status
+    expect(status('')).toBe('actual')
+    expect(status('status=actual')).toBe('actual')
+    expect(status('status=bogus')).toBe('actual')
+    expect(status('status=planned')).toBe('planned')
+    expect(status('status=all')).toBeUndefined()
+  })
+  it('«Факт» is not written to the address, «План» and every status are', () => {
+    const base = viewFromParams(new URLSearchParams(), NOW)
+    const out = (status: 'actual' | 'planned' | undefined) => viewToParams({ ...base, filters: { ...base.filters, status } }).toString()
+    expect(out('actual')).toBe('')
+    expect(out('planned')).toBe('status=planned')
+    expect(out(undefined)).toBe('status=all')
+    // and each one reads back as it was written
+    for (const status of ['actual', 'planned', undefined] as const) {
+      const view = { ...base, filters: { ...base.filters, status } }
+      expect(viewFromParams(viewToParams(view), NOW).filters.status).toBe(status)
+    }
+  })
+  it('the default status is not an active filter; any other status, or any other filter, is', () => {
+    expect(journalFiltersActive(DEFAULT_JOURNAL_FILTERS)).toBe(false)
+    expect(journalFiltersActive({ ...DEFAULT_JOURNAL_FILTERS, status: 'planned' })).toBe(true)
+    expect(journalFiltersActive({ ...DEFAULT_JOURNAL_FILTERS, status: undefined })).toBe(true)
+    expect(journalFiltersActive({ ...DEFAULT_JOURNAL_FILTERS, q: 'zus' })).toBe(true)
   })
   it('a preset is resolved against today and is not written as dates', () => {
     const view = viewFromParams(new URLSearchParams('period=currentMonth'), NOW)
