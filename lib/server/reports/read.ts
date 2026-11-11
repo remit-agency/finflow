@@ -56,10 +56,33 @@ export interface ReportContext {
   categoryTypes: CategoryTypes
 }
 
+/** The kinds of read a report makes: one document query, one aggregate (count) query, or documents by id. */
+export type ReadKind = 'query' | 'aggregate' | 'getAll'
+
 export interface ReadReportOptions {
   /** Tests and the rollout check: another read limit, or one path forced. */
   cap?: number
   source?: ReportSource
+  /** Tests: told of every read before it is made (a refusal must make no document read). */
+  onRead?: (kind: ReadKind) => void
+}
+
+function observed(r: Reader, onRead: ((kind: ReadKind) => void) | undefined): Reader {
+  if (onRead === undefined) return r
+  return {
+    query(q) {
+      onRead('query')
+      return r.query(q)
+    },
+    aggregate(q) {
+      onRead('aggregate')
+      return r.aggregate(q)
+    },
+    getAll(refs) {
+      onRead('getAll')
+      return r.getAll(refs)
+    },
+  }
 }
 
 export interface ReportRead<T> {
@@ -101,22 +124,29 @@ export async function readContext(r: Reader, db: Firestore, orgId: string, withC
   return { baseCurrency: org.get('currency') as string, accounts, categories, categoryTypes: categoryTypesOf(categories) }
 }
 
-interface Budget {
-  cap: number
-  used: number
+/** One document query of a read plan, with the projection it reads (`fields`, all fields when absent). */
+interface PlannedQuery {
+  query: Query
+  fields?: readonly string[]
 }
 
 /**
- * Counts the queries, refuses when their documents would pass the cap, then reads exactly what was counted: one snapshot,
- * so the count is what the reads return. Completeness comes from what was examined, never from a hope.
+ * Counts every query of the plan, plus `extra` documents the plan reads by id, and refuses when the total passes the cap:
+ * before any document is read. The counts run in the request's snapshot, so the reads that follow return what was counted.
+ * Completeness comes from what was examined, never from a hope.
  */
-async function readCounted(r: Reader, queries: readonly Query[], budget: Budget, stats: ReportReadStats, fields?: readonly string[]): Promise<QueryDocumentSnapshot[][]> {
-  const counts = await Promise.all(queries.map(async (q) => (await r.aggregate(q.count())).data().count))
-  stats.aggregates += queries.length
-  const total = counts.reduce((a, b) => a + b, 0)
-  if (budget.used + total > budget.cap) throw new ReportError('too_many_operations', { cap: budget.cap })
-  budget.used += total
-  return Promise.all(queries.map(async (q, i) => (counts[i] === 0 ? [] : (await r.query((fields ? q.select(...fields) : q).limit(counts[i]))).docs)))
+async function countPlan(r: Reader, plan: readonly PlannedQuery[], extra: number, cap: number, stats: ReportReadStats): Promise<number[]> {
+  const counts = await Promise.all(plan.map(async (p) => (await r.aggregate(p.query.count())).data().count))
+  stats.aggregates += plan.length
+  if (counts.reduce((a, b) => a + b, extra) > cap) throw new ReportError('too_many_operations', { cap })
+  return counts
+}
+
+/** Reads what `countPlan` counted: each query with its counted limit, so no document beyond the count is read. */
+async function readPlan(r: Reader, plan: readonly PlannedQuery[], counts: readonly number[]): Promise<QueryDocumentSnapshot[][]> {
+  return Promise.all(
+    plan.map(async (p, i) => (counts[i] === 0 ? [] : (await r.query((p.fields ? p.query.select(...p.fields) : p.query).limit(counts[i]))).docs)),
+  )
 }
 
 function parseOps(docs: readonly QueryDocumentSnapshot[], unreadable: Set<string>): LedgerTransaction[] {
@@ -129,19 +159,17 @@ function parseOps(docs: readonly QueryDocumentSnapshot[], unreadable: Set<string
   return out
 }
 
-async function readRollups(r: Reader, db: Firestore, orgId: string, accountIds: readonly string[], range: DayRange, kind: ReportKind, budget: Budget, stats: ReportReadStats): Promise<RollupDocs> {
-  const before = budget.used
-  const queries = accountIds.flatMap((id) => [cellsQuery(db, orgId, id, range.from, range.to, false), cellsQuery(db, orgId, id, range.from, range.to, true)])
-  const docs: RollupDocs = new Map()
-  for (const snaps of await readCounted(r, queries, budget, stats)) for (const d of snaps) docs.set(d.id, flatten(d.data()))
+async function readRollups(r: Reader, db: Firestore, orgId: string, accountIds: readonly string[], range: DayRange, kind: ReportKind, cap: number, stats: ReportReadStats): Promise<RollupDocs> {
+  const plan: PlannedQuery[] = accountIds.flatMap((id) => [{ query: cellsQuery(db, orgId, id, range.from, range.to, false) }, { query: cellsQuery(db, orgId, id, range.from, range.to, true) }])
   const ids = monthsBetween(range.from, range.to).flatMap((month) => {
     const id = kind === 'cashflow' ? cashCatDocId(month) : plDocId(month)
     return [id, excludedDocId(id)]
   })
-  if (budget.used + ids.length > budget.cap) throw new ReportError('too_many_operations', { cap: budget.cap })
-  budget.used += ids.length
+  const counts = await countPlan(r, plan, ids.length, cap, stats)
+  const docs: RollupDocs = new Map()
+  for (const snaps of await readPlan(r, plan, counts)) for (const d of snaps) docs.set(d.id, flatten(d.data()))
   for (const s of await r.getAll(ids.map((id) => rollupsCol(db, orgId).doc(id)))) if (s.exists) docs.set(s.id, flatten(s.data()))
-  stats.rollups += budget.used - before
+  stats.rollups += counts.reduce((a, b) => a + b, 0) + ids.length
   return docs
 }
 
@@ -167,10 +195,12 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
   const source = opts.source ?? reportSource(q)
   const includeExcluded = includesExcluded(q.filters)
   const range: DayRange = { from: q.from, to: q.to }
-  return readSnapshot(db, async (r) => {
+  return readSnapshot(db, async (snapshotReader) => {
     const stats: ReportReadStats = { operations: 0, rollups: 0, aggregates: 0 }
-    const budget: Budget = { cap: opts.cap ?? REPORT_SCAN_CAP, used: 0 }
-    const context = await readContext(r, db, orgId)
+    const cap = opts.cap ?? REPORT_SCAN_CAP
+    const context = await readContext(snapshotReader, db, orgId)
+    // The company, its accounts and categories are not counted against the cap; every read after them is.
+    const r = observed(snapshotReader, opts.onRead)
     const chosen = new Set(q.filters.accountIds)
     const accounts = chosen.size === 0 ? context.accounts : context.accounts.filter((a) => chosen.has(a.id))
     const scopeIds = new Set(accounts.map((a) => a.id))
@@ -180,14 +210,20 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
     let uncountable: number | null = null
 
     if (source === 'rollups') {
-      const docs = await readRollups(r, db, orgId, [...scopeIds], range, kind, budget, stats)
+      const docs = await readRollups(r, db, orgId, [...scopeIds], range, kind, cap, stats)
       scope = factsFromRollupDocs(selectRollupDocs(docs, scopeIds, range, kind))
       report = scope
     } else {
       const unreadable = new Set<string>()
-      const before = budget.used
-      // A transfer's money arrives within MAX_ARRIVAL_DAYS of its payment day: those payments are read too, their days kept.
-      const [paidDocs] = await readCounted(r, [paymentsQuery(db, orgId, addDays(q.from, -MAX_ARRIVAL_DAYS), addDays(q.to, MAX_ARRIVAL_DAYS))], budget, stats, REPORT_FIELDS)
+      // Every query of the request is counted before the first document is read (a refusal reads nothing). A transfer's money
+      // arrives within MAX_ARRIVAL_DAYS of its payment day: those payments are read too, their days kept.
+      const plan: PlannedQuery[] = [{ query: paymentsQuery(db, orgId, addDays(q.from, -MAX_ARRIVAL_DAYS), addDays(q.to, MAX_ARRIVAL_DAYS)), fields: REPORT_FIELDS }]
+      if (kind === 'pl') {
+        plan.push({ query: accrualDaysQuery(db, orgId, q.from, q.to), fields: REPORT_FIELDS }, { query: accrualPeriodsQuery(db, orgId, q.from), fields: REPORT_FIELDS })
+      }
+      const counts = await countPlan(r, plan, 0, cap, stats)
+      stats.operations += counts.reduce((a, b) => a + b, 0)
+      const [paidDocs, byDay = [], byPeriod = []] = await readPlan(r, plan, counts)
       const paid = parseOps(paidDocs, unreadable)
       const inScope = chosen.size === 0 ? paid : paid.filter((tx) => matchesSharedChoices(tx, { accountIds: q.filters.accountIds, counterpartyIds: [], tagIds: [] }))
       const scoped = operationRollups(inScope, base, range, { accounts: scopeIds, parts: ['cash'] })
@@ -197,7 +233,6 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
       })
       for (const id of scoped.uncountable) unreadable.add(id)
       if (kind === 'pl') {
-        const [byDay, byPeriod] = await readCounted(r, [accrualDaysQuery(db, orgId, q.from, q.to), accrualPeriodsQuery(db, orgId, q.from)], budget, stats, REPORT_FIELDS)
         const accrued = new Map<string, LedgerTransaction>()
         for (const tx of parseOps(byDay, unreadable)) accrued.set(tx.id, tx)
         for (const tx of parseOps(byPeriod, unreadable)) if (tx.accrual.mode === 'period' && tx.accrual.from <= q.to) accrued.set(tx.id, tx)
@@ -205,7 +240,6 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
         for (const id of recognised.uncountable) unreadable.add(id)
         addInto(reported.docs, recognised.docs)
       }
-      stats.operations += budget.used - before
       scope = factsFromRollupDocs(scoped.docs)
       report = factsFromRollupDocs(reported.docs)
       uncountable = unreadable.size

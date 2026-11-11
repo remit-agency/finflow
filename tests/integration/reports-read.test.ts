@@ -76,6 +76,23 @@ describe('Cash Flow on the server (S12)', () => {
     expect((await readCashFlowReport(deps, ORG, tagged, { cap: 50 })).report.totals.expenseBase).toBe(23_000)
   })
 
+  it('refuses before any document is read: the operations of every query are counted first (the P&L of the review)', async () => {
+    // Filtered P&L: 5 actual payments in the margin-wide window and 6 accrual-day operations (the planned one included) make 11.
+    // With a cap of 10 the refusal must come from the counts alone; the old code read the payments first and refused after.
+    const tagged: ReportQuery = { ...OCT, filters: { ...EMPTY_ANALYTICS_FILTERS, tagIds: ['vat'] } }
+    const reads: string[] = []
+    await expect(readPLReport(deps, ORG, tagged, { cap: 10, onRead: (kind) => reads.push(kind) })).rejects.toMatchObject({ code: 'too_many_operations', cap: 10 })
+    expect(reads.filter((kind) => kind === 'query' || kind === 'getAll')).toEqual([])
+    expect(reads).toEqual(['aggregate', 'aggregate', 'aggregate'])
+    expect((await readPLReport(deps, ORG, tagged, { cap: 11 })).report.totals.expenseBase).toBe(23_000)
+  })
+
+  it('a refused Cash Flow reads no document either: the count of the rollups comes before them', async () => {
+    const reads: string[] = []
+    await expect(readCashFlowReport(deps, ORG, OCT, { cap: 7, onRead: (kind) => reads.push(kind) })).rejects.toMatchObject({ code: 'too_many_operations' })
+    expect(reads.filter((kind) => kind === 'query' || kind === 'getAll')).toEqual([])
+  })
+
   it('a missing NBP rate leaves the reconciliation unvalued and names it; the figures of the report stay', async () => {
     const down = makeDeps(db, {
       resolveRate: async (from, to, date) => {
