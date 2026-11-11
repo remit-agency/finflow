@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { parseTransactionInput } from '@/lib/domain/ledger/input'
+import { createTransaction } from '@/lib/server/ledger/write'
 import { readBalances, readDashboard } from '@/lib/server/reports/balances'
-import { ORG, TODAY, makeDeps, testDb } from './helpers'
+import { ORG, TODAY, UID, makeDeps, testDb } from './helpers'
 import { seedReportCompany, steppedRate } from './report-helpers'
 
 const db = testDb()
@@ -18,6 +20,14 @@ describe('balances on a day (S12)', () => {
       ['pln', 115_000, 115_000],
     ])
     expect(report).toMatchObject({ date: '2026-10-15', currency: 'PLN', totalBase: 181_000, complete: true })
+  })
+
+  it('the arrival reads of a day are counted before the first read: a refusal over the cap reads no document', async () => {
+    // A transfer paid on 3 October arrives in the window of 1 October (7 days either side): one arrival read for the EUR account.
+    await createTransaction(deps, ORG, UID, parseTransactionInput({ type: 'transfer', accountId: 'pln', toAccountId: 'eur', amountMinor: 10_000, toAmountMinor: 2_500, paymentDate: '2026-10-03' }))
+    await expect(readBalances(deps, ORG, '2026-10-01', { cap: 0 })).rejects.toMatchObject({ code: 'too_many_operations', cap: 0 })
+    const { stats } = await readBalances(deps, ORG, '2026-10-01', { cap: 1 })
+    expect(stats.reads).toBe(1)
   })
 
   it('a day after today is today: the balances of the account documents, no aggregate query', async () => {

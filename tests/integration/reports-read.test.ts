@@ -96,9 +96,21 @@ describe('Cash Flow on the server (S12)', () => {
     const reads: string[] = []
     await expect(readPLReport(deps, ORG, tagged, { cap: 10, onRead: (kind) => reads.push(kind) })).rejects.toMatchObject({ code: 'too_many_operations', cap: 10 })
     expect(reads.filter((kind) => kind === 'query' || kind === 'getAll')).toEqual([])
-    // Four counts before the refusal: the payments, the accrual days and both shapes of the accrual periods (one is then read).
-    expect(reads).toEqual(['aggregate', 'aggregate', 'aggregate', 'aggregate'])
+    // Six counts before the refusal: the payments, the accrual days and both shapes of the accrual periods (one is then read),
+    // and the arrivals of the opening day (30 September) for each of the two accounts.
+    expect(reads).toEqual(['aggregate', 'aggregate', 'aggregate', 'aggregate', 'aggregate', 'aggregate'])
     expect((await readPLReport(deps, ORG, tagged, { cap: 11 })).report.totals.expenseBase).toBe(23_000)
+  })
+
+  it('the balance arrivals are counted with the rest: a transfer paid on 3 October arrives in the window of the opening balance', async () => {
+    // The opening balance (30 September) reads the transfers paid within 7 days of it: this one, for the EUR account. The payments
+    // of the period count it too (6 in all), and its arrival read makes 7 reads of the request.
+    await createTransaction(deps, ORG, UID, parseTransactionInput({ type: 'transfer', accountId: 'pln', toAccountId: 'eur', amountMinor: 10_000, toAmountMinor: 2_500, paymentDate: '2026-10-03' }))
+    const reads: string[] = []
+    await expect(readCashFlowReport(deps, ORG, OCT, { source: 'operations', cap: 6, onRead: (kind) => reads.push(kind) })).rejects.toMatchObject({ code: 'too_many_operations', cap: 6 })
+    expect(reads.filter((kind) => kind === 'query' || kind === 'getAll')).toEqual([])
+    const { stats } = await readCashFlowReport(deps, ORG, OCT, { source: 'operations', cap: 7 })
+    expect(stats.reads).toBe(7)
   })
 
   it('a refused Cash Flow reads no document either: the count of the rollups comes before them', async () => {

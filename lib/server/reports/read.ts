@@ -31,7 +31,7 @@ import {
   type ReportQuery,
   type ReportSource,
 } from '@/lib/domain/reports/types'
-import { balancesAt, type BalanceReadStats } from '@/lib/server/ledger/balance-at'
+import { balancesAt, countArrivals, type BalanceReadStats } from '@/lib/server/ledger/balance-at'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import { accountsCol, categoriesCol, orgRef, rollupsCol, transactionsCol } from '@/lib/server/ledger/paths'
 import { readSnapshot, type Reader } from '@/lib/server/ledger/reader'
@@ -202,14 +202,14 @@ function malformedPeriodReaches(data: Record<string, unknown>, range: DayRange):
   return typeof from === 'string' && isDay(from) && typeof to === 'string' && isDay(to) ? from <= range.to && to >= range.from : true
 }
 
-async function readRollups(r: Reader, db: Firestore, orgId: string, accountIds: readonly string[], range: DayRange, kind: ReportKind, cap: number, stats: ReportReadStats): Promise<RollupDocs> {
+async function readRollups(r: Reader, db: Firestore, orgId: string, accountIds: readonly string[], range: DayRange, kind: ReportKind, cap: number, stats: ReportReadStats, arrivalReads: number): Promise<RollupDocs> {
   const plan: PlannedQuery[] = accountIds.flatMap((id) => [{ query: cellsQuery(db, orgId, id, range.from, range.to, false) }, { query: cellsQuery(db, orgId, id, range.from, range.to, true) }])
   const ids = monthsBetween(range.from, range.to).flatMap((month) => {
     const id = kind === 'cashflow' ? cashCatDocId(month) : plDocId(month)
     return [id, excludedDocId(id)]
   })
   const counts = await countQueries(r, plan.map((p) => p.query), stats)
-  assertWithinCap(counts.reduce((a, b) => a + b, ids.length), cap)
+  assertWithinCap(counts.reduce((a, b) => a + b, ids.length + arrivalReads), cap)
   const docs: RollupDocs = new Map()
   for (const snaps of await readPlan(r, plan, counts)) for (const d of snaps) docs.set(d.id, flatten(d.data()))
   for (const s of await r.getAll(ids.map((id) => rollupsCol(db, orgId).doc(id)))) if (s.exists) docs.set(s.id, flatten(s.data()))
@@ -257,9 +257,14 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
     let uncountable: number | null = null
     /** The operations that reach the report: a payment in the period (or a transfer's arrival), an accrual overlapping it. */
     const reaching = new Set<string>()
+    // The arrival documents of the balances are read too (the day before the period, the closing day): counted with the rest, so
+    // the cap holds for every document the request reads, and a refusal reads none.
+    const arrivals = await countArrivals(r, deps, orgId, accounts, [days.openingDay, days.closingDay], today)
+    stats.aggregates += arrivals.size
+    const arrivalReads = [...arrivals.values()].reduce((a, b) => a + b, 0)
 
     if (source === 'rollups') {
-      const docs = await readRollups(r, db, orgId, [...scopeIds], range, kind, cap, stats)
+      const docs = await readRollups(r, db, orgId, [...scopeIds], range, kind, cap, stats, arrivalReads)
       scope = factsFromRollupDocs(selectRollupDocs(docs, scopeIds, range, kind))
       report = scope
     } else {
@@ -281,7 +286,7 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
       } else {
         counts = await countQueries(r, [paidPlan.query], stats)
       }
-      assertWithinCap(counts.reduce((a, b) => a + b, 0), cap)
+      assertWithinCap(counts.reduce((a, b) => a + b, arrivalReads), cap)
       stats.reads += counts.reduce((a, b) => a + b, 0)
       const [paidDocs, byDay = [], byPeriod = []] = await readPlan(r, plan, counts)
       const paidRead = parseOps(paidDocs, operationIds)
@@ -337,7 +342,7 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
     }
 
     // The arrival documents of the balances are operations too: the same set, so one that two reads return counts once.
-    const balanceStats: BalanceReadStats = { docsRead: 0, aggregates: 0, ids: operationIds }
+    const balanceStats: BalanceReadStats = { docsRead: 0, aggregates: 0, ids: operationIds, counted: arrivals }
     const balances = await balancesAt(r, deps, orgId, accounts, [days.openingDay, days.closingDay], today, balanceStats)
     stats.aggregates += balanceStats.aggregates
     stats.reads += balanceStats.docsRead
