@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { test, expect } from '@playwright/test'
 import { registerViaUi, waitForShell } from '../e2e/helpers/app-ui'
 import { seedDoc } from '../e2e/helpers/emulator-firestore'
-import { seedLedgerAccount, seedLedgerOperation } from '../e2e/helpers/ledger-seed'
+import { seedLedgerAccount } from '../e2e/helpers/ledger-seed'
+import { postOperation } from '../e2e/helpers/report-seed'
 import { todayDay } from '../../lib/utils/today'
 import pl from '../../messages/pl.json'
 import uk from '../../messages/uk.json'
@@ -71,11 +72,12 @@ test.describe('analytics filters shots', () => {
       await seedDoc(request, `organizations/${org}/tags`, 'tag-long', tagDoc(org, LONG_TAG, 'violet'))
       await seedDoc(request, `organizations/${org}/tags`, 'tag-old', tagDoc(org, 'Stare', 'slate', { archived: true }))
       const day = todayDay()
-      const main = { accountId: 'acc-main', currency: 'PLN', date: day }
-      await seedLedgerOperation(request, org, 'op-1', { ...main, type: 'income', amount: 4200, description: 'Faktura 12/11' })
-      await seedLedgerOperation(request, org, 'op-2', { ...main, type: 'expense', amount: 230, description: 'VAT', tags: ['tag-vat'], excluded: true })
-      await seedLedgerOperation(request, org, 'op-3', { type: 'income', accountId: 'acc-vat', currency: 'PLN', date: day, amount: 230, description: 'VAT', tags: ['tag-vat'], excluded: true })
-      await seedLedgerOperation(request, org, 'op-4', { ...main, type: 'expense', amount: 650, description: 'Biuro rachunkowe', categoryId: 'cat-fees', tags: ['tag-long'] })
+      // Through the create route (S12): the server reports read the rollups the ledger writes; `excluded` comes from the tag.
+      const main = { accountId: 'acc-main', paymentDate: day }
+      await postOperation(page, org, { ...main, type: 'income', amountMinor: 420_000, description: 'Faktura 12/11' })
+      await postOperation(page, org, { ...main, type: 'expense', amountMinor: 23_000, description: 'VAT', tags: ['tag-vat'] })
+      await postOperation(page, org, { accountId: 'acc-vat', paymentDate: day, type: 'income', amountMinor: 23_000, description: 'VAT', tags: ['tag-vat'] })
+      await postOperation(page, org, { ...main, type: 'expense', amountMinor: 65_000, description: 'Biuro rachunkowe', categoryId: 'cat-fees', tags: ['tag-long'] })
 
       if (locale !== 'uk') await context.addCookies([{ name: 'NEXT_LOCALE', value: locale, url: 'http://localhost:3000' }])
 
@@ -106,6 +108,9 @@ test.describe('analytics filters shots', () => {
         await waitForShell(page, user.companyName)
         await expect(page.getByTestId('analytics-excluded-hint')).toBeVisible()
         await noHorizontalScroll('report')
+        // Recharts animates in JavaScript: wait for the bars (a shot on arrival catches them at zero), pointer off the chart.
+        await page.mouse.move(0, 0)
+        await page.waitForTimeout(1500)
         await shot('report')
 
         await page.getByRole('button', { name: m.buttonActive.replace('{count}', '1') }).click()

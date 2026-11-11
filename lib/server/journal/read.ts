@@ -1,16 +1,17 @@
 // lib/server/journal/read.ts
-import { AggregateField, FieldPath, Filter, Timestamp, type DocumentSnapshot, type Query } from 'firebase-admin/firestore'
-import { arrivalShiftOf, balancesAfter, type DayOps } from '@/lib/domain/journal/balance'
+import { FieldPath, Filter, Timestamp, type DocumentSnapshot, type Query } from 'firebase-admin/firestore'
+import { balancesAfter, type DayOps } from '@/lib/domain/journal/balance'
 import { matchesFilters, type FilterContext, type JournalFilters } from '@/lib/domain/journal/filter'
 import { compareKeys, encodeCursor, type JournalKey } from '@/lib/domain/journal/order'
 import type { JournalPage, JournalRow } from '@/lib/domain/journal/types'
 import { parseAccount, parseTransaction } from '@/lib/domain/ledger/doc'
-import { addDays } from '@/lib/domain/ledger/days'
 import { datedEffects } from '@/lib/domain/ledger/effects'
 import { cashDocId, excludedDocId } from '@/lib/domain/ledger/rollups'
-import { MAX_ARRIVAL_DAYS, type LedgerAccount, type LedgerTransaction } from '@/lib/domain/ledger/types'
+import type { LedgerAccount, LedgerTransaction } from '@/lib/domain/ledger/types'
+import { netAfterDay } from '@/lib/server/ledger/balance-at'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import { accountsCol, counterpartiesCol, rollupsCol, transactionsCol } from '@/lib/server/ledger/paths'
+import { directReader } from '@/lib/server/ledger/reader'
 
 /** Documents one request may read while looking for a full page. */
 export const SCAN_CAP = 2000
@@ -156,58 +157,6 @@ interface DayNet {
 const netOf = (d: DayNet): number => (d.inMinor ?? 0) - (d.outMinor ?? 0) + (d.transferInMinor ?? 0) - (d.transferOutMinor ?? 0)
 
 /**
- * The net movement of an account on every day after `day`.
- *
- * Firestore cannot `sum` over a range of document ids (the index it needs, `__name__` followed by the summed field,
- * does not exist), so the daily rollups cannot be aggregated by id. The same totals come from three sum queries over
- * the actual operations themselves: money in (income), money out (expense and transfer out, both `amountMinor`) and
- * transfers into the account (`toAmountMinor`). They are billed by index entries, not by documents read.
- * A transfer whose money arrived on another day than it left (S10b) is corrected by `arrivalShift`.
- */
-async function netAfterDay(deps: LedgerDeps, orgId: string, accountId: string, day: string, stats: ReadStats): Promise<number> {
-  const actualAfter = transactionsCol(deps.db, orgId).where('status', '==', 'actual').where('paymentDate', '>', day)
-  const sum = async (q: Query, field: string): Promise<number> => {
-    const agg = await q.aggregate({ total: AggregateField.sum(field) }).get()
-    stats.aggregates++
-    return agg.data().total ?? 0
-  }
-  const [income, outflow, transferIn, arrivals] = await Promise.all([
-    sum(actualAfter.where('accountId', '==', accountId).where('type', '==', 'income'), 'amountMinor'),
-    sum(actualAfter.where('accountId', '==', accountId).where('type', 'in', ['expense', 'transfer']), 'amountMinor'),
-    sum(actualAfter.where('toAccountId', '==', accountId), 'toAmountMinor'),
-    arrivalShift(deps, orgId, accountId, day, stats),
-  ])
-  return income - outflow + transferIn + arrivals
-}
-
-/**
- * The transfers into the account paid within MAX_ARRIVAL_DAYS of `day`: the only ones whose arrival day (S10b) can be on
- * the other side of `day` than their payment day. The listing query of the journal (index `toAccountId`, `paymentDate`,
- * `createdAt`), so no index of its own. Exported for the rollout check (scripts/check-transfers.ts).
- */
-export function arrivalsQuery(deps: Pick<LedgerDeps, 'db'>, orgId: string, accountId: string, day: string): Query {
-  return transactionsCol(deps.db, orgId)
-    .where('toAccountId', '==', accountId)
-    .where('paymentDate', '>=', addDays(day, -MAX_ARRIVAL_DAYS))
-    .where('paymentDate', '<=', addDays(day, MAX_ARRIVAL_DAYS))
-    .orderBy('paymentDate', 'desc')
-    .orderBy('createdAt', 'desc')
-    .orderBy(FieldPath.documentId(), 'desc')
-}
-
-/** The sums by payment day place the money in of a transfer on the day it left; this moves it to the day it arrived. */
-async function arrivalShift(deps: LedgerDeps, orgId: string, accountId: string, day: string, stats: ReadStats): Promise<number> {
-  const snap = await arrivalsQuery(deps, orgId, accountId, day).get()
-  stats.docsRead += snap.size
-  let shift = 0
-  for (const d of snap.docs) {
-    const tx = parseTransaction(d.id, d.data())
-    if (tx) shift += arrivalShiftOf(tx, day)
-  }
-  return shift
-}
-
-/**
  * Net movement per day for the days from `oldest` to `newest` that have a rollup. An operation excluded from analytics
  * (S10t) still moved the account: its day sits in the `x_` twin of the daily rollup, which is read and added as well.
  */
@@ -281,7 +230,7 @@ async function attachBalances(deps: LedgerDeps, orgId: string, rows: JournalRow[
       const oldest = days[days.length - 1]
 
       const [netAfter, nets, dayOps] = await Promise.all([
-        netAfterDay(deps, orgId, accountId, newest, stats),
+        netAfterDay(directReader(deps.db), deps, orgId, accountId, newest, stats),
         days.length > 1 ? netsBetween(deps, orgId, accountId, oldest, newest, stats) : Promise.resolve(new Map<string, number>()),
         Promise.all(days.map(async (day): Promise<DayOps> => ({ day, ops: await opsOfDay(deps, orgId, accountId, day, stats) }))),
       ])

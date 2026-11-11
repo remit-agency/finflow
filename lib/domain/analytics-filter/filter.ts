@@ -82,6 +82,11 @@ export function matchesAnalyticsSelection(tx: SelectionFacts, f: AnalyticsFilter
   return matchesAnalyticsKinds(tx, f, types) && matchesSharedChoices(tx, f)
 }
 
+/** A concrete tag is chosen: the reports count the operations excluded from analytics too (Finmap's rule, S10f). */
+export function includesExcluded(f: AnalyticsFilters): boolean {
+  return f.tagIds.some((id) => id !== NO_TAG)
+}
+
 /**
  * The operations the reports are built from; without a choice the same array. `types` is the company's categories
  * (`categoryTypesOf`), or `undefined` while they are loading.
@@ -91,7 +96,7 @@ export function filterForAnalytics<T extends SelectionFacts & { excluded?: boole
   f: AnalyticsFilters,
   types: CategoryTypes | undefined,
 ): AnalyticsSelection<T> {
-  const includeExcluded = f.tagIds.some((id) => id !== NO_TAG)
+  const includeExcluded = includesExcluded(f)
   const chosen = activeAnalyticsFilterCount(f, 'operations') === 0 ? operations : operations.filter((tx) => matchesAnalyticsSelection(tx, f, types))
   return { operations: chosen, includeExcluded }
 }

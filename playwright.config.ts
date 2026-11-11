@@ -32,6 +32,8 @@ const E2E_SERVER_ENV: Record<string, string> = {
   ENABLEBANKING_APP_ID: 'e2e-app',
   ENABLEBANKING_PRIVATE_KEY: e2eBankKey,
   EB_API_BASE: 'http://127.0.0.1:4011',
+  // NBP rates (S12): the reports value the accounts in another currency at NBP rates; the stub answers, never the real NBP.
+  NBP_API_BASE: 'http://127.0.0.1:4012',
 }
 
 export default defineConfig({
@@ -79,6 +81,14 @@ export default defineConfig({
     {
       command: 'node tests/e2e/helpers/eb-stub.mjs',
       url: 'http://127.0.0.1:4011/health',
+      reuseExistingServer: false,
+      timeout: 30_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      command: 'node tests/e2e/helpers/nbp-stub.mjs',
+      url: 'http://127.0.0.1:4012/health',
       reuseExistingServer: false,
       timeout: 30_000,
       stdout: 'pipe',

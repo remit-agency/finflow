@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 import { registerViaUi, waitForShell } from '../e2e/helpers/app-ui'
 import { seedDoc } from '../e2e/helpers/emulator-firestore'
-import { seedLedgerAccount, seedLedgerOperation } from '../e2e/helpers/ledger-seed'
+import { seedLedgerAccount, utcDay } from '../e2e/helpers/ledger-seed'
+import { postOperation } from '../e2e/helpers/report-seed'
 import { formatDayLongUtc } from '../../lib/utils/calendar-grid'
 import en from '../../messages/en.json'
 import pl from '../../messages/pl.json'
@@ -22,7 +23,7 @@ const ANALYTICS = [
   { path: 'calendar', heading: 'Календар', charts: false },
 ] as const
 
-async function seedDemoData(request: APIRequestContext, orgId: string): Promise<void> {
+async function seedDemoData(page: Page, request: APIRequestContext, orgId: string): Promise<void> {
   const base = `organizations/${orgId}`
   const now = Date.now()
   const accounts = [
@@ -54,17 +55,16 @@ async function seedDemoData(request: APIRequestContext, orgId: string): Promise<
     { id: 'demo-t4', type: 'income', accountId: 'demo-main', amount: 7300, daysAgo: 2, description: 'Консультація', categoryId: 'demo-sales' },
     { id: 'demo-t5', type: 'transfer', accountId: 'demo-main', amount: 2000, daysAgo: 2, description: 'Поповнення каси', toAccountId: 'demo-cash' },
   ]
+  // Through the create route (S12): the analytics screens read the server reports, built from the rollups the ledger writes.
   for (const t of txs) {
-    await seedLedgerOperation(request, orgId, t.id, {
+    await postOperation(page, orgId, {
       type: t.type,
       accountId: t.accountId,
-      amount: t.amount,
-      currency: 'UAH',
-      date: new Date(now - t.daysAgo * DAY_MS),
+      amountMinor: Math.round(t.amount * 100),
+      paymentDate: utcDay(new Date(now - t.daysAgo * DAY_MS)),
       description: t.description,
-      categoryId: t.categoryId,
-      // Both accounts are in UAH: the received amount is the sent one.
-      ...(t.toAccountId ? { toAccountId: t.toAccountId, toAmount: t.amount, toCurrency: 'UAH' } : {}),
+      ...(t.categoryId ? { categoryId: t.categoryId } : {}),
+      ...(t.toAccountId ? { toAccountId: t.toAccountId } : {}),
     })
   }
 }
@@ -89,7 +89,7 @@ test.describe('ui shots', () => {
     // avoids a Windows quirk where overwriting a PNG that an image viewer holds open fails.
     for (const old of readdirSync(OUT_DIR)) {
       // These prefixes belong to their own specs, which clear them.
-      const ownedElsewhere = ['journal-', 'analytics-filters-', 'recurring-'].some((prefix) => old.startsWith(prefix))
+      const ownedElsewhere = ['journal-', 'analytics-filters-', 'recurring-', 'reports-'].some((prefix) => old.startsWith(prefix))
       if (old.endsWith('.png') && !ownedElsewhere) rmSync(join(OUT_DIR, old), { force: true })
     }
   })
@@ -99,7 +99,7 @@ test.describe('ui shots', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     const user = await registerViaUi(page, 'shots')
     await waitForShell(page, user.companyName)
-    await seedDemoData(request, user.orgId)
+    await seedDemoData(page, request, user.orgId)
 
     for (const viewport of VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height })
@@ -192,7 +192,7 @@ test.describe('ui shots', () => {
       await page.setViewportSize({ width: 1440, height: 900 })
       const user = await registerViaUi(page, `shots${locale}`)
       await waitForShell(page, user.companyName)
-      await seedDemoData(request, user.orgId)
+      await seedDemoData(page, request, user.orgId)
       await context.addCookies([{ name: 'NEXT_LOCALE', value: locale, url: 'http://localhost:3000' }])
 
       const shot = async (name: string, form: 'desktop' | 'phone') => {

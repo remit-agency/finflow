@@ -10,18 +10,23 @@ export function isSecureCookieEnv(): boolean {
   return process.env.NODE_ENV === 'production'
 }
 
-/** Extracts the `__session` value from a request's Cookie header, or null. */
-export function readSessionCookie(headers: Headers): string | null {
+/** The value of a cookie in a request's Cookie header, or null when it is missing or empty. */
+export function readCookie(headers: Headers, name: string): string | null {
   const header = headers.get('cookie')
   if (!header) return null
   for (const part of header.split(';')) {
     const eq = part.indexOf('=')
     if (eq === -1) continue
-    if (part.slice(0, eq).trim() !== SESSION_COOKIE_NAME) continue
+    if (part.slice(0, eq).trim() !== name) continue
     const value = part.slice(eq + 1).trim()
     return value.length > 0 ? value : null
   }
   return null
+}
+
+/** Extracts the `__session` value from a request's Cookie header, or null. */
+export function readSessionCookie(headers: Headers): string | null {
+  return readCookie(headers, SESSION_COOKIE_NAME)
 }
 
 function attributes(maxAgeSeconds: number, secure: boolean): string {

@@ -16,7 +16,9 @@ jobs:
   # The job id "ci" is the required status check on master (Task E7). Do not rename it.
   ci:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The e2e step alone takes ~18-20 min (S12: 161 tests), a normal run ~26 min; a slow apt mirror
+    # in "Install Playwright Chromium" has cost 8 min. 30 min cancelled a healthy run (S12, PR #24).
+    timeout-minutes: 45
     env:
       NEXT_TELEMETRY_DISABLED: '1'
       # Dummy, public-shaped config for the emulator-only demo project. These are not secrets.

@@ -22,6 +22,7 @@ const SERVER_CJS_MODULES = [
   'firebase-admin/auth',
   'firebase-admin/firestore',
   'stripe',
+  'write-excel-file/node',
 ]
 
 function runNode(args) {

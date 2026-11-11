@@ -6,7 +6,8 @@ import { readFileSync } from 'node:fs'
 import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test'
 import { registerViaUi, waitForShell, type RegisteredUser } from './helpers/app-ui'
 import { seedDoc } from './helpers/emulator-firestore'
-import { seedLedgerAccount, seedLedgerOperation } from './helpers/ledger-seed'
+import { seedLedgerAccount } from './helpers/ledger-seed'
+import { postOperation } from './helpers/report-seed'
 import { todayDay } from '../../lib/utils/today'
 
 const NEEDS_EMULATORS =
@@ -47,15 +48,16 @@ async function setup(page: Page, request: APIRequestContext, prefix: string): Pr
   await seedLedgerAccount(request, org, 'acc-vat', { name: 'Rachunek VAT', balance: 1000, currency: 'PLN' })
   await seedTag(request, org, 'tag-vat', 'ПДВ', true)
   await seedTag(request, org, 'tag-fuel', 'Паливо', false)
+  // Through the create route (S12): the server reports read the rollups the ledger writes; `excluded` comes from the tag.
   const day = todayDay()
-  const main = { accountId: 'acc-main', currency: 'PLN', date: day }
-  const vat = { accountId: 'acc-vat', currency: 'PLN', date: day }
-  await seedLedgerOperation(request, org, 'op-sale', { ...main, type: 'income', amount: 500, description: 'Faktura 7/11' })
-  await seedLedgerOperation(request, org, 'op-rent', { ...main, type: 'expense', amount: 120, description: 'Czynsz' })
-  await seedLedgerOperation(request, org, 'op-fuel', { ...main, type: 'expense', amount: 40, description: 'Orlen', tags: ['tag-fuel'] })
-  await seedLedgerOperation(request, org, 'op-vat-out', { ...main, type: 'expense', amount: 230, description: 'VAT na rachunek VAT', tags: ['tag-vat'], excluded: true })
-  await seedLedgerOperation(request, org, 'op-vat-in', { ...vat, type: 'income', amount: 230, description: 'VAT z konta głównego', tags: ['tag-vat'], excluded: true })
-  await seedLedgerOperation(request, org, 'op-fee', { ...vat, type: 'expense', amount: 15, description: 'Opłata bankowa' })
+  const main = { accountId: 'acc-main', paymentDate: day }
+  const vat = { accountId: 'acc-vat', paymentDate: day }
+  await postOperation(page, org, { ...main, type: 'income', amountMinor: 50_000, description: 'Faktura 7/11' })
+  await postOperation(page, org, { ...main, type: 'expense', amountMinor: 12_000, description: 'Czynsz' })
+  await postOperation(page, org, { ...main, type: 'expense', amountMinor: 4_000, description: 'Orlen', tags: ['tag-fuel'] })
+  await postOperation(page, org, { ...main, type: 'expense', amountMinor: 23_000, description: 'VAT na rachunek VAT', tags: ['tag-vat'] })
+  await postOperation(page, org, { ...vat, type: 'income', amountMinor: 23_000, description: 'VAT z konta głównego', tags: ['tag-vat'] })
+  await postOperation(page, org, { ...vat, type: 'expense', amountMinor: 1_500, description: 'Opłata bankowa' })
   return user
 }
 
@@ -64,7 +66,7 @@ async function setup(page: Page, request: APIRequestContext, prefix: string): Pr
  * income operation of 300 in the child. With `setup` the Cash Flow shows income 800 (500 uncategorised + 300) and expense 175
  * (all uncategorised).
  */
-async function seedTree(request: APIRequestContext, orgId: string): Promise<void> {
+async function seedTree(page: Page, request: APIRequestContext, orgId: string): Promise<void> {
   const createdAt = new Date()
   await seedDoc(request, `organizations/${orgId}/categories`, 'cat-services', { name: 'Консалтинг', type: 'income', color: '#6366f1', orgId, createdAt })
   await seedDoc(request, `organizations/${orgId}/categories`, 'cat-consult', {
@@ -75,15 +77,7 @@ async function seedTree(request: APIRequestContext, orgId: string): Promise<void
     orgId,
     createdAt,
   })
-  await seedLedgerOperation(request, orgId, 'op-consult', {
-    accountId: 'acc-main',
-    currency: 'PLN',
-    date: todayDay(),
-    type: 'income',
-    amount: 300,
-    description: 'Konsultacja',
-    categoryId: 'cat-consult',
-  })
+  await postOperation(page, orgId, { accountId: 'acc-main', paymentDate: todayDay(), type: 'income', amountMinor: 30_000, description: 'Konsultacja', categoryId: 'cat-consult' })
 }
 
 /** Opens «Фільтри» on the current report; `active` is the number the button shows (0: none). */
@@ -171,10 +165,12 @@ test.describe('report filters (emulators)', () => {
     const download = page.waitForEvent('download')
     await page.getByRole('button', { name: 'Експорт CSV', exact: true }).click()
     const csv = readFileSync(await (await download).path(), 'utf8')
-    expect(csv).toContain(',230,230,0,')
-    expect(csv).not.toContain(',500,')
+    expect(csv).toContain(';230,00;230,00;0,00;')
+    expect(csv).not.toContain(';500,00;')
 
-    // The report tabs keep the choice.
+    // The report tabs keep the choice. `next dev` compiles a route on its first visit, which can take longer than the
+    // 20 s URL wait on a cold server: the Balance route is compiled here, before the timed click on its tab.
+    await page.request.get(`/${user.orgId}/analytics/balance?tg=tag-vat`)
     for (const [name, path] of [['P&L', 'pl'], ['Календар', 'calendar']] as const) {
       await tab(page, name).click()
       await expect(page).toHaveURL(new RegExp(`/analytics/${path}\\?tg=tag-vat$`))
@@ -260,7 +256,7 @@ test.describe('report filters (emulators)', () => {
 
   test('the tree: a whole group takes all its operations and no other group; the group is stored as its type', async ({ page, request }) => {
     const user = await setup(page, request, 'af-grp')
-    await seedTree(request, user.orgId)
+    await seedTree(page, request, user.orgId)
     await page.goto(`/${user.orgId}/analytics/cashflow`)
     await waitForShell(page, user.companyName)
     await expect(income(page)).toHaveText('800')
@@ -286,7 +282,7 @@ test.describe('report filters (emulators)', () => {
 
   test('the tree: one subcategory alone, its parent dashed; the uncategorised row of expenses added to it', async ({ page, request }) => {
     const user = await setup(page, request, 'af-sub')
-    await seedTree(request, user.orgId)
+    await seedTree(page, request, user.orgId)
     await page.goto(`/${user.orgId}/analytics/cashflow`)
     await waitForShell(page, user.companyName)
 
@@ -315,7 +311,7 @@ test.describe('report filters (emulators)', () => {
 
   test('the tree: a parent ticked takes its child; unticking the child leaves the parent dashed', async ({ page, request }) => {
     const user = await setup(page, request, 'af-par')
-    await seedTree(request, user.orgId)
+    await seedTree(page, request, user.orgId)
     await page.goto(`/${user.orgId}/analytics/cashflow`)
     await waitForShell(page, user.companyName)
 

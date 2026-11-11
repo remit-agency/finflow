@@ -51,16 +51,34 @@ export function formatAmount(minor: number, decimal: ',' | '.'): string {
 /** A plain signed number such as an amount: spreadsheets read it as a number, so it is not a formula. */
 const PLAIN_NUMBER = /^-?\d+([.,]\d+)?$/
 
-/** Quotes where needed and defuses spreadsheet formulas (a cell that starts with = + - @ or a tab). */
+/**
+ * Quotes where needed and defuses spreadsheet formulas: a text a spreadsheet would read as a formula (it starts with = + - @
+ * or a tab) gets a `'` in front. The check looks past leading spaces (the indent of a subcategory in a report), and the
+ * apostrophe goes after them: the spaces stay where they were.
+ */
 export function csvCell(value: string): string {
-  const defuse = /^[=+\-@\t\r]/.test(value) && !PLAIN_NUMBER.test(value)
-  const safe = defuse ? `'${value}` : value
+  const core = value.replace(/^ +/, '')
+  const defuse = /^[=+\-@\t\r]/.test(core) && !PLAIN_NUMBER.test(core)
+  const safe = defuse ? `${value.slice(0, value.length - core.length)}'${core}` : value
   return /[;"\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
 }
 
 /** UTF-8 BOM so Excel reads the diacritics, `;` as the delimiter, CRLF line ends. */
 export function buildCsv(header: string[], rows: string[][]): string {
   const lines = [header, ...rows].map((cells) => cells.map(csvCell).join(DELIMITER))
+  return `﻿${lines.join('\r\n')}\r\n`
+}
+
+/**
+ * Several tables in one file (the sheets of a report, S12): each under its title row, an empty line between them; the
+ * cells, the delimiter, the BOM and the line ends of `buildCsv`.
+ */
+export function buildCsvSections(sections: ReadonlyArray<{ title: string; header: string[]; rows: string[][] }>): string {
+  const lines = sections.flatMap((s, i) => [
+    ...(i === 0 ? [] : ['']),
+    csvCell(s.title),
+    ...[s.header, ...s.rows].map((cells) => cells.map(csvCell).join(DELIMITER)),
+  ])
   return `﻿${lines.join('\r\n')}\r\n`
 }
 

@@ -2,7 +2,8 @@ import { test, expect, type APIRequestContext, type Locator, type Page } from '@
 import { registerViaUi, waitForShell } from './helpers/app-ui'
 import { signInEmulatorUser } from './helpers/emulator-auth'
 import { seedDoc, seedMember } from './helpers/emulator-firestore'
-import { seedLedgerAccount, seedLedgerOperation } from './helpers/ledger-seed'
+import { postOperation } from './helpers/report-seed'
+import { seedLedgerAccount, seedLedgerOperation, utcDay } from './helpers/ledger-seed'
 import { formatDayLongUtc } from '../../lib/utils/calendar-grid'
 import { formatPeriodLabel } from '../../lib/utils/period'
 import { todayUtcDay } from '../../lib/utils/today'
@@ -570,7 +571,7 @@ function inspectMenuItems(popup: Element) {
  * (last year when this runs in January). Amounts stay below 1000 (no group separator) and their
  * sums are unique, so a total identifies its period.
  */
-async function seedReportData(request: APIRequestContext, orgId: string) {
+async function seedReportData(page: Page, request: APIRequestContext, orgId: string) {
   // The app's «today» is the Warsaw day: the month of the report is that month, also between 22:00 and 24:00 UTC.
   const now = todayUtcDay()
   const y = now.getUTCFullYear()
@@ -582,15 +583,9 @@ async function seedReportData(request: APIRequestContext, orgId: string) {
     { id: 'rep-prev-month', amount: 70, date: prevMonthDay(10) },
   ]
   await seedAccount(request, orgId, 'acc-rep', { name: 'Reports', balance: 0, currency: 'UAH' })
+  // Through the create route (S12): the server reports read the rollups the ledger writes.
   for (const t of txs) {
-    await seedLedgerOperation(request, orgId, t.id, {
-      type: 'income',
-      accountId: 'acc-rep',
-      amount: t.amount,
-      currency: 'UAH',
-      date: t.date,
-      description: `Report ${t.id}`,
-    })
+    await postOperation(page, orgId, { type: 'income', accountId: 'acc-rep', amountMinor: Math.round(t.amount * 100), paymentDate: utcDay(t.date), description: `Report ${t.id}` })
   }
   const prevMonthInThisYear = prevMonthDay(10).getUTCFullYear() === y
   return {
@@ -621,7 +616,7 @@ test.describe('report period filter', () => {
   test('Cash Flow: the current year by default; «За попередній рік» changes the label, the numbers and the CSV name', async ({ page, request }) => {
     const user = await registerViaUi(page, 'period')
     await waitForShell(page, user.companyName)
-    const expected = await seedReportData(request, user.orgId)
+    const expected = await seedReportData(page, request, user.orgId)
     await page.goto(`/${user.orgId}/analytics/cashflow`)
     await waitForShell(page, user.companyName)
 
@@ -666,7 +661,7 @@ test.describe('report period filter', () => {
   test('keyboard: Enter opens the menu, ArrowDown moves, Enter selects; Esc closes', async ({ page, request }) => {
     const user = await registerViaUi(page, 'periodkb')
     await waitForShell(page, user.companyName)
-    const expected = await seedReportData(request, user.orgId)
+    const expected = await seedReportData(page, request, user.orgId)
     await page.goto(`/${user.orgId}/analytics/cashflow`)
     await waitForShell(page, user.companyName)
     const pill = periodPill(page)
@@ -696,7 +691,7 @@ test.describe('report period filter', () => {
   test('«Обрати дати»: a range picked in the calendar becomes the period; Cancel and Esc keep the old one', async ({ page, request }) => {
     const user = await registerViaUi(page, 'periodcal')
     await waitForShell(page, user.companyName)
-    const expected = await seedReportData(request, user.orgId)
+    const expected = await seedReportData(page, request, user.orgId)
     await page.goto(`/${user.orgId}/analytics/cashflow`)
     await waitForShell(page, user.companyName)
     const pill = periodPill(page)
@@ -754,7 +749,7 @@ test.describe('report period filter', () => {
   test('P&L has the same toolbar and period behaviour', async ({ page, request }) => {
     const user = await registerViaUi(page, 'periodpl')
     await waitForShell(page, user.companyName)
-    const expected = await seedReportData(request, user.orgId)
+    const expected = await seedReportData(page, request, user.orgId)
     await page.goto(`/${user.orgId}/analytics/pl`)
     await waitForShell(page, user.companyName)
 
@@ -787,7 +782,7 @@ test.describe('report period filter', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     const user = await registerViaUi(page, 'periodphone')
     await waitForShell(page, user.companyName)
-    const expected = await seedReportData(request, user.orgId)
+    const expected = await seedReportData(page, request, user.orgId)
     await page.goto(`/${user.orgId}/analytics/cashflow`)
     await waitForShell(page, user.companyName)
     const pill = periodPill(page)
