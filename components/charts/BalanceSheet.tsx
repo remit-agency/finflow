@@ -1,15 +1,16 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Account } from '@/types'
+import type { BalanceSheetLine } from '@/lib/utils/report-view'
 import { useTranslations } from 'next-intl'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { TOKEN_COLORS } from '@/lib/ui/colors'
 
 interface BalanceSheetProps {
-  accounts: Account[]
+  /** The accounts at the chosen day, from the server (S12): each in its own currency and in the company currency. */
+  lines: BalanceSheetLine[]
   orgId?: string
-  /** The company currency: every amount on the sheet is shown in it (no conversion before S04). */
+  /** The company currency: the sections and the totals are in it (an account in another currency counts at its NBP rate). */
   currency: string
   loading?: boolean
 }
@@ -85,10 +86,10 @@ function ReadOnlyRow({ label, value, currency, color }: { label: string; value: 
   )
 }
 
-function SectionHeader({ roman, title, total, currency }: { roman: string; title: string; total: number; currency: string }) {
+function SectionHeader({ roman, title, total, currency, testId }: { roman: string; title: string; total: number; currency: string; testId?: string }) {
   const { money } = useFormatters()
   return (
-    <div className="flex items-center justify-between py-2 border-t border-line mt-2">
+    <div data-testid={testId} className="flex items-center justify-between py-2 border-t border-line mt-2">
       <span className="text-xs font-bold text-ink-muted uppercase tracking-wide">
         {roman}. {title}
       </span>
@@ -120,7 +121,7 @@ function Skeleton() {
   )
 }
 
-export default function BalanceSheet({ accounts, orgId = 'default', currency, loading }: BalanceSheetProps) {
+export default function BalanceSheet({ lines, orgId = 'default', currency, loading }: BalanceSheetProps) {
   const t = useTranslations('charts.balanceSheet')
   const { money } = useFormatters()
   const storageKey = `balance-sheet-${orgId}`
@@ -154,8 +155,8 @@ export default function BalanceSheet({ accounts, orgId = 'default', currency, lo
   if (loading) return <Skeleton />
 
   // --- Assets calculations ---
-  const cryptoAccounts = accounts.filter((a) => a.type === 'crypto')
-  const cryptoTotal = cryptoAccounts.reduce((s, a) => s + a.balance, 0)
+  const cryptoAccounts = lines.filter((a) => a.type === 'crypto')
+  const cryptoTotal = cryptoAccounts.reduce((s, a) => s + (a.base ?? 0), 0)
 
   // Section I — Fixed assets
   const fixedTotal = fields.realestate + fields.equipment + cryptoTotal
@@ -164,7 +165,7 @@ export default function BalanceSheet({ accounts, orgId = 'default', currency, lo
   const currentTotal = fields.inventory + fields.receivables
 
   // Section III — Money (auto from accounts)
-  const moneyTotal = accounts.reduce((s, a) => s + a.balance, 0)
+  const moneyTotal = lines.reduce((s, a) => s + (a.base ?? 0), 0)
 
   const totalAssets = fixedTotal + currentTotal + moneyTotal
 
@@ -209,11 +210,11 @@ export default function BalanceSheet({ accounts, orgId = 'default', currency, lo
         <EditableRow label={t('receivables')} value={fields.receivables} currency={currency} onChange={(v) => updateField('receivables', v)} />
 
         {/* III. Money */}
-        <SectionHeader roman="III" title={t('money')} total={moneyTotal} currency={currency} />
-        {accounts.length === 0 ? (
+        <SectionHeader roman="III" title={t('money')} total={moneyTotal} currency={currency} testId="balance-money-total" />
+        {lines.length === 0 ? (
           <p className="text-sm text-ink-muted italic py-1">{t('noAccounts')}</p>
         ) : (
-          accounts.map((acc) => (
+          lines.map((acc) => (
             <div key={acc.id} className="flex items-center justify-between gap-3 py-1">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: acc.color }} />

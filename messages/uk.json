@@ -973,11 +973,6 @@
       "subtitle": "Активи та капітал",
       "asOf": "Станом на:",
       "asOfLabel": "Станом на",
-      "periods": {
-        "currentMonth": "Поточний місяць",
-        "quarter": "Квартал",
-        "year": "Рік"
-      },
       "asOfOptions": {
         "today": "Сьогодні",
         "prevMonthEnd": "Кінець минулого місяця",

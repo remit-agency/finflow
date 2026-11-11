@@ -973,11 +973,6 @@
       "subtitle": "Aktywa i kapitał",
       "asOf": "Stan na:",
       "asOfLabel": "Stan na",
-      "periods": {
-        "currentMonth": "Bieżący miesiąc",
-        "quarter": "Kwartał",
-        "year": "Rok"
-      },
       "asOfOptions": {
         "today": "Dziś",
         "prevMonthEnd": "Koniec poprzedniego miesiąca",

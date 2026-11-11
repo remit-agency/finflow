@@ -973,11 +973,6 @@
       "subtitle": "Assets and equity",
       "asOf": "As of:",
       "asOfLabel": "As of",
-      "periods": {
-        "currentMonth": "Current month",
-        "quarter": "Quarter",
-        "year": "Year"
-      },
       "asOfOptions": {
         "today": "Today",
         "prevMonthEnd": "End of last month",

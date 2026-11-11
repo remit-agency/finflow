@@ -20,7 +20,7 @@ import type { CashFlowBucket } from '@/lib/utils/analytics'
 import { TOKEN_COLORS } from '@/lib/ui/colors'
 
 interface CashFlowChartProps {
-  /** Months or days of the selected period (`buildCashFlow`); the x axis shows `label`. */
+  /** Months or days of the selected period (the server Cash Flow, `buildCashFlowCore`); the x axis shows `label`. */
   data: CashFlowBucket[]
   loading?: boolean
 }

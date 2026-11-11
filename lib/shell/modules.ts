@@ -1,6 +1,6 @@
 // Module tabs of the shell (S01A): only modules that exist. New tabs arrive with their modules.
 
-export type ModuleKey = 'transactions' | 'recurring' | 'analytics'
+export type ModuleKey = 'dashboard' | 'transactions' | 'recurring' | 'analytics'
 
 export interface ModuleTab {
   /** Also the slug of the label: the UI shows `t('shell.modules.<key>')`. */
@@ -11,6 +11,7 @@ export interface ModuleTab {
 }
 
 export const MODULE_TABS: readonly ModuleTab[] = [
+  { key: 'dashboard', segment: 'dashboard', href: (orgId) => `/${orgId}/dashboard` },
   { key: 'transactions', segment: 'transactions', href: (orgId) => `/${orgId}/transactions` },
   { key: 'recurring', segment: 'recurring', href: (orgId) => `/${orgId}/recurring` },
   { key: 'analytics', segment: 'analytics', href: (orgId) => `/${orgId}/analytics/cashflow` },
