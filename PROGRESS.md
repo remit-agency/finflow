@@ -839,3 +839,60 @@ CashFlowChart (Recharts), PLTable, CalendarView, BalanceSheet, all 4 analytics p
 - Некоректний `seriesId` дає 404, чужа компанія 403 (наявна конвенція `requireOrgRole`); spec казав 400/404.
 - Undo ручної зміни планової операції (і «Перенести», і «Позначити сплаченою») повертає вміст, але прапорці серії (`manual`, `estimated`) сервер не відновлює: `manual` лишається, `estimated` не повертається. Точне відновлення потребує попереднього стану прапорців на сервері (поведінку зафіксовано тестом `ledger-series`).
 - Щоденний виклик: `bank-sync.yml` читає `recurring.failed` через `if has("recurring") then … else 0 end` (відсутній `recurring` дає 0, інша відповідь валить job). На реальному `jq` ще не запускався (локально його немає), перевірено читанням і `bash -n` блоку `run`.
+
+## 2026-11-11 — S12: звіти на сервері, «Гроші зараз», звірка, експорт CSV і XLSX
+
+### Вимірювання (Task 15, емулятор Firestore, реально виміряно; оцінки для production позначено)
+
+`scripts/measure-reports.ts`, одна синтетична компанія (4 рахунки, один в EUR, 12 категорій, тег «VAT» виключає з аналітики), 13 місяців. Кожен рядок двічі: cold (перший виклик у процесі) і warm (другий). «before» — еквівалент старого шляху: повне читання всіх операцій компанії з JSON, а не запуск master-клієнта.
+
+```
+--ops=3000
+before: the browser reads every operation      cold  docs   3000  aggregates    0  bytes   1558059     388 ms  cpu    233 ms  peak rss 256 MB
+before: the browser reads every operation      warm  docs   3000  aggregates    0  bytes   1558059     227 ms  cpu    235 ms  peak rss 272 MB
+after: Cash Flow, this year, no filter         cold  docs   1169  aggregates   20  bytes      4060     449 ms  cpu    234 ms  peak rss 272 MB
+after: Cash Flow, this year, no filter         warm  docs   1169  aggregates   20  bytes      4060     213 ms  cpu     94 ms  peak rss 272 MB
+after: Cash Flow, this year, tag VAT           cold  docs   2436  aggregates   13  bytes      3502     317 ms  cpu    141 ms  peak rss 272 MB
+after: Cash Flow, this year, tag VAT           warm  docs   2436  aggregates   13  bytes      3502     273 ms  cpu    219 ms  peak rss 272 MB
+after: Cash Flow, this month, tag VAT          cold  docs    155  aggregates   13  bytes      4440     160 ms  cpu     47 ms  peak rss 272 MB
+after: Cash Flow, this month, tag VAT          warm  docs    155  aggregates   13  bytes      4440     162 ms  cpu      0 ms  peak rss 272 MB
+after: P&L, this year, no filter               cold  docs   1169  aggregates   20  bytes      3592     173 ms  cpu    140 ms  peak rss 272 MB
+after: P&L, this year, no filter               warm  docs   1169  aggregates   20  bytes      3592     179 ms  cpu     16 ms  peak rss 272 MB
+after: P&L, this year, tag VAT                 cold  docs   4805  aggregates   15  bytes      2411     404 ms  cpu    234 ms  peak rss 286 MB
+after: P&L, this year, tag VAT                 warm  docs   4805  aggregates   15  bytes      2411     385 ms  cpu    234 ms  peak rss 303 MB
+after: balances 30 days ago                    cold  docs      3  aggregates   12  bytes       851      83 ms  cpu      0 ms  peak rss 304 MB
+after: balances 30 days ago                    warm  docs      3  aggregates   12  bytes       851      95 ms  cpu      0 ms  peak rss 304 MB
+after: dashboard                               cold  docs      0  aggregates    0  bytes       861       7 ms  cpu      0 ms  peak rss 304 MB
+after: dashboard                               warm  docs      0  aggregates    0  bytes       861       5 ms  cpu      0 ms  peak rss 304 MB
+agent tokens: not applicable (S12 has no agent-facing interface).
+not measured: production Firestore latency, NBP latency, the bytes on the wire after compression, the browser render time.
+
+--ops=12000
+before: the browser reads every operation      cold  docs  12000  aggregates    0  bytes   6217765    1154 ms  cpu    719 ms  peak rss 263 MB
+before: the browser reads every operation      warm  docs  12000  aggregates    0  bytes   6217765     587 ms  cpu    562 ms  peak rss 263 MB
+after: Cash Flow, this year, no filter         cold  docs   1582  aggregates   20  bytes      4145     789 ms  cpu    172 ms  peak rss 263 MB
+after: Cash Flow, this year, no filter         warm  docs   1582  aggregates   20  bytes      4145     414 ms  cpu     62 ms  peak rss 263 MB
+after: Cash Flow, this year, tag VAT           cold  docs   9828  aggregates   13  bytes      3583    1032 ms  cpu    500 ms  peak rss 286 MB
+after: Cash Flow, this year, tag VAT           warm  docs   9828  aggregates   13  bytes      3583     951 ms  cpu    500 ms  peak rss 313 MB
+after: Cash Flow, this month, tag VAT          cold  docs    569  aggregates   13  bytes      5067     528 ms  cpu     47 ms  peak rss 318 MB
+after: Cash Flow, this month, tag VAT          warm  docs    569  aggregates   13  bytes      5067     499 ms  cpu     16 ms  peak rss 318 MB
+after: P&L, this year, no filter               cold  docs   1582  aggregates   20  bytes      3707     348 ms  cpu     78 ms  peak rss 321 MB
+after: P&L, this year, no filter               warm  docs   1582  aggregates   20  bytes      3707     358 ms  cpu    204 ms  peak rss 323 MB
+after: P&L, this year, tag VAT                 cold  refused: too_many_operations (cap 10000)     756 ms  cpu    360 ms  peak rss 323 MB
+after: P&L, this year, tag VAT                 warm  refused: too_many_operations (cap 10000)     756 ms  cpu    422 ms  peak rss 323 MB
+after: balances 30 days ago                    cold  docs     14  aggregates   12  bytes       862     275 ms  cpu     15 ms  peak rss 323 MB
+after: balances 30 days ago                    warm  docs     14  aggregates   12  bytes       862     262 ms  cpu     47 ms  peak rss 323 MB
+after: dashboard                               cold  docs      0  aggregates    0  bytes       872      26 ms  cpu      0 ms  peak rss 323 MB
+after: dashboard                               warm  docs      0  aggregates    0  bytes       872      12 ms  cpu      0 ms  peak rss 323 MB
+agent tokens: not applicable (S12 has no agent-facing interface).
+not measured: production Firestore latency, NBP latency, the bytes on the wire after compression, the browser render time.
+```
+
+Висновки (емулятор; усе, що не виміряно, позначено):
+
+- **Cash Flow за рік без фільтра проти «before» (3000 операцій):** документів 1169 проти 3000 (≈2,6 раза менше), відповідь 4 060 Б проти 1 558 059 Б (≈384 рази менше). На 12000: 1582 проти 12000 (≈7,6 раза), 4 145 Б проти 6 217 765 Б. «docs» тут — це документи зведень (рахунок × день), а не «сотні», як прогнозував план; їхня кількість росте з днями з рухом і кількістю рахунків, не з кількістю операцій.
+- **Межа REPORT_SCAN_CAP:** «Cash Flow, this year, tag VAT» на 12000 операціях прочитав 9 828 документів (під межею 10 000), 1,03 с cold і 0,95 с warm, CPU 500 мс, відповідь 3,6 КБ. Оцінка «до ~5 с» (план) для емулятора виконується з запасом, але production-швидкість не виміряна. Розібрані дані «≤ 10 МБ» напряму не вимірювались: повний JSON операцій при 12000 — 6,2 МБ, а звіт читає лише `REPORT_FIELDS`, тож це верхня межа, не виміряна величина.
+- **P&L з тегом за рік:** на 3000 — 4 805 документів (шлях двічі: за датою платежу для звірки і за датою визнання для рядків, ≈2 рази більше за Cash Flow, як і записано в плані). На 12000 — `refused: too_many_operations` за 756 мс (лише `count()`), це очікувана поведінка для межі, а не помилка.
+- **Cold проти warm:** різниця в межах шуму процесу на одному емуляторі (наприклад, Cash Flow з тегом за рік, 12000: 1032 проти 951 мс). Пік пам'яті — `maxRSS` процесу, накопичений з початку запуску, а не пік на запит: 263 → 323 МБ за весь прогін.
+- **Баланси й дашборд:** баланс на 30 днів тому — 3 документи (3000) або 14 (12000) і 12 агрегатів; дашборд — 0 документів і 2 рядки відповіді, 0,005–0,03 с.
+- **Не виміряно:** латентність production Firestore; NBP (курс у вимірі підставлений як стуб 4,30); стиснення і байти на дроті; час рендера в браузері; холодний старт функції; реальний клієнт master (замість нього еквівалент повного читання); токени агента (S12 не має агентського інтерфейсу).
