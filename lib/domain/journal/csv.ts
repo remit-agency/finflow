@@ -51,10 +51,10 @@ export function formatAmount(minor: number, decimal: ',' | '.'): string {
 /** A plain signed number such as an amount: spreadsheets read it as a number, so it is not a formula. */
 const PLAIN_NUMBER = /^-?\d+([.,]\d+)?$/
 
-/** Quotes where needed and defuses spreadsheet formulas (a cell that starts with = + - @ or a tab). */
 /**
- * A text a spreadsheet would read as a formula gets a `'` in front. The check looks past leading spaces (the indent of a
- * subcategory in a report), and the apostrophe goes after them: the spaces stay where they were.
+ * Quotes where needed and defuses spreadsheet formulas: a text a spreadsheet would read as a formula (it starts with = + - @
+ * or a tab) gets a `'` in front. The check looks past leading spaces (the indent of a subcategory in a report), and the
+ * apostrophe goes after them: the spaces stay where they were.
  */
 export function csvCell(value: string): string {
   const core = value.replace(/^ +/, '')
