@@ -132,6 +132,14 @@ describe('Cash Flow on the server (S12)', () => {
     expect(report.coverage).toMatchObject({ uncountable: 1 })
   })
 
+  it('the coverage counts the operations that reach the period: a payment the margin reads, outside the period, is read but not counted', async () => {
+    // 25 September: outside October and not a transfer, so it is read by the payments window (7 days before) and changes nothing.
+    await createTransaction(deps, ORG, UID, parseTransactionInput({ type: 'expense', accountId: 'pln', amountMinor: 1_000, paymentDate: '2026-09-25', categoryId: 'k-ex' }))
+    const { report, stats } = await readCashFlowReport(deps, ORG, OCT, { source: 'operations' })
+    expect(stats.operations).toBe(6)
+    expect(report.coverage).toMatchObject({ operationsRead: 5, uncountable: 0 })
+  })
+
   it('a missing NBP rate leaves the reconciliation unvalued and names it; the figures of the report stay', async () => {
     const down = makeDeps(db, {
       resolveRate: async (from, to, date) => {
@@ -217,5 +225,22 @@ describe('P&L on the server (S12)', () => {
     }
     const after = await readPLReport(deps, ORG, OCT, { source: 'operations', cap: before })
     expect(after.stats.reads).toBe(before)
+  })
+
+  it('a malformed period that ends before the report is neither uncountable nor an operation of the report', async () => {
+    // Three planned operations of November make the start shape the cheaper one to read, and that shape finds the August period
+    // (it starts in the window); the period ends before October, so it cannot change the report.
+    for (let i = 0; i < 3; i++) {
+      await createTransaction(deps, ORG, UID, parseTransactionInput({
+        type: 'expense', status: 'planned', accountId: 'pln', amountMinor: 1_000, paymentDate: '2026-11-02', categoryId: 'k-ex',
+        accrual: { mode: 'period', from: '2026-11-01', to: '2026-11-30' },
+      }))
+    }
+    await testDb().doc(`organizations/${ORG}/transactions/bad-august`).set({
+      status: 'actual', type: 'expense', accountId: 'pln', paymentDate: '2026-09-15', amountMinor: 1, accrual: { mode: 'period', from: '2026-08-01', to: '2026-08-31' },
+    })
+    const { report, stats } = await readPLReport(deps, ORG, OCT, { source: 'operations' })
+    expect(stats.operations).toBe(7)
+    expect(report.coverage).toMatchObject({ uncountable: 0, operationsRead: 6 })
   })
 })

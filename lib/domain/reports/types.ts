@@ -197,6 +197,7 @@ export interface Reconciliation {
 
 export interface Coverage {
   source: ReportSource
+  /** Operations that reach the report (a payment in the period or a transfer's arrival, an accrual overlapping it); 0 on the rollups path. */
   operationsRead: number
   rollupsRead: number
   /** Operations read that could not be counted (malformed, or another currency without base amounts); null on the rollups path, which cannot see them. */

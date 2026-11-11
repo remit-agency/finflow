@@ -192,6 +192,14 @@ function malformedPaymentReaches(data: Record<string, unknown>, range: DayRange)
   return typeof day === 'string' && isDay(day) ? reachesPeriod(day, String(data.type), range) : true
 }
 
+/** The same for a malformed accrual period: its raw days decide whether it overlaps the period; without them it is counted. */
+function malformedPeriodReaches(data: Record<string, unknown>, range: DayRange): boolean {
+  const accrual = data.accrual
+  if (typeof accrual !== 'object' || accrual === null) return true
+  const { from, to } = accrual as Record<string, unknown>
+  return typeof from === 'string' && isDay(from) && typeof to === 'string' && isDay(to) ? from <= range.to && to >= range.from : true
+}
+
 async function readRollups(r: Reader, db: Firestore, orgId: string, accountIds: readonly string[], range: DayRange, kind: ReportKind, cap: number, stats: ReportReadStats): Promise<RollupDocs> {
   const plan: PlannedQuery[] = accountIds.flatMap((id) => [{ query: cellsQuery(db, orgId, id, range.from, range.to, false) }, { query: cellsQuery(db, orgId, id, range.from, range.to, true) }])
   const ids = monthsBetween(range.from, range.to).flatMap((month) => {
@@ -245,6 +253,8 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
     let scope: ReportFacts
     let report: ReportFacts
     let uncountable: number | null = null
+    /** The operations that reach the report: a payment in the period (or a transfer's arrival), an accrual overlapping it. */
+    const reaching = new Set<string>()
 
     if (source === 'rollups') {
       const docs = await readRollups(r, db, orgId, [...scopeIds], range, kind, cap, stats)
@@ -274,7 +284,12 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
       const [paidDocs, byDay = [], byPeriod = []] = await readPlan(r, plan, counts)
       const paidRead = parseOps(paidDocs, operationIds)
       const paid = paidRead.ops
-      for (const d of paidRead.malformed) if (malformedPaymentReaches(d.data(), range)) unreadable.add(d.id)
+      for (const tx of paid) if (reachesPeriod(tx.paymentDate, tx.type, range)) reaching.add(tx.id)
+      for (const d of paidRead.malformed) {
+        if (!malformedPaymentReaches(d.data(), range)) continue
+        unreadable.add(d.id)
+        reaching.add(d.id)
+      }
       const inScope = chosen.size === 0 ? paid : paid.filter((tx) => matchesSharedChoices(tx, { accountIds: q.filters.accountIds, counterpartyIds: [], tagIds: [] }))
       const scoped = operationRollups(inScope, base, range, { accounts: scopeIds, parts: ['cash'] })
       const reported = operationRollups(filterForAnalytics(paid, q.filters, context.categoryTypes).operations, base, range, {
@@ -287,13 +302,29 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
         if (tx && reachesPeriod(tx.paymentDate, tx.type, range)) unreadable.add(id)
       }
       if (kind === 'pl') {
-        // Operations of the accrual queries: their accrual lies in the period by the query, so every unreadable one counts.
+        // Operations of the accrual queries. An accrual day lies in the period by the query; an accrual period is in it only when
+        // it overlaps the period (the query reads the periods that start or end near it, not only the overlapping ones).
         const accrued = new Map<string, LedgerTransaction>()
         const byDayRead = parseOps(byDay, operationIds)
         const byPeriodRead = parseOps(byPeriod, operationIds)
-        for (const d of [...byDayRead.malformed, ...byPeriodRead.malformed]) unreadable.add(d.id)
-        for (const tx of byDayRead.ops) accrued.set(tx.id, tx)
-        for (const tx of byPeriodRead.ops) if (tx.accrual.mode === 'period' && tx.accrual.from <= q.to && tx.accrual.to >= q.from) accrued.set(tx.id, tx)
+        for (const d of byDayRead.malformed) {
+          unreadable.add(d.id)
+          reaching.add(d.id)
+        }
+        for (const d of byPeriodRead.malformed) {
+          if (!malformedPeriodReaches(d.data(), range)) continue
+          unreadable.add(d.id)
+          reaching.add(d.id)
+        }
+        for (const tx of byDayRead.ops) {
+          accrued.set(tx.id, tx)
+          reaching.add(tx.id)
+        }
+        for (const tx of byPeriodRead.ops) {
+          if (tx.accrual.mode !== 'period' || tx.accrual.from > q.to || tx.accrual.to < q.from) continue
+          accrued.set(tx.id, tx)
+          reaching.add(tx.id)
+        }
         const recognised = operationRollups(filterForAnalytics([...accrued.values()], q.filters, context.categoryTypes).operations, base, range, { parts: ['pl'] })
         for (const id of recognised.uncountable) unreadable.add(id)
         addInto(reported.docs, recognised.docs)
@@ -309,7 +340,7 @@ async function readFacts(deps: LedgerDeps, orgId: string, q: ReportQuery, kind: 
     stats.aggregates += balanceStats.aggregates
     stats.reads += balanceStats.docsRead
     stats.operations = operationIds.size
-    const coverage: Coverage = { source, operationsRead: stats.operations, rollupsRead: stats.rollups, uncountable }
+    const coverage: Coverage = { source, operationsRead: reaching.size, rollupsRead: stats.rollups, uncountable }
     return { context, accounts, includeExcluded, scope, report, days, balances, coverage, stats }
   })
 }
