@@ -127,7 +127,10 @@
     "modules": {
       "transactions": "Payments",
       "analytics": "Analytics",
-      "recurring": "Planned payments"
+      "recurring": "Planned payments",
+      "invoices": "Invoices",
+      "calendar": "Calendar",
+      "rules": "Automation rules"
     },
     "analyticsSections": {
       "cashflow": "Cash Flow",
@@ -140,7 +143,6 @@
       "language": "Language",
       "categories": "Categories",
       "counterparties": "Counterparties",
-      "rules": "Rules",
       "banks": "Banks",
       "subscription": "Subscription",
       "tags": "Tags"
@@ -1100,6 +1102,10 @@
       "balanced": "Assets = Equity + Liabilities",
       "difference": "Difference: {amount}"
     }
+  },
+  "invoices": {
+    "title": "Invoices",
+    "soon": "This module is coming soon."
   },
   "recurring": {
     "title": "Planned payments",

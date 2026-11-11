@@ -34,7 +34,7 @@ test.describe('auto-rules (emulators + fake bank)', () => {
   test('a rule made in settings gives the imported bank operation its category, and the journal says so', async ({ page, request }) => {
     const user = await setup(page, request, 'rl-import', { id: 'cat-exp-fuel', name: 'Paliwo' })
 
-    await page.goto(`/${user.orgId}/settings/rules`)
+    await page.goto(`/${user.orgId}/rules`)
     await expect(page.getByText('Правил ще немає')).toBeVisible()
     await page.getByRole('button', { name: 'Додати правило' }).click()
     const editor = page.getByRole('dialog')
@@ -84,7 +84,7 @@ test.describe('auto-rules (emulators + fake bank)', () => {
       updatedAt: new Date(),
     })
 
-    await page.goto(`/${user.orgId}/settings/rules`)
+    await page.goto(`/${user.orgId}/rules`)
     await expect(page.getByTestId('rule-row')).toContainText('Czynsz')
     await page.getByRole('button', { name: 'Застосувати до наявних' }).click()
     const dialog = page.getByRole('dialog')

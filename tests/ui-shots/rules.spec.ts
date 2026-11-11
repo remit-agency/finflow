@@ -8,7 +8,7 @@ import en from '../../messages/en.json'
 import pl from '../../messages/pl.json'
 import uk from '../../messages/uk.json'
 
-// S10: the auto-rules UI (settings/rules, the editor, «Застосувати до наявних», the «за правилом» chip of the journal)
+// S10: the auto-rules UI (the Reguły automatyzacji tab, the editor, «Застосувати до наявних», the «за правилом» chip of the journal)
 // at 1440 and 390 px for the visual review. Files: rules-<state>-<desktop|phone>-<uk|pl|en>.png.
 const OUT_DIR = join(process.cwd(), 'ui-shots')
 const VIEWPORTS = [
@@ -137,7 +137,7 @@ test.describe('rules shots', () => {
         await seedLedgerOperation(request, org, `fill-${viewport.form}-1`, { ...base, amount: 212.4, date: '2026-10-27', description: 'ORLEN Stacja 1234 Gdańsk' })
         await seedLedgerOperation(request, org, `fill-${viewport.form}-2`, { ...base, amount: 64.1, date: '2026-10-26', description: 'BP-STACJA A1 Tczew' })
 
-        await page.goto(`/${org}/settings/rules`)
+        await page.goto(`/${org}/rules`)
         await waitForShell(page, user.companyName)
         await expect(page.getByTestId('rule-row')).toHaveCount(3)
         await noHorizontalScroll('list')
@@ -239,7 +239,7 @@ test('rules: the empty list', async ({ page }) => {
   await waitForShell(page, user.companyName)
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
-    await page.goto(`/${user.orgId}/settings/rules`)
+    await page.goto(`/${user.orgId}/rules`)
     await waitForShell(page, user.companyName)
     await expect(page.getByText(uk.settings.rules.empty)).toBeVisible()
     await page.screenshot({ path: join(OUT_DIR, `rules-empty-${viewport.form}-uk.png`), animations: 'disabled' })
