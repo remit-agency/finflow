@@ -1,54 +1,28 @@
-import { Transaction, Category } from '@/types'
-import {
-  DAY_MS,
-  addDaysUtc,
-  dayKeyUtc,
-  endOfDayUtc,
-  shiftMonth,
-  startOfDayUtc,
-  type YearMonth,
-} from '@/lib/utils/calendar-grid'
+import type { Transaction } from '@/types'
 import { countsInAnalytics, type AnalyticsSelection } from '@/lib/domain/analytics-filter/filter'
-import { categoryTypesOf, kindRowOf } from '@/lib/domain/analytics-filter/kinds'
-import type { PeriodRange } from '@/lib/utils/period'
 import { formatDate } from '@/lib/i18n/format'
 import type { Locale } from '@/lib/i18n/config'
 
-/** Cash Flow buckets are months for a range longer than this many days, days otherwise. */
-export const CASHFLOW_DAY_BUCKETS_MAX_DAYS = 31
+// Cash Flow and P&L are server reports since S12 (lib/domain/reports, lib/server/reports); what stays here is the view
+// types the charts and tables draw, the labels of their buckets and columns, and the Calendar (a browser report until S13).
 
-export type CashFlowGranularity = 'month' | 'day'
-
+/** One Cash Flow bucket as the chart and the table draw it (major units of the company currency; `cashFlowBuckets`). */
 export interface CashFlowBucket {
   label: string       // month: "Січ 26"; day: "12 жов" (in the UI language)
   key: string         // month: "2026-01"; day: "2026-01-12" (UTC)
   income: number
   expense: number
-  balance: number     // running balance from the start of the range
+  balance: number     // running total of `net` from the start of the period
   net: number         // income - expense
 }
 
-export interface CashFlowReport {
-  granularity: CashFlowGranularity
-  buckets: CashFlowBucket[]
-  /** An operation excluded from analytics was counted into a bucket: the page's hint (S10f). */
-  excludedCounted: boolean
-}
-
+/** One P&L row as the table and the charts draw it (major units; `plRows`). */
 export interface PLRow {
   categoryId: string
   categoryName: string
   type: 'income' | 'expense'
   months: Record<string, number>  // { "2026-01": 5000, "2026-02": 3200 }
   total: number
-}
-
-export interface PLReport {
-  /** The months of the range, oldest first ("2026-01"); the table's columns. */
-  monthKeys: string[]
-  rows: PLRow[]
-  /** An operation excluded from analytics was counted into a row: the page's hint (S10f). */
-  excludedCounted: boolean
 }
 
 export interface CalendarReport {
@@ -67,10 +41,6 @@ export interface DayData {
   expense: number
   balance: number     // running end-of-day balance
   hasTransactions: boolean
-}
-
-function formatMonthKey(year: number, month: number): string {
-  return `${year}-${String(month + 1).padStart(2, '0')}`
 }
 
 /** «Січ» / «Sty» / «Jan»: the first three letters of the language's month name, capitalised. */
@@ -93,193 +63,6 @@ export function formatMonthLabel(year: number, month: number, locale: Locale): s
 export function formatDayLabel(date: Date, locale: Locale): string {
   const month = shortMonthName(date.getUTCFullYear(), date.getUTCMonth(), locale)
   return `${date.getUTCDate()} ${locale === 'en' ? month : month.toLowerCase()}`
-}
-
-function txDate(tx: Pick<Transaction, 'date'>): Date {
-  return tx.date instanceof Date ? tx.date : new Date(tx.date)
-}
-
-function monthKeyUtc(date: Date): string {
-  return formatMonthKey(date.getUTCFullYear(), date.getUTCMonth())
-}
-
-/**
- * The closed range a report covers. A bounded range is used as is; an open side (`allTime`, the
- * journal's future filter) takes the first / last transaction's UTC day. Null when nothing is left
- * to show (no transactions for an open range, or an empty range).
- */
-function reportRange(range: PeriodRange, transactions: Transaction[]): { start: Date; end: Date } | null {
-  let { start, end } = range
-  if (!start || !end) {
-    let min = Infinity
-    let max = -Infinity
-    for (const tx of transactions) {
-      const t = txDate(tx).getTime()
-      if (t < min) min = t
-      if (t > max) max = t
-    }
-    if (min === Infinity) return null
-    start ??= startOfDayUtc(new Date(min))
-    end ??= endOfDayUtc(new Date(max))
-  }
-  return start.getTime() <= end.getTime() ? { start, end } : null
-}
-
-function inRange(tx: Transaction, range: { start: Date; end: Date }): boolean {
-  const t = txDate(tx).getTime()
-  return t >= range.start.getTime() && t <= range.end.getTime()
-}
-
-/** The UTC months a range touches, oldest first. */
-function monthsOf(range: { start: Date; end: Date }): YearMonth[] {
-  const last: YearMonth = { year: range.end.getUTCFullYear(), month: range.end.getUTCMonth() }
-  const months: YearMonth[] = []
-  for (
-    let ym: YearMonth = { year: range.start.getUTCFullYear(), month: range.start.getUTCMonth() };
-    ym.year < last.year || (ym.year === last.year && ym.month <= last.month);
-    ym = shiftMonth(ym, 1)
-  ) {
-    months.push(ym)
-  }
-  return months
-}
-
-/** Number of UTC calendar days of a range (both ends included). */
-function daysOf(range: { start: Date; end: Date }): number {
-  return Math.round((startOfDayUtc(range.end).getTime() - startOfDayUtc(range.start).getTime()) / DAY_MS) + 1
-}
-
-/**
- * Cash Flow over a resolved period (`resolvePeriod`): transactions outside the range are left
- * out; buckets are UTC months when the range is longer than 31 days and UTC days otherwise.
- * Transfers do not count, nor do operations excluded from analytics by their tags (S10t) unless the selection includes them (`includeExcluded`)
- * (S10f). `balance` is the running total of `net` from the start of the range.
- * `locale` (the UI language) only decides the bucket labels.
- */
-export function buildCashFlow(selection: AnalyticsSelection<Transaction>, range: PeriodRange, locale: Locale): CashFlowReport {
-  const { operations: transactions, includeExcluded } = selection
-  const bounded = reportRange(range, transactions)
-  if (!bounded) return { granularity: 'month', buckets: [], excludedCounted: false }
-  let excludedCounted = false
-
-  const granularity: CashFlowGranularity =
-    daysOf(bounded) > CASHFLOW_DAY_BUCKETS_MAX_DAYS ? 'month' : 'day'
-  const buckets: CashFlowBucket[] = []
-  const empty = { income: 0, expense: 0, balance: 0, net: 0 }
-
-  if (granularity === 'month') {
-    for (const { year, month } of monthsOf(bounded)) {
-      buckets.push({ label: formatMonthLabel(year, month, locale), key: formatMonthKey(year, month), ...empty })
-    }
-  } else {
-    for (let d = startOfDayUtc(bounded.start); d.getTime() <= bounded.end.getTime(); d = addDaysUtc(d, 1)) {
-      buckets.push({ label: formatDayLabel(d, locale), key: dayKeyUtc(d), ...empty })
-    }
-  }
-
-  const byKey = new Map(buckets.map((b) => [b.key, b]))
-  const keyOf = granularity === 'month' ? monthKeyUtc : dayKeyUtc
-  for (const tx of transactions) {
-    if (!countsInAnalytics(tx, includeExcluded) || !inRange(tx, bounded)) continue
-    const entry = byKey.get(keyOf(txDate(tx)))
-    if (!entry) continue
-    if (tx.type === 'income') entry.income += tx.amount
-    else if (tx.type === 'expense') entry.expense += tx.amount
-    else continue
-    if (tx.excluded === true) excludedCounted = true
-  }
-
-  // Net and the running balance
-  let runningBalance = 0
-  for (const entry of buckets) {
-    entry.net = entry.income - entry.expense
-    runningBalance += entry.net
-    entry.balance = runningBalance
-  }
-
-  return { granularity, buckets, excludedCounted }
-}
-
-/**
- * P&L over a resolved period: income and expense by category for the transactions inside the
- * range, split by the UTC months the range touches (the table's columns) with a total per row.
- * Transfers do not count, nor do operations excluded from analytics (S10t) unless the selection includes them (`includeExcluded`) (S10f); transactions without a known category go to two rows (income and
- * expense) named `uncategorizedName` (the translated «Без категорії»). An operation counts in its category's row only while
- * the company has that category with its own type (`kindRowOf`): a deleted category and a category of the other type count as
- * uncategorised, as the report filter counts them. `nameOf` is the label of a category row (the UI passes the localized
- * name); it defaults to the stored name.
- */
-export function buildPL(
-  selection: AnalyticsSelection<Transaction>,
-  categories: Category[],
-  range: PeriodRange,
-  uncategorizedName: string,
-  nameOf: (category: Category) => string = (category) => category.name
-): PLReport {
-  const { operations: transactions, includeExcluded } = selection
-  const bounded = reportRange(range, transactions)
-  if (!bounded) return { monthKeys: [], rows: [], excludedCounted: false }
-  let excludedCounted = false
-  const monthKeys = monthsOf(bounded).map(({ year, month }) => formatMonthKey(year, month))
-
-  const rowMap = new Map<string, PLRow>()
-
-  // Initialize rows for all categories
-  for (const cat of categories) {
-    const months: Record<string, number> = {}
-    for (const key of monthKeys) months[key] = 0
-    rowMap.set(cat.id, {
-      categoryId: cat.id,
-      categoryName: nameOf(cat),
-      type: cat.type,
-      months,
-      total: 0,
-    })
-  }
-
-  // Uncategorized buckets
-  const uncatIncome: PLRow = {
-    categoryId: '__uncategorized_income',
-    categoryName: uncategorizedName,
-    type: 'income',
-    months: Object.fromEntries(monthKeys.map(k => [k, 0])),
-    total: 0,
-  }
-  const uncatExpense: PLRow = {
-    categoryId: '__uncategorized_expense',
-    categoryName: uncategorizedName,
-    type: 'expense',
-    months: Object.fromEntries(monthKeys.map(k => [k, 0])),
-    total: 0,
-  }
-
-  // Aggregate: an operation counts in the row `kindRowOf` gives it, the same rule the report filter uses.
-  const types = categoryTypesOf(categories)
-  for (const tx of transactions) {
-    if (tx.type === 'transfer' || !countsInAnalytics(tx, includeExcluded)) continue
-    if (!inRange(tx, bounded)) continue
-    const key = monthKeyUtc(txDate(tx))
-
-    const row = kindRowOf(tx, types)
-    const target = row === undefined ? undefined : rowMap.get(row)
-    if (target) {
-      target.months[key] = (target.months[key] || 0) + tx.amount
-      target.total += tx.amount
-    } else {
-      const bucket = tx.type === 'income' ? uncatIncome : uncatExpense
-      bucket.months[key] = (bucket.months[key] || 0) + tx.amount
-      bucket.total += tx.amount
-    }
-    if (tx.excluded === true) excludedCounted = true
-  }
-
-  const rows = Array.from(rowMap.values()).filter(r => r.total > 0)
-
-  // Add uncategorized if has data
-  if (uncatIncome.total > 0) rows.push(uncatIncome)
-  if (uncatExpense.total > 0) rows.push(uncatExpense)
-
-  return { monthKeys, rows, excludedCounted }
 }
 
 /**

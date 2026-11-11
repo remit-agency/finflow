@@ -1,79 +1,79 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { filterForAnalytics } from '@/lib/domain/analytics-filter/filter'
-import { useAnalyticsFilters } from '@/lib/hooks/useAnalyticsFilters'
-import { useTransactions } from '@/lib/hooks/useTransactions'
-import { useShell } from '@/lib/hooks/useShell'
-import { useCategoryName } from '@/lib/i18n/useCategoryName'
-import { buildPL } from '@/lib/utils/analytics'
-import { exportToCSV } from '@/lib/utils/export'
-import { DEFAULT_REPORT_PERIOD, periodSlug, resolvePeriod, type PeriodSelection } from '@/lib/utils/period'
-import { todayUtcDay } from '@/lib/utils/today'
-import PLTable from '@/components/charts/PLTable'
-import PLSummaryCharts from '@/components/charts/PLSummaryCharts'
+import { toast } from 'sonner'
 import { ExcludedHint } from '@/components/analytics/AnalyticsFilters'
 import { ReportToolbar } from '@/components/analytics/ReportToolbar'
+import PLSummaryCharts from '@/components/charts/PLSummaryCharts'
+import PLTable from '@/components/charts/PLTable'
+import { ExcludedLine } from '@/components/reports/ExcludedLine'
+import { ReconciliationBlock } from '@/components/reports/ReconciliationBlock'
+import { ReportNotice, ReportSource } from '@/components/reports/ReportNotice'
+import { downloadReport } from '@/lib/api/reports-client'
+import type { ExportFormat } from '@/lib/domain/reports/types'
+import { useAnalyticsFilters } from '@/lib/hooks/useAnalyticsFilters'
+import { usePLReport } from '@/lib/hooks/useReports'
+import { useShell } from '@/lib/hooks/useShell'
+import { useCategoryName } from '@/lib/i18n/useCategoryName'
+import { DEFAULT_REPORT_PERIOD, periodSlug, type PeriodSelection } from '@/lib/utils/period'
+import { plRows, reportQueryOf } from '@/lib/utils/report-view'
+import { todayUtcDay } from '@/lib/utils/today'
 
 export default function PLPage() {
   const t = useTranslations('analytics')
+  const tReports = useTranslations('reports')
   const noCategory = useTranslations('journal.list')('noCategory')
   const categoryName = useCategoryName()
-  const params = useParams()
-  const orgSlug = params.orgSlug as string
-  const orgId = orgSlug
-  const { transactions, loading: txLoading } = useTransactions(orgId)
-  // Categories come from ShellProvider (one subscription, one default-category seed per org).
-  const { incomeCategories, expenseCategories, categoriesLoading: catLoading } = useShell()
-  const categories = [...incomeCategories, ...expenseCategories]
+  const { orgSlug } = useParams<{ orgSlug: string }>()
+  // Categories come from ShellProvider (one subscription): the names and the order of the rows.
+  const { incomeCategories, expenseCategories } = useShell()
+  const categories = useMemo(() => [...incomeCategories, ...expenseCategories], [incomeCategories, expenseCategories])
   const [period, setPeriod] = useState<PeriodSelection>(DEFAULT_REPORT_PERIOD)
   // Warsaw's date, read once per visit (presets resolve against it).
   const [now] = useState(() => todayUtcDay())
 
-  const loading = txLoading || catLoading
-
-  // The report filters live in the address (S10f); a concrete tag brings the operations excluded from analytics in.
+  // The figures come from the server (S12), by recognition date; the filters live in the address (S10f).
   const { filters, setFilters, categoryTypes } = useAnalyticsFilters('operations')
-  const selection = useMemo(() => filterForAnalytics(transactions, filters, categoryTypes), [transactions, filters, categoryTypes])
-
-  const report = useMemo(
-    () => buildPL(selection, categories, resolvePeriod(period, now), noCategory, categoryName),
-    [selection, categories, period, now, noCategory, categoryName]
+  const query = useMemo(() => (categoryTypes === undefined ? null : reportQueryOf(period, now, filters)), [categoryTypes, period, now, filters])
+  const { view, refresh } = usePLReport(orgSlug, query)
+  const report = view.status === 'ready' ? view.data : null
+  const { monthKeys, rows } = useMemo(
+    () => (report ? plRows(report, categories, categoryName, noCategory) : { monthKeys: [], rows: [] }),
+    [report, categories, categoryName, noCategory],
   )
-  const { monthKeys, rows } = report
 
-  const handleExport = () => {
-    exportToCSV(
-      rows.map((row) => ({
-        [t('columns.category')]: row.categoryName,
-        [t('columns.type')]: row.type === 'income' ? t('columns.income') : t('columns.expense'),
-        ...Object.fromEntries(monthKeys.map((k) => [k, row.months[k] ?? 0])),
-        [t('columns.total')]: row.total,
-      })),
-      `pl-${periodSlug(period)}`
-    )
+  const handleExport = (format: ExportFormat) => {
+    if (query === null) return
+    downloadReport(orgSlug, 'pl', format, query, `pl-${periodSlug(period)}.${format}`).catch(() => toast.error(tReports('exportFailed')))
   }
 
   return (
     // The shared container and the reports' sub-navigation come from analytics/layout.tsx.
     <div className="space-y-6">
-        {/* Header and the report toolbar (period first, then the actions), as in Finmap */}
-        <div className="space-y-4">
-          <div>
-            <h1 className="font-display text-xl font-semibold text-ink">{t('pl.title')}</h1>
-            <p className="text-sm text-ink-muted">{t('pl.subtitle')}</p>
-          </div>
-          <ReportToolbar period={period} onPeriodChange={setPeriod} filters={filters} onFiltersChange={setFilters} onExport={handleExport} />
-          {report.excludedCounted && <ExcludedHint />}
+      <div className="space-y-4">
+        <div>
+          <h1 className="font-display text-xl font-semibold text-ink">{t('pl.title')}</h1>
+          <p className="text-sm text-ink-muted">{t('pl.subtitle')}</p>
         </div>
+        <ReportToolbar period={period} onPeriodChange={setPeriod} filters={filters} onFiltersChange={setFilters} onExport={handleExport} />
+        {report?.excludedCounted && <ExcludedHint />}
+        {report && <ReportSource coverage={report.coverage} />}
+      </div>
 
-        {/* Summary + pie charts */}
-        {!loading && rows.length > 0 && <PLSummaryCharts rows={rows} />}
+      {view.status === 'too_large' && <ReportNotice kind="too_large" cap={view.cap} />}
+      {view.status === 'error' && <ReportNotice kind="error" onRetry={refresh} />}
 
-        {/* Table */}
-        <PLTable rows={rows} monthKeys={monthKeys} loading={loading} />
+      {report && rows.length > 0 && <PLSummaryCharts rows={rows} />}
+      {view.status !== 'too_large' && view.status !== 'error' && <PLTable rows={rows} monthKeys={monthKeys} loading={view.status === 'loading'} />}
+
+      {report && (
+        <>
+          <ExcludedLine excluded={report.excluded} currency={report.currency} testId="pl-excluded" />
+          <ReconciliationBlock reconciliation={report.reconciliation} currency={report.currency} />
+        </>
+      )}
     </div>
   )
 }
