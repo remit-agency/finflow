@@ -5,7 +5,7 @@ import { fromMinor } from '@/lib/domain/ledger/money'
 import type { CashFlowReport } from '@/lib/domain/reports/types'
 import { useShell } from '@/lib/hooks/useShell'
 import { useFormatters } from '@/lib/i18n/useFormatters'
-import { inShellOrder } from '@/lib/utils/report-view'
+import { inShellOrder, openRowGap } from '@/lib/utils/report-view'
 
 /**
  * «За рахунками» of Cash Flow (S12): every chosen account in its own currency. With only accounts chosen each row shows its
@@ -39,9 +39,13 @@ export function CashFlowAccounts({ report }: { report: CashFlowReport }) {
             {inShellOrder(report.accounts, accounts).map((line) => {
               const m = (minor: number) => money(fromMinor(minor), currencies.get(line.accountId) ?? report.currency)
               const balance = (minor: number | null) => (minor === null ? '—' : m(minor))
+              const gap = openRowGap(line)
               return (
                 <tr key={line.accountId} data-testid="cf-account-row" className="border-t border-line">
-                  <td className="whitespace-nowrap px-6 py-3 font-medium text-ink">{names.get(line.accountId) ?? line.accountId}</td>
+                  <td className="whitespace-nowrap px-6 py-3 font-medium text-ink">
+                    {names.get(line.accountId) ?? line.accountId}
+                    {gap !== null && <span data-testid="cf-account-gap" className="ms-2 text-xs font-medium text-expense">{t('gap', { amount: m(gap) })}</span>}
+                  </td>
                   {withBalances && <td className="whitespace-nowrap px-4 py-3 text-right text-ink">{balance(line.openingMinor)}</td>}
                   <td className="whitespace-nowrap px-4 py-3 text-right text-income">{m(line.inMinor)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-expense">{m(line.outMinor)}</td>

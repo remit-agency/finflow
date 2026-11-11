@@ -1269,7 +1269,8 @@
       "expense": "Money out",
       "transfers": "Transfers",
       "excluded": "Excluded from analytics",
-      "closing": "Closing balance"
+      "closing": "Closing balance",
+      "gap": "Does not close: {amount}"
     },
     "byCategory": {
       "title": "By category",

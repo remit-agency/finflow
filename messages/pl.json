@@ -1269,7 +1269,8 @@
       "expense": "Wydatki",
       "transfers": "Przelewy",
       "excluded": "Wyłączone z analityki",
-      "closing": "Saldo końcowe"
+      "closing": "Saldo końcowe",
+      "gap": "Nie zamyka się: {amount}"
     },
     "byCategory": {
       "title": "Według kategorii",

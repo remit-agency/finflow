@@ -7,7 +7,8 @@ import { monthBounds, monthOf, prevMonth } from '@/lib/domain/ledger/days'
 import { fromMinor } from '@/lib/domain/ledger/money'
 import type { AccountType } from '@/lib/domain/ledger/types'
 import { rowRank } from '@/lib/domain/reports/categories'
-import type { BalancesReport, CashFlowReport, PLReport, ReportQuery } from '@/lib/domain/reports/types'
+import { accountRowGap } from '@/lib/domain/reports/cashflow'
+import type { AccountMovement, BalancesReport, CashFlowReport, PLReport, ReportQuery } from '@/lib/domain/reports/types'
 import type { Locale } from '@/lib/i18n/config'
 import type { Category } from '@/types'
 import { formatDayLabel, formatMonthLabel, type CashFlowBucket, type PLRow } from './analytics'
@@ -59,6 +60,12 @@ export function plRows(report: PLReport, categories: readonly Category[], nameOf
 }
 
 /** Lines in the order of the sidebar's accounts; accounts it does not know (yet) come last. */
+/** The gap of an account row that shows balances and does not close (the row says so); null when it closes or shows no balances. */
+export function openRowGap(line: AccountMovement): number | null {
+  const gap = accountRowGap(line)
+  return gap === null || gap === 0 ? null : gap
+}
+
 export function inShellOrder<T extends { accountId: string }>(lines: readonly T[], accounts: ReadonlyArray<{ id: string }>): T[] {
   const index = new Map(accounts.map((a, i) => [a.id, i]))
   return [...lines].sort((a, b) => (index.get(a.accountId) ?? Number.MAX_SAFE_INTEGER) - (index.get(b.accountId) ?? Number.MAX_SAFE_INTEGER))

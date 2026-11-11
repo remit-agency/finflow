@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { EMPTY_ANALYTICS_FILTERS } from '@/lib/domain/analytics-filter/filter'
-import type { BalancesReport } from '@/lib/domain/reports/types'
+import type { AccountMovement, BalancesReport } from '@/lib/domain/reports/types'
 import {
   AS_OF_OPTIONS,
   asOfDay,
   balanceSheetLines,
   cashFlowBuckets,
   inShellOrder,
+  openRowGap,
   periodKeyLabel,
   plRows,
   reportQueryOf,
@@ -83,5 +84,15 @@ describe('balanceSheetLines and inShellOrder', () => {
       ['new', 0, 0, 0],
     ])
     expect(inShellOrder([{ accountId: 'b' }, { accountId: 'a' }], [{ id: 'a' }, { id: 'b' }]).map((l) => l.accountId)).toEqual(['a', 'b'])
+  })
+
+  it('openRowGap is the gap of a row with balances that does not close, null when it closes or shows no balances', () => {
+    const row = (over: Partial<AccountMovement>): AccountMovement => ({
+      accountId: 'a', inMinor: 0, outMinor: 0, transferInMinor: 0, transferOutMinor: 0, excludedNetMinor: 0, openingMinor: 100, closingMinor: 100, ...over,
+    })
+    expect(openRowGap(row({ inMinor: 50, closingMinor: 150 }))).toBeNull()
+    expect(openRowGap(row({ inMinor: 50, closingMinor: 120 }))).toBe(-30)
+    expect(openRowGap(row({ inMinor: 50, excludedNetMinor: -230, closingMinor: 1_050, openingMinor: 1_230 }))).toBeNull()
+    expect(openRowGap(row({ inMinor: 50, openingMinor: null, closingMinor: null }))).toBeNull()
   })
 })
