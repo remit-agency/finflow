@@ -11,13 +11,25 @@ import { useFormatters } from '@/lib/i18n/useFormatters'
  * A report the server refused (more data than it reads at once: «звузьте період»), an address the page cannot ask for (a period
  * that ends before it starts, or longer than a report covers: `reason`), or a report it could not give (with a retry).
  */
-export function ReportNotice({ kind, cap, reason, onRetry }: { kind: 'too_large' | 'invalid' | 'error'; cap?: number; reason?: PeriodProblem; onRetry?: () => void }) {
+export function ReportNotice({ kind, cap, reason, onRetry }: { kind: 'too_large' | 'invalid' | 'busy' | 'error'; cap?: number; reason?: PeriodProblem; onRetry?: () => void }) {
   const t = useTranslations('reports')
   const { number } = useFormatters()
   if (kind === 'too_large') {
     return (
       <p role="status" data-testid="report-too-large" className="rounded-field border border-line bg-surface px-4 py-3 text-sm text-ink">
         {t('tooLarge', { cap: number(cap ?? 0) })}
+      </p>
+    )
+  }
+  if (kind === 'busy') {
+    return (
+      <p role="status" data-testid="report-busy" className="rounded-field border border-line bg-surface px-4 py-3 text-sm text-ink">
+        {t('busy')}
+        {onRetry && (
+          <button type="button" onClick={onRetry} className="ms-3 rounded-control px-3 py-1.5 font-medium text-brand-soft-foreground hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand-soft-foreground">
+            {t('retry')}
+          </button>
+        )}
       </p>
     )
   }
@@ -53,7 +65,7 @@ export function useExportFailure(): (e: unknown) => void {
   const { number } = useFormatters()
   return (e: unknown) => {
     const view = viewOfFailure(e)
-    toast.error(view.status === 'too_large' ? t('tooLarge', { cap: number(view.cap) }) : t('exportFailed'))
+    toast.error(view.status === 'too_large' ? t('tooLarge', { cap: number(view.cap) }) : view.status === 'busy' ? t('busy') : t('exportFailed'))
   }
 }
 

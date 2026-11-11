@@ -84,6 +84,7 @@ export default function BalancePage() {
       </div>
 
       {view.status === 'error' && <ReportNotice kind="error" onRetry={refresh} />}
+      {view.status === 'busy' && <ReportNotice kind="busy" onRetry={refresh} />}
       {report && !report.complete && (
         <p data-testid="balance-incomplete" className="text-sm text-expense">
           {tDashboard('incomplete', { currencies: missing.join(', ') })}

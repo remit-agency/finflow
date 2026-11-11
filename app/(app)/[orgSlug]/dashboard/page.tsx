@@ -37,6 +37,7 @@ export default function DashboardPage() {
       </div>
 
       {view.status === 'error' && <ReportNotice kind="error" onRetry={refresh} />}
+      {view.status === 'busy' && <ReportNotice kind="busy" onRetry={refresh} />}
       {view.status === 'loading' && (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (

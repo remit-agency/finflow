@@ -1254,6 +1254,7 @@
     "periodTooLong": "Okres jest za długi: raport obejmuje do {days} dni. Wybierz krótszy okres.",
     "periodOrder": "Okres kończy się przed początkiem. Wybierz daty ponownie.",
     "error": "Nie udało się wczytać raportu.",
+    "busy": "Zbyt wiele zapytań. Poczekaj chwilę i spróbuj ponownie.",
     "retry": "Spróbuj ponownie",
     "exportFailed": "Nie udało się przygotować pliku.",
     "excluded": {

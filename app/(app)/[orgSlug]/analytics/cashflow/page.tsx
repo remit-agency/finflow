@@ -68,6 +68,7 @@ export default function CashFlowPage() {
       {view.status === 'too_large' && <ReportNotice kind="too_large" cap={view.cap} />}
       {view.status === 'invalid' && <ReportNotice kind="invalid" reason={view.reason} />}
       {view.status === 'error' && <ReportNotice kind="error" onRetry={refresh} />}
+      {view.status === 'busy' && <ReportNotice kind="busy" onRetry={refresh} />}
 
       {report && buckets.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -87,7 +88,7 @@ export default function CashFlowPage() {
         </div>
       )}
 
-      {view.status !== 'too_large' && view.status !== 'invalid' && view.status !== 'error' && (
+      {view.status !== 'too_large' && view.status !== 'invalid' && view.status !== 'error' && view.status !== 'busy' && (
         <>
           <div className="rounded-panel border border-line bg-surface p-4 lg:p-6">
             <CashFlowChart data={buckets} loading={loading} />

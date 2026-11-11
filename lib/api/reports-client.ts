@@ -7,8 +7,17 @@ import type { BalancesReport, CashFlowReport, DashboardReport, ExportFormat, PLR
 import { downloadBlob } from '@/lib/utils/download'
 import { LedgerApiError, readApiError } from './ledger-client'
 
-/** What a page shows of one server read. `invalid`: the address the page built is refused before any request; `reason` says why. */
-export type ServerView<T> = { status: 'loading' } | { status: 'ready'; data: T } | { status: 'too_large'; cap: number } | { status: 'invalid'; reason: PeriodProblem } | { status: 'error' }
+/**
+ * What a page shows of one server read. `invalid`: the address the page built is refused before any request; `reason` says why.
+ * `busy`: the server refused for too many requests of this user (a moment later, not a broken report).
+ */
+export type ServerView<T> =
+  | { status: 'loading' }
+  | { status: 'ready'; data: T }
+  | { status: 'too_large'; cap: number }
+  | { status: 'invalid'; reason: PeriodProblem }
+  | { status: 'busy' }
+  | { status: 'error' }
 
 const reportsPath = (orgId: string): string => `/api/orgs/${encodeURIComponent(orgId)}/reports`
 
@@ -53,5 +62,6 @@ export function viewOfFailure(e: unknown): ServerView<never> {
     return { status: 'too_large', cap: Number.isFinite(cap) ? cap : 0 }
   }
   if (e instanceof ReportError && e.code === 'invalid_input' && e.reason !== undefined) return { status: 'invalid', reason: e.reason }
+  if (e instanceof LedgerApiError && e.status === 429) return { status: 'busy' }
   return { status: 'error' }
 }

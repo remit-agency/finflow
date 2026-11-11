@@ -1254,6 +1254,7 @@
     "periodTooLong": "The period is too long: a report covers up to {days} days. Choose a shorter period.",
     "periodOrder": "The period ends before it starts. Choose the dates again.",
     "error": "Could not load the report.",
+    "busy": "Too many requests. Wait a moment, then try again.",
     "retry": "Try again",
     "exportFailed": "Could not build the file.",
     "excluded": {

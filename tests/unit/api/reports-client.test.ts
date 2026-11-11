@@ -45,6 +45,10 @@ describe('reports client', () => {
     expect(viewOfFailure(new ReportError('invalid_input', { field: 'types' }))).toEqual({ status: 'error' })
   })
 
+  it('a refusal for too many requests is its own view («зачекайте хвилинку»), not the generic error', () => {
+    expect(viewOfFailure(new LedgerApiError(429, 'rate_limited'))).toEqual({ status: 'busy' })
+  })
+
   it('a refusal is a LedgerApiError with its code and details; the read limit becomes its own view', async () => {
     fetchMock.mockResolvedValue(json({ error: 'too_many_operations', cap: 10_000 }, 422))
     const e = await fetchCashFlow('org1', Q).catch((x: unknown) => x)
