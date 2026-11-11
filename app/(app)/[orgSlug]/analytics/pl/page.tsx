@@ -3,14 +3,13 @@
 import { useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { toast } from 'sonner'
 import { ExcludedHint } from '@/components/analytics/AnalyticsFilters'
 import { ReportToolbar } from '@/components/analytics/ReportToolbar'
 import PLSummaryCharts from '@/components/charts/PLSummaryCharts'
 import PLTable from '@/components/charts/PLTable'
 import { ExcludedLine } from '@/components/reports/ExcludedLine'
 import { ReconciliationBlock } from '@/components/reports/ReconciliationBlock'
-import { ReportNotice, ReportSource } from '@/components/reports/ReportNotice'
+import { ReportNotice, ReportSource, useExportFailure } from '@/components/reports/ReportNotice'
 import { downloadReport } from '@/lib/api/reports-client'
 import type { ExportFormat } from '@/lib/domain/reports/types'
 import { useAnalyticsFilters } from '@/lib/hooks/useAnalyticsFilters'
@@ -23,7 +22,7 @@ import { todayUtcDay } from '@/lib/utils/today'
 
 export default function PLPage() {
   const t = useTranslations('analytics')
-  const tReports = useTranslations('reports')
+  const exportFailed = useExportFailure()
   const noCategory = useTranslations('journal.list')('noCategory')
   const categoryName = useCategoryName()
   const { orgSlug } = useParams<{ orgSlug: string }>()
@@ -46,7 +45,7 @@ export default function PLPage() {
 
   const handleExport = (format: ExportFormat) => {
     if (query === null) return
-    downloadReport(orgSlug, 'pl', format, query, `pl-${periodSlug(period)}.${format}`).catch(() => toast.error(tReports('exportFailed')))
+    downloadReport(orgSlug, 'pl', format, query, `pl-${periodSlug(period)}.${format}`).catch(exportFailed)
   }
 
   return (

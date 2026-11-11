@@ -181,6 +181,18 @@ test.describe('server reports (emulators)', () => {
     await expect(page.getByTestId('cashflow-total-income')).toHaveCount(0)
   })
 
+  test('an export the server refuses for its size says why, not only «could not build the file»', async ({ page }) => {
+    const user = await registerViaUi(page, 'rp-export-limit', 'PLN')
+    await waitForShell(page, user.companyName)
+    await page.route('**/api/orgs/*/reports/export?**', (route) =>
+      route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: 'too_many_operations', cap: 10_000 }) }),
+    )
+    await page.goto(`/${user.orgId}/analytics/cashflow`)
+    await waitForShell(page, user.companyName)
+    await page.getByRole('button', { name: 'Експорт CSV', exact: true }).click()
+    await expect(page.getByText(`Звіту потрібно більше даних, ніж сервер читає разом (ліміт ${formatNumber(10_000, 'uk')}). Звузьте період або рахунки чи зніміть фільтри.`)).toBeVisible()
+  })
+
   test('the Balance reads the server balances on the chosen day', async ({ page, request }) => {
     const user = await setup(page, request, 'rp-bal')
     await page.goto(`/${user.orgId}/analytics/balance`)

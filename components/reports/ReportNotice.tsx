@@ -1,6 +1,8 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
+import { viewOfFailure } from '@/lib/api/reports-client'
 import { MAX_REPORT_DAYS, type Coverage } from '@/lib/domain/reports/types'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 
@@ -39,6 +41,19 @@ export function ReportNotice({ kind, cap, onRetry }: { kind: 'too_large' | 'inva
       )}
     </div>
   )
+}
+
+/**
+ * The toast of an export that failed: the server's own sentence when it refused the size (the same as the page's notice),
+ * the generic one otherwise (S12).
+ */
+export function useExportFailure(): (e: unknown) => void {
+  const t = useTranslations('reports')
+  const { number } = useFormatters()
+  return (e: unknown) => {
+    const view = viewOfFailure(e)
+    toast.error(view.status === 'too_large' ? t('tooLarge', { cap: number(view.cap) }) : t('exportFailed'))
+  }
 }
 
 /** Where the figures came from (the response's `source`) and, when some were read but could not be counted, how many. */

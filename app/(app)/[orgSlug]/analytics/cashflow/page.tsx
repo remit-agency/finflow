@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { toast } from 'sonner'
 import { ExcludedHint } from '@/components/analytics/AnalyticsFilters'
 import { ReportToolbar } from '@/components/analytics/ReportToolbar'
 import CashFlowChart from '@/components/charts/CashFlowChart'
@@ -12,7 +11,7 @@ import { CashFlowAccounts } from '@/components/reports/CashFlowAccounts'
 import { CategoryBreakdown } from '@/components/reports/CategoryBreakdown'
 import { ExcludedLine } from '@/components/reports/ExcludedLine'
 import { ReconciliationBlock } from '@/components/reports/ReconciliationBlock'
-import { ReportNotice, ReportSource } from '@/components/reports/ReportNotice'
+import { ReportNotice, ReportSource, useExportFailure } from '@/components/reports/ReportNotice'
 import { downloadReport } from '@/lib/api/reports-client'
 import { fromMinor } from '@/lib/domain/ledger/money'
 import type { ExportFormat } from '@/lib/domain/reports/types'
@@ -29,7 +28,7 @@ export default function CashFlowPage() {
   const t = useTranslations('analytics')
   const tCharts = useTranslations('charts')
   const tSections = useTranslations('shell.analyticsSections')
-  const tReports = useTranslations('reports')
+  const exportFailed = useExportFailure()
   const { locale, number } = useFormatters()
   const formatNum = (n: number) => number(n, { maximumFractionDigits: 0 })
   const { orgSlug } = useParams<{ orgSlug: string }>()
@@ -50,7 +49,7 @@ export default function CashFlowPage() {
 
   const handleExport = (format: ExportFormat) => {
     if (query === null) return
-    downloadReport(orgSlug, 'cashflow', format, query, `cashflow-${periodSlug(period)}.${format}`).catch(() => toast.error(tReports('exportFailed')))
+    downloadReport(orgSlug, 'cashflow', format, query, `cashflow-${periodSlug(period)}.${format}`).catch(exportFailed)
   }
 
   return (
