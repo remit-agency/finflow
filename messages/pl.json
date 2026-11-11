@@ -1251,6 +1251,7 @@
     },
     "uncountable": "Nie policzono operacji bez kwoty w walucie firmy: {count}",
     "tooLarge": "Raport wymaga więcej danych, niż serwer odczytuje naraz (limit {cap}). Zawęź okres lub konta albo usuń filtry.",
+    "periodTooLong": "Okres jest za długi: raport obejmuje do {days} dni. Wybierz krótszy okres.",
     "error": "Nie udało się wczytać raportu.",
     "retry": "Spróbuj ponownie",
     "exportFailed": "Nie udało się przygotować pliku.",

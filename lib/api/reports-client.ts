@@ -1,13 +1,14 @@
 // lib/api/reports-client.ts
 // The browser side of the server reports (S12): same-origin GETs that authenticate with the session cookie, and the export,
 // which the server builds and the browser only names and saves.
+import { ReportError } from '@/lib/domain/reports/errors'
 import { reportQueryToParams } from '@/lib/domain/reports/query'
 import type { BalancesReport, CashFlowReport, DashboardReport, ExportFormat, PLReport, ReportKind, ReportQuery } from '@/lib/domain/reports/types'
 import { downloadBlob } from '@/lib/utils/download'
 import { LedgerApiError, readApiError } from './ledger-client'
 
-/** What a page shows of one server read. */
-export type ServerView<T> = { status: 'loading' } | { status: 'ready'; data: T } | { status: 'too_large'; cap: number } | { status: 'error' }
+/** What a page shows of one server read. `invalid`: the address the page built is refused before any request (a period too long). */
+export type ServerView<T> = { status: 'loading' } | { status: 'ready'; data: T } | { status: 'too_large'; cap: number } | { status: 'invalid' } | { status: 'error' }
 
 const reportsPath = (orgId: string): string => `/api/orgs/${encodeURIComponent(orgId)}/reports`
 
@@ -51,5 +52,6 @@ export function viewOfFailure(e: unknown): ServerView<never> {
     const cap = Number(e.details?.cap)
     return { status: 'too_large', cap: Number.isFinite(cap) ? cap : 0 }
   }
+  if (e instanceof ReportError && e.code === 'invalid_input') return { status: 'invalid' }
   return { status: 'error' }
 }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LedgerApiError } from '@/lib/api/ledger-client'
 import { downloadReport, fetchBalances, fetchCashFlow, fetchDashboard, fetchPL, viewOfFailure } from '@/lib/api/reports-client'
 import { EMPTY_ANALYTICS_FILTERS } from '@/lib/domain/analytics-filter/filter'
+import { ReportError } from '@/lib/domain/reports/errors'
 import type { ReportQuery } from '@/lib/domain/reports/types'
 import { downloadBlob } from '@/lib/utils/download'
 
@@ -35,6 +36,10 @@ describe('reports client', () => {
     fetchMock.mockResolvedValue(json({ date: '2026-10-27' }))
     await fetchDashboard('org1')
     expect(fetchMock.mock.calls[3][0]).toBe('/api/orgs/org1/reports/dashboard')
+  })
+
+  it('a period the parser refuses is its own view («звузьте період»), not an error', () => {
+    expect(viewOfFailure(new ReportError('invalid_input', { field: 'to' }))).toEqual({ status: 'invalid' })
   })
 
   it('a refusal is a LedgerApiError with its code and details; the read limit becomes its own view', async () => {

@@ -63,10 +63,11 @@ export default function PLPage() {
       </div>
 
       {view.status === 'too_large' && <ReportNotice kind="too_large" cap={view.cap} />}
+      {view.status === 'invalid' && <ReportNotice kind="invalid" />}
       {view.status === 'error' && <ReportNotice kind="error" onRetry={refresh} />}
 
       {report && rows.length > 0 && <PLSummaryCharts rows={rows} />}
-      {view.status !== 'too_large' && view.status !== 'error' && <PLTable rows={rows} monthKeys={monthKeys} loading={view.status === 'loading'} />}
+      {view.status !== 'too_large' && view.status !== 'invalid' && view.status !== 'error' && <PLTable rows={rows} monthKeys={monthKeys} loading={view.status === 'loading'} />}
 
       {report && (
         <>

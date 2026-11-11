@@ -67,6 +67,7 @@ export default function CashFlowPage() {
       </div>
 
       {view.status === 'too_large' && <ReportNotice kind="too_large" cap={view.cap} />}
+      {view.status === 'invalid' && <ReportNotice kind="invalid" />}
       {view.status === 'error' && <ReportNotice kind="error" onRetry={refresh} />}
 
       {report && buckets.length > 0 && (
@@ -87,7 +88,7 @@ export default function CashFlowPage() {
         </div>
       )}
 
-      {view.status !== 'too_large' && view.status !== 'error' && (
+      {view.status !== 'too_large' && view.status !== 'invalid' && view.status !== 'error' && (
         <>
           <div className="rounded-panel border border-line bg-surface p-4 lg:p-6">
             <CashFlowChart data={buckets} loading={loading} />

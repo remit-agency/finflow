@@ -1,17 +1,27 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import type { Coverage } from '@/lib/domain/reports/types'
+import { MAX_REPORT_DAYS, type Coverage } from '@/lib/domain/reports/types'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 
-/** A report the server refused (more operations than it reads: «звузьте період») or could not give (with a retry). */
-export function ReportNotice({ kind, cap, onRetry }: { kind: 'too_large' | 'error'; cap?: number; onRetry?: () => void }) {
+/**
+ * A report the server refused (more data than it reads at once: «звузьте період»), an address the page cannot ask for (a period
+ * longer than a report covers), or a report it could not give (with a retry).
+ */
+export function ReportNotice({ kind, cap, onRetry }: { kind: 'too_large' | 'invalid' | 'error'; cap?: number; onRetry?: () => void }) {
   const t = useTranslations('reports')
   const { number } = useFormatters()
   if (kind === 'too_large') {
     return (
       <p role="status" data-testid="report-too-large" className="rounded-field border border-line bg-surface px-4 py-3 text-sm text-ink">
         {t('tooLarge', { cap: number(cap ?? 0) })}
+      </p>
+    )
+  }
+  if (kind === 'invalid') {
+    return (
+      <p role="status" data-testid="report-invalid-period" className="rounded-field border border-line bg-surface px-4 py-3 text-sm text-ink">
+        {t('periodTooLong', { days: number(MAX_REPORT_DAYS) })}
       </p>
     )
   }

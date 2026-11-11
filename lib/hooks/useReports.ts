@@ -21,11 +21,12 @@ function partsOf(key: string): [string, string] {
   const bar = key.indexOf('|')
   return [decodeURIComponent(key.slice(0, bar)), key.slice(bar + 1)]
 }
-const readCashFlow = (key: string, signal: AbortSignal): Promise<CashFlowReport> => {
+// Async, so a query the parser refuses (a period over the report length) is a rejection the view shows, not a throw in the effect.
+export const readCashFlowOf = async (key: string, signal: AbortSignal): Promise<CashFlowReport> => {
   const [orgId, params] = partsOf(key)
   return fetchCashFlow(orgId, parseReportQuery(new URLSearchParams(params)), signal)
 }
-const readPL = (key: string, signal: AbortSignal): Promise<PLReport> => {
+export const readPLOf = async (key: string, signal: AbortSignal): Promise<PLReport> => {
   const [orgId, params] = partsOf(key)
   return fetchPL(orgId, parseReportQuery(new URLSearchParams(params)), signal)
 }
@@ -75,13 +76,13 @@ function useServerRead<T>(key: string | null, round: number, read: (key: string,
 export function useCashFlowReport(orgId: string, query: ReportQuery | null): ServerRead<CashFlowReport> {
   const [round, refresh] = useLedgerRound()
   const key = query === null ? null : keyOf(orgId, reportQueryToParams(query).toString())
-  return { view: useServerRead(key, round, readCashFlow), refresh }
+  return { view: useServerRead(key, round, readCashFlowOf), refresh }
 }
 
 export function usePLReport(orgId: string, query: ReportQuery | null): ServerRead<PLReport> {
   const [round, refresh] = useLedgerRound()
   const key = query === null ? null : keyOf(orgId, reportQueryToParams(query).toString())
-  return { view: useServerRead(key, round, readPL), refresh }
+  return { view: useServerRead(key, round, readPLOf), refresh }
 }
 
 export function useBalances(orgId: string, date: string): ServerRead<BalancesReport> {
