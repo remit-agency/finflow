@@ -127,8 +127,7 @@
     "modules": {
       "transactions": "Платежі",
       "analytics": "Аналітика",
-      "recurring": "Планові платежі",
-      "dashboard": "Гроші зараз"
+      "recurring": "Планові платежі"
     },
     "analyticsSections": {
       "cashflow": "Cash Flow",
@@ -1293,18 +1292,8 @@
       "rate": "{currency}: {rate} (НБП, {date})",
       "pending": "Курс НБП на сьогодні ще може змінитися"
     },
-    "dashboard": {
-      "title": "Гроші зараз",
-      "subtitle": "Залишки всіх рахунків",
-      "total": "Разом у {currency}",
-      "byCurrency": "За валютами",
-      "accounts": "Рахунки",
-      "rate": "Курс НБП {rate} від {date}",
-      "noRate": "Немає курсу НБП: не враховано в сумі",
-      "incomplete": "Без рахунків у {currencies}: немає курсу НБП",
-      "lastSync": "З банку: {date}",
-      "neverSynced": "Ще не оновлено з банку",
-      "empty": "Ще немає рахунків"
+    "balance": {
+      "incomplete": "Без рахунків у {currencies}: немає курсу НБП"
     },
     "export": {
       "sheets": {

@@ -8,9 +8,9 @@ import { postOperation } from '../e2e/helpers/report-seed'
 import { addDays, monthOf } from '../../lib/domain/ledger/days'
 import { todayDay } from '../../lib/utils/today'
 
-// S12: the server reports (Cash Flow with its reconciliation, P&L, the dashboard «Гроші зараз») at 1440 and 390 px in uk
+// S12: the server reports (Cash Flow with its reconciliation, P&L) at 1440 and 390 px in uk
 // and pl, with an EUR account (the NBP stub's rate), a tagged VAT payment excluded from analytics and a subcategory.
-// Files: reports-<cashflow|reconciliation|pl|dashboard>-<desktop|phone>-<uk|pl>.png.
+// Files: reports-<cashflow|reconciliation|pl>-<desktop|phone>-<uk|pl>.png.
 const OUT_DIR = join(process.cwd(), 'ui-shots')
 const VIEWPORTS = [
   { form: 'desktop', width: 1440, height: 900 },
@@ -60,8 +60,8 @@ test.describe('reports shots', () => {
 
       if (locale !== 'uk') await context.addCookies([{ name: 'NEXT_LOCALE', value: locale, url: 'http://localhost:3000' }])
 
-      // The first visit to a route on a cold dev server compiles it: warm the three routes before the timed waits.
-      for (const path of ['analytics/cashflow', 'analytics/pl', 'dashboard']) await page.request.get(`/${org}/${path}`)
+      // The first visit to a route on a cold dev server compiles it: warm the two routes before the timed waits.
+      for (const path of ['analytics/cashflow', 'analytics/pl']) await page.request.get(`/${org}/${path}`)
 
       const noHorizontalScroll = async (what: string): Promise<void> => {
         const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
@@ -97,13 +97,6 @@ test.describe('reports shots', () => {
         await noHorizontalScroll('p&l')
         await settleChart()
         await shot('pl')
-
-        await page.goto(`/${org}`)
-        await page.waitForURL(/\/dashboard$/)
-        await waitForShell(page, user.companyName)
-        await expect(page.getByTestId('dashboard-total')).toBeVisible()
-        await noHorizontalScroll('dashboard')
-        await shot('dashboard')
       }
     })
   }

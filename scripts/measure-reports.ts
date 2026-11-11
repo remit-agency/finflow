@@ -19,7 +19,7 @@ import type { RateSnapshot } from '@/lib/server/fx/types'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import { transactionsCol } from '@/lib/server/ledger/paths'
 import { createTransaction } from '@/lib/server/ledger/write'
-import { readBalances, readDashboard } from '@/lib/server/reports/balances'
+import { readBalances } from '@/lib/server/reports/balances'
 import { accrualEndsQuery, accrualStartsQuery, readCashFlowReport, readPLReport, type ReportReadStats } from '@/lib/server/reports/read'
 import { todayUtcDay } from '@/lib/utils/today'
 
@@ -180,10 +180,6 @@ async function main(): Promise<void> {
   }
   await measure('after: balances 30 days ago', async () => {
     const { report, stats } = await readBalances(deps, ORG, addDays(today, -30))
-    return sampleOf(stats, report)
-  })
-  await measure('after: dashboard', async () => {
-    const { report, stats } = await readDashboard(deps, ORG)
     return sampleOf(stats, report)
   })
   console.log('agent tokens: not applicable (S12 has no agent-facing interface).')

@@ -24,14 +24,14 @@ export default function BalancePage() {
   const t = useTranslations('analytics')
   const tSections = useTranslations('shell.analyticsSections')
   const tTypes = useTranslations('common.accountTypes')
-  const tDashboard = useTranslations('reports.dashboard')
+  const tBalance = useTranslations('reports.balance')
   const { orgSlug } = useParams<{ orgSlug: string }>()
   const { org, accounts } = useShell()
   const { locale } = useFormatters()
   const [asOf, setAsOf] = useState<AsOfOption>('today')
   // Warsaw's date, read once per visit.
   const [today] = useState(() => toDay(todayUtcDay()))
-  // The balances on the chosen day come from the server (S12), the same rule as the dashboard «Гроші зараз».
+  // The balances on the chosen day come from the server (S12), the account documents and the day's arrivals in one snapshot.
   const { view, refresh } = useBalances(orgSlug, asOfDay(asOf, today))
   // The Balance is made of accounts: of the report filters (S10f) only the accounts apply; the rest stay in the address.
   const { filters, setFilters } = useAnalyticsFilters('accounts')
@@ -87,7 +87,7 @@ export default function BalancePage() {
       {view.status === 'busy' && <ReportNotice kind="busy" onRetry={refresh} />}
       {report && !report.complete && (
         <p data-testid="balance-incomplete" className="text-sm text-expense">
-          {tDashboard('incomplete', { currencies: missing.join(', ') })}
+          {tBalance('incomplete', { currencies: missing.join(', ') })}
         </p>
       )}
 

@@ -1,5 +1,5 @@
 // lib/domain/reports/types.ts
-// The server reports (S12): Cash Flow, P&L, the balances on a day and the dashboard «Гроші зараз». Pure: no Firebase, no
+// The server reports (S12): Cash Flow, P&L and the balances on a day. Pure: no Firebase, no
 // `server-only`, no next. Money is integer minor units: `...Base` in the company currency, `...Minor` in the account's own.
 import type { AnalyticsFilters } from '@/lib/domain/analytics-filter/filter'
 import type { AccountType } from '@/lib/domain/ledger/types'
@@ -284,12 +284,3 @@ export interface BalancesReport {
   byCurrency: CurrencyTotal[]
 }
 
-export interface BankSync {
-  accountId: string
-  /** ISO time of the last bank sync of the account's active link, null when it never ran. */
-  lastSyncAt: string | null
-}
-
-export interface DashboardReport extends BalancesReport {
-  bank: BankSync[]
-}

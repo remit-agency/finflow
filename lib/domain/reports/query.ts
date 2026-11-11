@@ -81,11 +81,6 @@ export function parseBalancesDate(p: URLSearchParams): string {
   return date
 }
 
-/** A route without parameters (the dashboard). */
-export function assertNoParams(p: URLSearchParams): void {
-  for (const key of p.keys()) bad(key)
-}
-
 export function parseExportRequest(p: URLSearchParams): { kind: ReportKind; format: ExportFormat; query: ReportQuery } {
   const kind = single(p, 'report')
   const format = single(p, 'format')

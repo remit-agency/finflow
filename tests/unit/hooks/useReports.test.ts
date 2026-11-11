@@ -11,7 +11,6 @@ vi.mock('@/lib/api/reports-client', () => ({
   fetchCashFlow: vi.fn(),
   fetchPL: vi.fn(),
   fetchBalances: vi.fn(),
-  fetchDashboard: vi.fn(),
   viewOfFailure: vi.fn(),
 }))
 
