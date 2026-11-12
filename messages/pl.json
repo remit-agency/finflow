@@ -440,7 +440,14 @@
     },
     "upcoming": {
       "title": "Przyszłe płatności",
-      "window": "(najbliższe {days} dni)",
+      "period": "Okres",
+      "periods": {
+        "month": "1 miesiąc",
+        "half": "6 miesięcy",
+        "all": "Wszystko"
+      },
+      "empty": "Brak płatności planowanych w tym okresie",
+      "partial": "Pokazano pierwsze {shown} z {count}",
       "all": "Wszystkie płatności planowane"
     },
     "plans": {

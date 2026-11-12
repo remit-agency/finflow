@@ -1,5 +1,5 @@
 import type { LedgerTransaction } from '@/lib/domain/ledger/types'
-import { MAX_MATCH_ITEMS, type FutureMode, type MatchOutcome, type MatchSuggestions, type PlanMatch, type RecurringOverview, type Series } from '@/lib/domain/recurring/types'
+import { MAX_MATCH_ITEMS, type FutureMode, type MatchOutcome, type MatchSuggestions, type PlanMatch, type RecurringOverview, type Series, type UpcomingPeriod, type UpcomingRead } from '@/lib/domain/recurring/types'
 import { apiCall, readApiError } from './ledger-client'
 import { notifyLedgerChanged } from './ledger-events'
 
@@ -32,6 +32,11 @@ async function read<T>(path: string, signal?: AbortSignal): Promise<T> {
 /** The page «Планові платежі» (S11). Throws `LedgerApiError`. */
 export function fetchRecurringOverview(orgId: string, signal?: AbortSignal): Promise<RecurringOverview> {
   return read<RecurringOverview>(`${org(orgId)}/recurring`, signal)
+}
+
+/** The journal's «Майбутні платежі» block (S12e): the overdue and the upcoming planned operations of a period. */
+export function fetchUpcoming(orgId: string, period: UpcomingPeriod, signal?: AbortSignal): Promise<UpcomingRead> {
+  return read<UpcomingRead>(`${org(orgId)}/recurring/upcoming?period=${period}`, signal)
 }
 
 /** One series (the form names it); status 404 when it is gone. */

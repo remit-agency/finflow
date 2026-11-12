@@ -11,6 +11,7 @@ import { RecurringError } from './errors'
 import { parsePlanId } from './plan'
 import { PRESET_DEFAULTS } from './presets'
 import {
+  DEFAULT_UPCOMING_PERIOD,
   FREQUENCIES,
   MAX_INTERVAL,
   MAX_MATCH_ITEMS,
@@ -22,11 +23,13 @@ import {
   WEEKEND_RULES,
   type Frequency,
   type FutureMode,
+  UPCOMING_PERIODS,
   type MatchRequest,
   type Preset,
   type Series,
   type SeriesKind,
   type SeriesStatus,
+  type UpcomingPeriod,
   type WeekendRule,
 } from './types'
 
@@ -243,6 +246,17 @@ export function parseDeleteQuery(query: URLSearchParams): FutureMode {
   const value = values[0]
   if (values.length !== 1 || (value !== 'delete' && value !== 'keep')) bad('future')
   return value
+}
+
+/** `GET /recurring/upcoming?period=month|half|all`; month when absent. */
+export function parseUpcomingQuery(query: URLSearchParams): UpcomingPeriod {
+  for (const key of query.keys()) if (key !== 'period') bad(key)
+  const values = query.getAll('period')
+  if (values.length === 0) return DEFAULT_UPCOMING_PERIOD
+  const value = values[0]
+  const period = UPCOMING_PERIODS.find((p) => p === value)
+  if (values.length !== 1 || period === undefined) bad('period')
+  return period
 }
 
 /** `POST /recurring/{id}/skip { occurrence }`. */

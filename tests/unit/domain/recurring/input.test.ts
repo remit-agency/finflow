@@ -8,6 +8,7 @@ import {
   parseSeriesInput,
   parseSeriesPatch,
   parseSkipBody,
+  parseUpcomingQuery,
   seriesFromInput,
   seriesToRaw,
 } from '@/lib/domain/recurring/input'
@@ -134,6 +135,15 @@ describe('the other bodies', () => {
     expect(parseDeleteQuery(new URLSearchParams('future=keep'))).toBe('keep')
     expect(code(() => parseDeleteQuery(new URLSearchParams('future=maybe')))).toBe('invalid_input:future')
     expect(code(() => parseDeleteQuery(new URLSearchParams('x=1')))).toBe('invalid_input:x')
+  })
+
+  it('the upcoming query names a block period (a month by default)', () => {
+    expect(parseUpcomingQuery(new URLSearchParams(''))).toBe('month')
+    expect(parseUpcomingQuery(new URLSearchParams('period=half'))).toBe('half')
+    expect(parseUpcomingQuery(new URLSearchParams('period=all'))).toBe('all')
+    expect(code(() => parseUpcomingQuery(new URLSearchParams('period=week')))).toBe('invalid_input:period')
+    expect(code(() => parseUpcomingQuery(new URLSearchParams('period=all&period=half')))).toBe('invalid_input:period')
+    expect(code(() => parseUpcomingQuery(new URLSearchParams('x=1')))).toBe('invalid_input:x')
   })
 
   it('a skip names one occurrence day', () => {

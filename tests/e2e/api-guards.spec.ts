@@ -97,6 +97,7 @@ test.describe('API guards', () => {
       { method: 'DELETE', path: '/api/orgs/x/recurring/s1' },
       { method: 'POST', path: '/api/orgs/x/recurring/s1/skip', data: { occurrence: '2026-11-10' } },
       { method: 'GET', path: '/api/orgs/x/recurring/suggestions' },
+      { method: 'GET', path: '/api/orgs/x/recurring/upcoming' },
       { method: 'POST', path: '/api/orgs/x/recurring/matches', data: { undo: ['pl_s1_2026-11-10'] } },
     ]
     for (const { method, path, data } of calls) {

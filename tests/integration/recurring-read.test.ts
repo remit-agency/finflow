@@ -3,9 +3,9 @@ import { parseTransactionInput } from '@/lib/domain/ledger/input'
 import { parseSeriesInput } from '@/lib/domain/recurring/input'
 import { createSeries } from '@/lib/server/ledger/series'
 import { createTransaction } from '@/lib/server/ledger/write'
-import { CRON_MAX_SERIES } from '@/lib/domain/recurring/types'
+import { CRON_MAX_SERIES, UPCOMING_ROWS } from '@/lib/domain/recurring/types'
 import { runRecurringCron } from '@/lib/server/recurring/cron'
-import { readMatchSuggestions, readOverview } from '@/lib/server/recurring/read'
+import { readMatchSuggestions, readOverview, readUpcoming } from '@/lib/server/recurring/read'
 import { ORG, UID, clearFirestore, makeDeps, readDoc, seedAccount, seedCategory, seedOrg, testDb } from './helpers'
 import { KEY, importBankOp } from './transfer-helpers'
 
@@ -39,6 +39,53 @@ describe('the overview (S11)', () => {
     expect(o.upcoming.map((r) => r.paymentDate)).toEqual(['2026-10-30', '2026-11-10'])
     expect(o.series).toMatchObject([{ id: series.id, name: 'Czynsz', next: '2026-11-10' }])
     expect(o.truncated).toBe(false)
+  })
+})
+
+describe('the journal block read (S12e)', () => {
+  // TODAY is 2026-10-27: a month ends 2026-11-27, half a year 2027-04-27.
+  async function plans() {
+    const { series } = await createSeries(deps, ORG, UID, rent(10))
+    const overdue = await planned('2026-10-20', 'expense', 5_000)
+    const soon = await planned('2026-11-05', 'income', 70_000)
+    const quarter = await planned('2027-01-15', 'expense', 9_000)
+    const far = await planned('2027-09-01', 'expense', 1_000)
+    return { series, overdue, soon, quarter, far }
+  }
+
+  it('counts and lists the overdue and the planned operations of the period: a month, half a year, everything', async () => {
+    const { series, overdue, soon, quarter, far } = await plans()
+    const ids = (rows: { id: string }[]) => rows.map((r) => r.id)
+    const month = await readUpcoming(deps, ORG, 'month')
+    expect(month).toMatchObject({ period: 'month', overdueCount: 1, upcomingCount: 2 })
+    expect(ids(month.overdue)).toEqual([overdue.transaction.id])
+    expect(month.upcoming.map((r) => r.paymentDate)).toEqual(['2026-11-05', '2026-11-10'])
+    expect(month.upcoming[0].id).toBe(soon.transaction.id)
+
+    const half = await readUpcoming(deps, ORG, 'half')
+    // The month's two, the series' December and January days (its window ends 2027-01-27) and the plan of 2027-01-15.
+    expect(half.upcomingCount).toBe(5)
+    expect(ids(half.upcoming)).toContain(quarter.transaction.id)
+    expect(ids(half.upcoming)).not.toContain(far.transaction.id)
+
+    const all = await readUpcoming(deps, ORG, 'all')
+    expect(ids(all.upcoming)).toContain(far.transaction.id)
+    expect(all.upcomingCount).toBe(all.upcoming.length)
+    expect(all.upcoming.map((r) => r.paymentDate)).toEqual([...all.upcoming.map((r) => r.paymentDate)].sort())
+    expect(all.names).toEqual({ [series.id]: 'Czynsz' })
+  })
+
+  it('lists at most UPCOMING_ROWS of each and still counts all of them', async () => {
+    const batch = Array.from({ length: UPCOMING_ROWS + 5 }, (_, i) => planned(`2026-12-${String((i % 28) + 1).padStart(2, '0')}`, 'expense', 100 + i))
+    await Promise.all(batch)
+    const month = await readUpcoming(deps, ORG, 'all')
+    expect(month.upcomingCount).toBe(UPCOMING_ROWS + 5)
+    expect(month.upcoming).toHaveLength(UPCOMING_ROWS)
+  })
+
+  it('reads nothing of another company', async () => {
+    await plans()
+    expect(await readUpcoming(deps, 'other-org', 'all')).toMatchObject({ overdueCount: 0, upcomingCount: 0, overdue: [], upcoming: [], names: {} })
   })
 })
 

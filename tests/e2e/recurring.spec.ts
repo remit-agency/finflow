@@ -130,41 +130,61 @@ test.describe('planned payments (emulators)', () => {
     await expect(page.getByTestId('planned-row').filter({ hasText: 'Faktura prąd' }).getByTestId('plan-overdue')).toBeVisible()
   })
 
-  test('the planned payments are a closed block above the journal: opens with the arrow, pays a plan from it, and the list is what happened', async ({ page, request }) => {
+  test('the planned payments are a closed block above the journal: opens with the arrow, has a period (a month, 6 months, all), pays a plan from it, and the list is what happened', async ({ page, request }) => {
     const user = await setup(page, request, 'rc-block')
-    await seedPlanned(page, user.orgId, { type: 'expense', accountId: 'acc-a', amountMinor: 12_000, paymentDate: dayFromToday(-3), description: 'Faktura prąd' })
-    await seedPlanned(page, user.orgId, { type: 'expense', accountId: 'acc-a', amountMinor: 30_000, paymentDate: dayFromToday(2), description: 'Hosting' })
-    await seedPlanned(page, user.orgId, { type: 'expense', accountId: 'acc-a', amountMinor: 99_000, paymentDate: dayFromToday(20), description: 'Daleki wydatek' })
+    const plan = (days: number, description: string, amountMinor: number) =>
+      seedPlanned(page, user.orgId, { type: 'expense', accountId: 'acc-a', amountMinor, paymentDate: dayFromToday(days), description })
+    await plan(-3, 'Faktura prąd', 12_000)
+    await plan(2, 'Hosting', 30_000)
+    await plan(20, 'Daleki wydatek', 99_000)
+    await plan(100, 'Kwartalny podatek', 5_000)
+    await plan(400, 'Roczna polisa', 7_000)
     await page.goto(`/${user.orgId}/transactions`)
 
-    // Closed by default: the title counts the overdue and the next 7 days; the list below has no planned row at all.
+    // Closed by default, for a month: the title counts the overdue and what falls in the next month; the list has no planned row.
     const block = page.getByTestId('upcoming')
     await expect(block).toContainText('Майбутні платежі')
-    await expect(page.getByTestId('upcoming-count')).toHaveText('2')
+    await expect(page.getByTestId('upcoming-count')).toHaveText('3')
     const toggle = page.getByTestId('upcoming-toggle')
+    const period = page.getByTestId('upcoming-period')
     await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(period).toHaveValue('month')
     await expect(page.getByTestId('upcoming-row')).toHaveCount(0)
     await expect(rowsOf(page)).toHaveCount(0)
 
-    // The arrow opens it: the overdue one first, then the next days; the plan 20 days ahead is not in it.
+    // The arrow opens it: the overdue one first, then by day; the plans beyond the month are not in it.
     await toggle.click()
     await expect(toggle).toHaveAttribute('aria-expanded', 'true')
     const rows = page.getByTestId('upcoming-row')
-    await expect(rows).toHaveCount(2)
+    await expect(rows).toHaveCount(3)
     await expect(rows.nth(0)).toContainText('Faktura prąd')
     await expect(rows.nth(0).getByTestId('upcoming-overdue')).toHaveText('Прострочено')
     await expect(rows.nth(1)).toContainText('Hosting')
-    await expect(block).not.toContainText('Daleki wydatek')
+    await expect(rows.nth(2)).toContainText('Daleki wydatek')
+    await expect(block).not.toContainText('Kwartalny podatek')
 
-    // The choice is remembered in this browser.
+    // 6 months brings the plan 100 days ahead; «Усе» the one 400 days ahead.
+    await period.selectOption('half')
+    await expect(page.getByTestId('upcoming-count')).toHaveText('4')
+    await expect(rows).toHaveCount(4)
+    await expect(block).toContainText('Kwartalny podatek')
+    await expect(block).not.toContainText('Roczna polisa')
+    await period.selectOption('all')
+    await expect(page.getByTestId('upcoming-count')).toHaveText('5')
+    await expect(rows).toHaveCount(5)
+    await expect(rows.nth(4)).toContainText('Roczna polisa')
+
+    // The arrow and the period are remembered in this browser.
     await page.reload()
     await expect(page.getByTestId('upcoming-toggle')).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByTestId('upcoming-period')).toHaveValue('all')
+    await expect(page.getByTestId('upcoming-count')).toHaveText('5')
 
-    // «Позначити сплаченою» from the block: the plan leaves it (count 1) and is an actual operation in the list.
+    // «Позначити сплаченою» from the block: the plan leaves it (count 4) and is an actual operation in the list.
     await page.getByTestId('upcoming-row').filter({ hasText: 'Hosting' }).getByRole('button', { name: 'Позначити сплаченою' }).click()
     await expect(toast(page, 'Позначено сплаченою')).toBeVisible()
-    await expect(page.getByTestId('upcoming-count')).toHaveText('1')
-    await expect(page.getByTestId('upcoming-row')).toHaveCount(1)
+    await expect(page.getByTestId('upcoming-count')).toHaveText('4')
+    await expect(page.getByTestId('upcoming-row')).toHaveCount(4)
     await expect(rowsOf(page).filter({ hasText: 'Hosting' })).toHaveCount(1)
     expect(await balanceMinor(request, user.orgId, 'acc-a')).toBe(70_000)
 
@@ -174,8 +194,20 @@ test.describe('planned payments (emulators)', () => {
     await expect(page.getByTestId('upcoming')).toHaveCount(0)
     // «План» shows only the planned ones.
     await page.goto(`/${user.orgId}/transactions?status=planned`)
-    await expect(rowsOf(page)).toHaveCount(2)
+    await expect(rowsOf(page)).toHaveCount(4)
     await expect(rowsOf(page).filter({ hasText: 'Hosting' })).toHaveCount(0)
+  })
+
+  test('the block stays when nothing is planned in the period, so that another period can be chosen', async ({ page, request }) => {
+    const user = await setup(page, request, 'rc-block-empty')
+    await seedPlanned(page, user.orgId, { type: 'expense', accountId: 'acc-a', amountMinor: 7_000, paymentDate: dayFromToday(200), description: 'Daleka polisa' })
+    await page.goto(`/${user.orgId}/transactions`)
+    await expect(page.getByTestId('upcoming-count')).toHaveText('0')
+    await page.getByTestId('upcoming-toggle').click()
+    await expect(page.getByTestId('upcoming-empty')).toBeVisible()
+    await page.getByTestId('upcoming-period').selectOption('all')
+    await expect(page.getByTestId('upcoming-count')).toHaveText('1')
+    await expect(page.getByTestId('upcoming-row')).toHaveCount(1)
   })
 
   test('«Пропустити» takes one plan off and «Скасувати» brings it back', async ({ page, request }) => {
