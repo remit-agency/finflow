@@ -53,6 +53,14 @@ export const MAX_MATCHES = 50
 export const MAX_MATCH_ITEMS = 50
 /** «Найближчі 7 днів»: today and the six days after it. */
 export const UPCOMING_DAYS = 7
+/** The journal block's period (S12e): the next month, the next six months, or everything planned; the next month is the default. */
+export const UPCOMING_PERIODS = ['month', 'half', 'all'] as const
+export type UpcomingPeriod = (typeof UPCOMING_PERIODS)[number]
+export const DEFAULT_UPCOMING_PERIOD: UpcomingPeriod = 'month'
+/** Months the periods reach ahead of today (null: no end). */
+export const UPCOMING_PERIOD_MONTHS: Record<UpcomingPeriod, number | null> = { month: 1, half: 6, all: null }
+/** Overdue and upcoming rows one `GET /recurring/upcoming` lists, each at most; the counts are exact. */
+export const UPCOMING_ROWS = 100
 /** The page lists the planned operations of the next 31 days ... */
 export const LIST_DAYS = 31
 /** ... at most this many, and at most this many overdue ones. */
@@ -175,6 +183,21 @@ export interface RecurringOverview {
   soon: { income: CurrencyTotal[]; expense: CurrencyTotal[] }
   /** The read of the window stopped at PLANNED_SCAN. */
   truncated: boolean
+}
+
+/** `GET /recurring/upcoming`: the journal block's overdue and upcoming planned operations (S12e). */
+export interface UpcomingRead {
+  period: UpcomingPeriod
+  /** Planned operations before today, all of them. */
+  overdueCount: number
+  /** The oldest overdue ones, at most UPCOMING_ROWS. */
+  overdue: PlannedRow[]
+  /** Planned operations from today to the period's end, all of them. */
+  upcomingCount: number
+  /** The first of them by payment day, at most UPCOMING_ROWS. */
+  upcoming: PlannedRow[]
+  /** The name of each series the rows belong to (the series that still exist). */
+  names: Record<string, string>
 }
 
 /** The plan of a suggested match. */

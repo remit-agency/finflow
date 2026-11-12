@@ -1,6 +1,18 @@
 import { addDays } from '@/lib/domain/ledger/days'
-import { nextOccurrenceAfter, paymentDayOf } from './schedule'
-import { LIST_DAYS, LIST_ROWS, UPCOMING_DAYS, type CurrencyTotal, type PlannedRow, type RecurringOverview, type Series, type SeriesRow } from './types'
+import { addMonthsClamped, nextOccurrenceAfter, paymentDayOf } from './schedule'
+import {
+  LIST_DAYS,
+  LIST_ROWS,
+  UPCOMING_DAYS,
+  UPCOMING_PERIOD_MONTHS,
+  type CurrencyTotal,
+  type PlannedRow,
+  type RecurringOverview,
+  type Series,
+  type SeriesRow,
+  type UpcomingPeriod,
+  type UpcomingRead,
+} from './types'
 
 export interface OverviewInput {
   series: readonly Series[]
@@ -64,23 +76,29 @@ export function buildOverview(input: OverviewInput): RecurringOverview {
   }
 }
 
-/** The journal's «Майбутні платежі» block (S12d): what is overdue and what falls in the next UPCOMING_DAYS days. */
+/** The last day of a journal block period on `today` (included); null for «Усе». */
+export function upcomingEnd(period: UpcomingPeriod, today: string): string | null {
+  const months = UPCOMING_PERIOD_MONTHS[period]
+  return months === null ? null : addMonthsClamped(today, months)
+}
+
+/** The journal's «Майбутні платежі» block (S12d, S12e): what is overdue and what falls in the chosen period. */
 export interface UpcomingBlock {
-  /** Overdue first (oldest first), then the next days. */
+  /** Overdue first (oldest first), then the upcoming ones by payment day. */
   rows: PlannedRow[]
-  /** The title's number: every overdue operation (the overview lists at most LIST_ROWS of them) and the next days. */
+  /** The title's number. */
   count: number
+  /** `count` is the whole number; false when an account is chosen and the server listed only the first rows of a longer list. */
+  exact: boolean
 }
 
 /**
- * The rows of the journal block from the overview. With an account selected in the sidebar only that account's operations
- * count, as in the list below. An overdue total the overview did not list in full still counts in full without an account.
+ * The rows of the journal block from `GET /recurring/upcoming`. With an account chosen in the sidebar only that account's
+ * operations count, as in the list below; the server counts every account, so then the number is that of the listed rows,
+ * and it is not `exact` when the server listed fewer rows than it counted.
  */
-export function upcomingBlock(overview: Pick<RecurringOverview, 'overdue' | 'overdueCount' | 'upcoming'>, today: string, accountId?: string): UpcomingBlock {
-  const end = addDays(today, UPCOMING_DAYS - 1)
-  const keep = (r: PlannedRow): boolean => accountId === undefined || r.accountId === accountId
-  const overdue = overview.overdue.filter(keep)
-  const soon = overview.upcoming.filter((r) => r.paymentDate <= end && keep(r))
-  const overdueTotal = accountId === undefined ? Math.max(overview.overdueCount, overdue.length) : overdue.length
-  return { rows: [...overdue, ...soon], count: overdueTotal + soon.length }
+export function upcomingBlock(read: Pick<UpcomingRead, 'overdue' | 'overdueCount' | 'upcoming' | 'upcomingCount'>, accountId?: string): UpcomingBlock {
+  if (accountId === undefined) return { rows: [...read.overdue, ...read.upcoming], count: read.overdueCount + read.upcomingCount, exact: true }
+  const rows = [...read.overdue, ...read.upcoming].filter((r) => r.accountId === accountId)
+  return { rows, count: rows.length, exact: read.overdueCount <= read.overdue.length && read.upcomingCount <= read.upcoming.length }
 }

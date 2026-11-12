@@ -2,7 +2,7 @@ import type { Firestore, Query, QueryDocumentSnapshot } from 'firebase-admin/fir
 import { addDays } from '@/lib/domain/ledger/days'
 import { parseSeries } from '@/lib/domain/recurring/doc'
 import { BANK_FIELDS, findPlanMatches, parseBankSide, parsePlanSide } from '@/lib/domain/recurring/match'
-import { buildOverview } from '@/lib/domain/recurring/overview'
+import { buildOverview, upcomingEnd } from '@/lib/domain/recurring/overview'
 import { ROW_FIELDS, parsePlannedRow } from '@/lib/domain/recurring/rows'
 import { windowEnd } from '@/lib/domain/recurring/schedule'
 import {
@@ -14,6 +14,7 @@ import {
   MATCH_PLAN_SCAN,
   MAX_SERIES,
   PLANNED_SCAN,
+  UPCOMING_ROWS,
   type BankSide,
   type MatchSuggestions,
   type PlanMatch,
@@ -21,6 +22,8 @@ import {
   type PlannedRow,
   type RecurringOverview,
   type Series,
+  type UpcomingPeriod,
+  type UpcomingRead,
 } from '@/lib/domain/recurring/types'
 import { encodeVersion } from '@/lib/domain/transfers/version'
 import type { LedgerDeps } from '@/lib/server/ledger/deps'
@@ -40,6 +43,13 @@ export function overdueQuery(db: Firestore, orgId: string, today: string): Query
 /** Planned operations from today to the window end, by payment day (the same index). */
 export function upcomingQuery(db: Firestore, orgId: string, today: string): Query {
   return transactionsCol(db, orgId).where('status', '==', 'planned').where('paymentDate', '>=', today).where('paymentDate', '<=', windowEnd(today)).orderBy('paymentDate')
+}
+
+/** Planned operations from today to the end of a block period (`all`: every later one), by payment day (the same index). */
+export function periodQuery(db: Firestore, orgId: string, today: string, period: UpcomingPeriod): Query {
+  const end = upcomingEnd(period, today)
+  const from = transactionsCol(db, orgId).where('status', '==', 'planned').where('paymentDate', '>=', today)
+  return (end === null ? from : from.where('paymentDate', '<=', end)).orderBy('paymentDate')
 }
 
 /** The plans a bank operation may have paid: from MATCH_LOOKBACK_DAYS back to MATCH_BEFORE_DAYS ahead (the same index). */
@@ -87,6 +97,36 @@ export async function readOverview(deps: ReadDeps, orgId: string): Promise<Recur
     truncated: upcomingSnap.size >= PLANNED_SCAN,
     today,
   })
+}
+
+/**
+ * `GET /recurring/upcoming` (S12e), computed on demand: for the journal block, the overdue and the upcoming planned operations
+ * of a period as an exact count each (`count()`) and the first UPCOMING_ROWS of them (selected fields), and the names of the
+ * series (at most MAX_SERIES documents, one field). The same index as the overview; nothing is stored.
+ */
+export async function readUpcoming(deps: ReadDeps, orgId: string, period: UpcomingPeriod): Promise<UpcomingRead> {
+  const { db } = deps
+  const today = deps.today()
+  const [seriesSnap, overdueCount, overdueSnap, upcomingCount, upcomingSnap] = await Promise.all([
+    recurringCol(db, orgId).select('name').limit(MAX_SERIES).get(),
+    overdueQuery(db, orgId, today).count().get(),
+    overdueQuery(db, orgId, today).orderBy('paymentDate').select(...ROW_FIELDS).limit(UPCOMING_ROWS).get(),
+    periodQuery(db, orgId, today, period).count().get(),
+    periodQuery(db, orgId, today, period).select(...ROW_FIELDS).limit(UPCOMING_ROWS).get(),
+  ])
+  const names: Record<string, string> = {}
+  for (const d of seriesSnap.docs) {
+    const name = d.get('name')
+    if (typeof name === 'string') names[d.id] = name
+  }
+  return {
+    period,
+    overdueCount: overdueCount.data().count,
+    overdue: rowsOf(overdueSnap.docs),
+    upcomingCount: upcomingCount.data().count,
+    upcoming: rowsOf(upcomingSnap.docs),
+    names,
+  }
 }
 
 export interface MatchRead extends MatchSuggestions {

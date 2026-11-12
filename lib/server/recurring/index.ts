@@ -1,14 +1,15 @@
 import 'server-only'
 import type { SeriesInput, SeriesPatch } from '@/lib/domain/recurring/input'
-import type { FutureMode, MatchRequest } from '@/lib/domain/recurring/types'
+import type { FutureMode, MatchRequest, UpcomingPeriod } from '@/lib/domain/recurring/types'
 import { ledger, ledgerDeps } from '@/lib/server/ledger'
 import { runRecurringCron } from './cron'
-import { readMatchSuggestions, readOverview, readSeries } from './read'
+import { readMatchSuggestions, readOverview, readSeries, readUpcoming } from './read'
 import { runMatches } from './run'
 
 /** Planned payments (S11) bound to the production Firestore and the Warsaw clock. Every write goes through `ledger`. */
 export const recurring = {
   overview: (orgId: string) => readOverview(ledgerDeps(), orgId),
+  upcoming: (orgId: string, period: UpcomingPeriod) => readUpcoming(ledgerDeps(), orgId, period),
   get: (orgId: string, seriesId: string) => readSeries(ledgerDeps(), orgId, seriesId),
   create: (orgId: string, uid: string, input: SeriesInput) => ledger.createSeries(orgId, uid, input),
   update: (orgId: string, uid: string, seriesId: string, patch: SeriesPatch) => ledger.updateSeries(orgId, uid, seriesId, patch),
