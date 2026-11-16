@@ -35,7 +35,7 @@ async function seedIncome(
   await seedLedgerOperation(request, orgId, id, { type: 'income', accountId, amount, currency: 'UAH', description })
 }
 
-/** Two UAH accounts with one income each, plus a EUR account (left out of the company total). */
+/** Two UAH accounts with one income each, plus a EUR account (counted in the company total at the NBP rate, marked ≈). */
 async function seedJournal(request: APIRequestContext, orgId: string): Promise<void> {
   await seedAccount(request, orgId, 'acc-alpha', { name: 'Alpha', balance: 300, currency: 'UAH' })
   await seedAccount(request, orgId, 'acc-beta', { name: 'Beta', balance: 450.5, currency: 'UAH', color: '#6366f1' })
