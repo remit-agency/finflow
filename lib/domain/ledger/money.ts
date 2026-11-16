@@ -1,4 +1,4 @@
-import { roundAmount } from '@/lib/utils/amount-input'
+import { parseAmountInput, roundAmount } from '@/lib/utils/amount-input'
 
 /** Largest operation amount: 10^13 minor units (10^11 of the currency). */
 export const MAX_MINOR = 10 ** 13
@@ -17,6 +17,12 @@ export function toMinor(major: number): number {
 
 export function fromMinor(minor: number): number {
   return minor / 100
+}
+
+/** An amount typed into a field, as minor units; null when it is not an amount (a sign is never an amount, see `parseAmountInput`). */
+export function parseMinorInput(text: string): number | null {
+  const major = parseAmountInput(text)
+  return major === null ? null : toMinor(major)
 }
 
 /** `minor * rate` as an integer, half away from zero. */
