@@ -19,10 +19,15 @@ export function fromMinor(minor: number): number {
   return minor / 100
 }
 
-/** An amount typed into a field, as minor units; null when it is not an amount (a sign is never an amount, see `parseAmountInput`). */
+/**
+ * An amount typed into a field, as minor units; null when it is not an amount (a sign is never an amount, see `parseAmountInput`)
+ * or when it is above `MAX_MINOR`, the largest amount the server accepts.
+ */
 export function parseMinorInput(text: string): number | null {
   const major = parseAmountInput(text)
-  return major === null ? null : toMinor(major)
+  if (major === null) return null
+  const minor = toMinor(major)
+  return minor > MAX_MINOR ? null : minor
 }
 
 /** `minor * rate` as an integer, half away from zero. */
