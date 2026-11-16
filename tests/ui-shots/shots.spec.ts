@@ -20,7 +20,7 @@ const ANALYTICS = [
   { path: 'cashflow', heading: 'Cash Flow', charts: true },
   { path: 'pl', heading: 'P&L — Прибутки та збитки', charts: true },
   { path: 'balance', heading: 'Баланс', charts: false },
-  { path: 'calendar', heading: 'Календар', charts: false },
+  { path: 'calendar', heading: 'Календар платежів', charts: false },
 ] as const
 
 async function seedDemoData(page: Page, request: APIRequestContext, orgId: string): Promise<void> {

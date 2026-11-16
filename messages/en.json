@@ -982,9 +982,6 @@
       "title": "Profit & Loss (P&L)",
       "subtitle": "By category for the selected period"
     },
-    "calendar": {
-      "subtitle": "Daily cash movement"
-    },
     "balance": {
       "subtitle": "Assets and equity",
       "asOf": "As of:",
@@ -1082,16 +1079,6 @@
       "totalIncome": "Total income",
       "totalExpense": "Total expenses",
       "profit": "Profit / loss"
-    },
-    "calendar": {
-      "previousMonth": "Previous month",
-      "nextMonth": "Next month",
-      "empty": "No transactions this month",
-      "day": "Day",
-      "income": "Income",
-      "expense": "Expense",
-      "transfer": "Transfer",
-      "balance": "Balance"
     },
     "balanceSheet": {
       "assets": "Assets",

@@ -982,9 +982,6 @@
       "title": "Rachunek zysków i strat (P&L)",
       "subtitle": "Według kategorii za wybrany okres"
     },
-    "calendar": {
-      "subtitle": "Dzienny ruch pieniędzy"
-    },
     "balance": {
       "subtitle": "Aktywa i kapitał",
       "asOf": "Stan na:",
@@ -1082,16 +1079,6 @@
       "totalIncome": "Razem wpływy",
       "totalExpense": "Razem wydatki",
       "profit": "Zysk / strata"
-    },
-    "calendar": {
-      "previousMonth": "Poprzedni miesiąc",
-      "nextMonth": "Następny miesiąc",
-      "empty": "Brak operacji w tym miesiącu",
-      "day": "Dzień",
-      "income": "Wpływ",
-      "expense": "Wydatek",
-      "transfer": "Przelew",
-      "balance": "Saldo"
     },
     "balanceSheet": {
       "assets": "Aktywa",
