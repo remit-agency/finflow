@@ -8,6 +8,7 @@ import { CATEGORIES, sampleCashFlow, samplePL } from '../../domain/reports/fixtu
 const categories = [...CATEGORIES, { id: 'cat-sales', name: 'Продажі', type: 'income' as const }]
 const CONTEXT: ReportContext = {
   baseCurrency: 'PLN',
+  cashMinimumMinor: 0,
   accounts: [{ id: 'main', name: 'Konto główne', type: 'bank', currency: 'PLN', color: '#00c896', openingMinor: 100_000, balanceMinor: 110_950 }],
   categories,
   categoryTypes: categoryTypesOf(categories),

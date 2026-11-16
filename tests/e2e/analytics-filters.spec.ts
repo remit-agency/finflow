@@ -171,11 +171,12 @@ test.describe('report filters (emulators)', () => {
     // The report tabs keep the choice. `next dev` compiles a route on its first visit, which can take longer than the
     // 20 s URL wait on a cold server: the Balance route is compiled here, before the timed click on its tab.
     await page.request.get(`/${user.orgId}/analytics/balance?tg=tag-vat`)
-    for (const [name, path] of [['P&L', 'pl'], ['Календар', 'calendar']] as const) {
-      await tab(page, name).click()
-      await expect(page).toHaveURL(new RegExp(`/analytics/${path}\\?tg=tag-vat$`))
-      await expect(hint(page)).toBeVisible()
-    }
+    await tab(page, 'P&L').click()
+    await expect(page).toHaveURL(new RegExp(`/analytics/pl\\?tg=tag-vat$`))
+    await expect(hint(page)).toBeVisible()
+    // The calendar has no filters: the tag stays in the address and the page ignores it.
+    await tab(page, 'Календар').click()
+    await expect(page).toHaveURL(new RegExp(`/analytics/calendar\\?tg=tag-vat$`))
     await tab(page, 'Баланс').click()
     await expect(page).toHaveURL(/\/analytics\/balance\?tg=tag-vat$/)
     // The Balance is made of accounts: the tag does not apply there and is not counted.

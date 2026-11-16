@@ -12,9 +12,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useOrg } from '@/lib/hooks/useOrg'
 import { useShell } from '@/lib/hooks/useShell'
 import { LedgerApiError, updateOrganization } from '@/lib/api/ledger-client'
+import { fromMinor, parseMinorInput } from '@/lib/domain/ledger/money'
 
 // Codes only; the labels live in the catalogs (settings.company.currencies.<code>).
 const CURRENCIES = ['UAH', 'EUR', 'USD', 'PLN'] as const
+
+/** The minimum as the field shows it: the company currency, 2 decimals, a comma. */
+const minimumText = (minor: number): string => fromMinor(minor).toFixed(2).replace('.', ',')
 
 export default function CompanySettingsPage() {
   const t = useTranslations('settings.company')
@@ -28,24 +32,28 @@ export default function CompanySettingsPage() {
 
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState('UAH')
+  const [minimum, setMinimum] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (org) {
       setName(org.name)
       setCurrency(org.currency)
+      setMinimum(minimumText(org.cashMinimumMinor))
     }
   }, [org])
 
   // The name is saved trimmed (the rules also refuse a blank one); a blank name is not a valid change.
   const trimmedName = name.trim()
+  // Null for anything that is not an amount (empty, a sign, letters): the minimum cannot be saved then.
+  const minimumMinor = parseMinorInput(minimum)
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!canEdit || !orgId || trimmedName.length === 0) return
+    if (!canEdit || !orgId || trimmedName.length === 0 || minimumMinor === null) return
     setSaving(true)
     try {
-      await updateOrganization(orgId, { name: trimmedName, currency })
+      await updateOrganization(orgId, { name: trimmedName, currency, cashMinimumMinor: minimumMinor })
     } catch (e) {
       toast.error(e instanceof LedgerApiError && e.code === 'currency_locked' ? t('currencyLocked') : t('saveFailed'))
       setSaving(false)
@@ -62,7 +70,7 @@ export default function CompanySettingsPage() {
     setSaving(false)
   }
 
-  const isChanged = org && trimmedName.length > 0 && (trimmedName !== org.name || currency !== org.currency)
+  const isChanged = org && trimmedName.length > 0 && minimumMinor !== null && (trimmedName !== org.name || currency !== org.currency || minimumMinor !== org.cashMinimumMinor)
 
   return (
     <Card className="ring-line">
@@ -98,6 +106,20 @@ export default function CompanySettingsPage() {
                 <option key={code} value={code}>{t(`currencies.${code}`)}</option>
               ))}
             </NativeSelect>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cashMinimum" className="text-ink">{t('minimumLabel')} ({org?.currency})</Label>
+            <Input
+              id="cashMinimum"
+              data-testid="cash-minimum"
+              inputMode="decimal"
+              value={minimum}
+              onChange={(e) => setMinimum(e.target.value)}
+              className="h-9 rounded-control border-line bg-surface"
+              aria-invalid={minimumMinor === null}
+              disabled={!canEdit}
+            />
+            <p className="text-xs text-ink-muted">{minimumMinor === null ? t('minimumInvalid') : t('minimumHint')}</p>
           </div>
           {canEdit ? (
             <Button type="submit" size="lg" disabled={!isChanged || saving}>

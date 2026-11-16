@@ -867,6 +867,9 @@
       "saveFailed": "Could not save",
       "currencyLocked": "The currency cannot be changed while the company has transactions.",
       "ownerOnly": "Only the owner can change the company details.",
+      "minimumLabel": "Minimum balance",
+      "minimumHint": "The cash gap warning appears when the forecast is below this amount. 0 means a balance below zero.",
+      "minimumInvalid": "Enter an amount from 0",
       "currencies": {
         "UAH": "UAH — Ukrainian Hryvnia",
         "EUR": "EUR — Euro",
@@ -979,9 +982,6 @@
       "title": "Profit & Loss (P&L)",
       "subtitle": "By category for the selected period"
     },
-    "calendar": {
-      "subtitle": "Daily cash movement"
-    },
     "balance": {
       "subtitle": "Assets and equity",
       "asOf": "As of:",
@@ -1079,16 +1079,6 @@
       "totalIncome": "Total income",
       "totalExpense": "Total expenses",
       "profit": "Profit / loss"
-    },
-    "calendar": {
-      "previousMonth": "Previous month",
-      "nextMonth": "Next month",
-      "empty": "No transactions this month",
-      "day": "Day",
-      "income": "Income",
-      "expense": "Expense",
-      "transfer": "Transfer",
-      "balance": "Balance"
     },
     "balanceSheet": {
       "assets": "Assets",
@@ -1260,6 +1250,50 @@
       "done": "Series deleted"
     },
     "cancel": "Cancel"
+  },
+  "forecast": {
+    "gap": {
+      "title": "{date}: the balance will fall to {balance} (minimum {minimum})",
+      "titleToday": "The balance is already below the minimum: {balance} (minimum {minimum})",
+      "cause": "Biggest payment: {label}, {amount}",
+      "causeNoLabel": "Biggest payment: {amount}",
+      "approximate": "Approximate: amounts in other currencies use the latest NBP rate",
+      "incomplete": "The forecast may be incomplete",
+      "unvalued": "Amounts without a rate are not counted: {count}",
+      "open": "Show in the calendar"
+    },
+    "calendar": {
+      "title": "Payment calendar",
+      "subtitle": "What happened, what is planned and the forecast balance, day by day",
+      "view": {
+        "label": "View",
+        "calendar": "Calendar",
+        "chart": "Chart"
+      },
+      "prev": "Previous month",
+      "next": "Next month",
+      "today": "Today",
+      "income": "Income",
+      "expense": "Expense",
+      "planned": "Planned",
+      "balance": "Balance",
+      "forecastBalance": "Forecast",
+      "minimum": "Minimum",
+      "gapDay": "Cash gap",
+      "overdue": "Overdue: {count}",
+      "noForecast": "Beyond {days} days the balance is not forecast",
+      "loading": "Loading…",
+      "error": "Could not load the calendar",
+      "dayOpen": "Payments on {date}"
+    },
+    "day": {
+      "title": "Payments on {date}",
+      "planned": "Planned",
+      "actual": "Done",
+      "empty": "No payments on this day",
+      "truncated": "Showing the first {count} payments",
+      "close": "Close"
+    }
   },
   "reports": {
     "source": {

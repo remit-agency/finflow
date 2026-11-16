@@ -69,11 +69,6 @@ export interface AnalyticsSelection<T> {
   includeExcluded: boolean
 }
 
-/** The one rule of the reports: an operation excluded from analytics counts only when the selection includes them (S10f). */
-export function countsInAnalytics(tx: { excluded?: boolean }, includeExcluded: boolean): boolean {
-  return tx.excluded !== true || includeExcluded
-}
-
 /**
  * The report's rule for an operation: the payment types and categories by their union (`matchesAnalyticsKinds`), the other
  * choices by the rule the journal shares (`matchesSharedChoices`). `types` is the company's categories (`categoryTypesOf`).

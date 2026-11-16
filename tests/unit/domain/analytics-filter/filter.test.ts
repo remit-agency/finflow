@@ -7,7 +7,6 @@ import {
 import {
   activeAnalyticsFilterCount,
   analyticsFiltersToParams,
-  countsInAnalytics,
   EMPTY_ANALYTICS_FILTERS,
   filterAccounts,
   filterForAnalytics,
@@ -284,15 +283,6 @@ describe('knownAnalyticsFilters', () => {
     expect(knownAnalyticsFilters(value, { categoryIds: undefined })).toBe(value)
     const clean = f({ categoryIds: ['c1'], tagIds: [NO_TAG, 'vat'] })
     expect(knownAnalyticsFilters(clean, known)).toBe(clean)
-  })
-})
-
-describe('countsInAnalytics', () => {
-  it('an operation excluded from analytics counts only when the selection includes them', () => {
-    expect(countsInAnalytics({}, false)).toBe(true)
-    expect(countsInAnalytics({ excluded: false }, false)).toBe(true)
-    expect(countsInAnalytics({ excluded: true }, false)).toBe(false)
-    expect(countsInAnalytics({ excluded: true }, true)).toBe(true)
   })
 })
 

@@ -1,5 +1,6 @@
 import { doc, getDoc, Timestamp } from 'firebase/firestore'
 import { db } from './firebase'
+import { parseCashMinimum } from '@/lib/domain/forecast/query'
 import type { Organization } from '@/types'
 
 // firestore.rules deny `get` both for orgs the user is not a member of and for
@@ -30,6 +31,7 @@ export async function getOrganization(orgId: string): Promise<Organization | nul
     id: orgDoc.id,
     name: data.name,
     currency: data.currency,
+    cashMinimumMinor: parseCashMinimum(data.cashMinimumMinor),
     ownerId: data.ownerId,
     plan: data.plan,
     trialEndsAt: (data.trialEndsAt as Timestamp).toDate(),

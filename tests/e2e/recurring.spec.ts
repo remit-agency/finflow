@@ -9,7 +9,7 @@ import { registerViaUi, waitForShell, type RegisteredUser } from './helpers/app-
 import { dayFromToday } from './helpers/bank-seed'
 import { deleteDoc, readDoc, seedDoc } from './helpers/emulator-firestore'
 import { seedLedgerAccount } from './helpers/ledger-seed'
-import { isoWeekdayOf, seedPlanned, seedSeries } from './helpers/recurring-seed'
+import { balanceMinor, isoWeekdayOf, seedPlanned, seedSeries } from './helpers/recurring-seed'
 import { seedBankOperation } from './helpers/transfer-seed'
 import { addDays } from '../../lib/domain/ledger/days'
 import { addMonthsClamped, paymentDayOf } from '../../lib/domain/recurring/schedule'
@@ -27,13 +27,6 @@ const dmy = (day: string): string => `${day.slice(8, 10)}.${day.slice(5, 7)}.${d
 const toast = (page: Page, text: string): Locator => page.locator('[data-sonner-toast]').filter({ hasText: text })
 const accountRow = (page: Page, name: string): Locator =>
   page.getByRole('complementary', { name: 'Рахунки' }).getByRole('listitem').filter({ hasText: name })
-
-async function balanceMinor(request: APIRequestContext, orgId: string, accountId: string): Promise<number> {
-  const raw = (await readDoc(request, `organizations/${orgId}/accounts/${accountId}`))?.balanceMinor as unknown as
-    | { doubleValue?: number; integerValue?: string }
-    | undefined
-  return Number(raw?.doubleValue ?? raw?.integerValue)
-}
 
 /** A PLN company with one bank account of 1000 zł. */
 async function setup(page: Page, request: APIRequestContext, prefix: string): Promise<RegisteredUser> {

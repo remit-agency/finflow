@@ -88,7 +88,7 @@ describe('authorization of every ledger route', () => {
     })
 
     it('lets the owner through', async () => {
-      vi.mocked(ledger.updateOrganization).mockResolvedValue({ name: 'New', currency: 'PLN' })
+      vi.mocked(ledger.updateOrganization).mockResolvedValue({ name: 'New', currency: 'PLN', cashMinimumMinor: 0 })
       vi.mocked(ledger.rebuild).mockResolvedValue({ applied: false } as never)
       expect((await call('token-alice')).status).toBe(200)
       expect(ledger[mock]).toHaveBeenCalledTimes(1)
@@ -267,10 +267,10 @@ describe('accounts and company settings', () => {
   })
 
   it('patchOrg answers 200 with the organization', async () => {
-    vi.mocked(ledger.updateOrganization).mockResolvedValue({ name: 'New', currency: 'PLN' })
+    vi.mocked(ledger.updateOrganization).mockResolvedValue({ name: 'New', currency: 'PLN', cashMinimumMinor: 0 })
     const res = await patchOrg(req('PATCH', '/api/orgs/org-acme', { name: 'New' }), ctx())
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ organization: { name: 'New', currency: 'PLN' } })
+    expect(await res.json()).toEqual({ organization: { name: 'New', currency: 'PLN', cashMinimumMinor: 0 } })
     expect(ledger.updateOrganization).toHaveBeenCalledWith('org-acme', 'user-alice', { name: 'New' })
   })
 })

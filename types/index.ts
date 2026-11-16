@@ -5,6 +5,8 @@ export interface Organization {
   id: string
   name: string
   currency: string
+  /** The company minimum balance (minor units of `currency`) the cash gap warning compares with; 0 when unset. */
+  cashMinimumMinor: number
   ownerId: string
   plan: 'trial' | 'pro' | 'free'
   trialEndsAt: Date
