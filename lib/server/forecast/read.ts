@@ -1,10 +1,11 @@
 import type { Firestore, Query } from 'firebase-admin/firestore'
 import { buildCalendarMonth, monthRange } from '@/lib/domain/forecast/calendar'
 import { buildForecast, type ForecastInput } from '@/lib/domain/forecast/build'
+import { accountMovementMinor, rollBackBalances } from '@/lib/domain/forecast/balances'
 import { DAY_ROWS, FORECAST_DAYS, type CalendarMonth, type DayActual, type DayPayments, type Forecast } from '@/lib/domain/forecast/types'
 import { addDays } from '@/lib/domain/ledger/days'
 import { parseTransaction } from '@/lib/domain/ledger/doc'
-import { flatten, type RollupDocs } from '@/lib/domain/ledger/rollups'
+import { cashDocId, excludedDocId, flatten, type RollupDocs } from '@/lib/domain/ledger/rollups'
 import { balanceRates, balancesReport } from '@/lib/domain/reports/balances'
 import { ReportError } from '@/lib/domain/reports/errors'
 import { factsFromRollupDocs, selectRollupDocs } from '@/lib/domain/reports/facts'
@@ -99,7 +100,9 @@ export async function readForecast(deps: ReadDeps, orgId: string): Promise<Forec
 /**
  * `GET /calendar?year&month`: a month of the payment calendar. What happened comes from the daily `cash_` rollups of every
  * account (income and expense counted in analytics); what is planned from the planned operations of the month; the balance
- * is the real total for the past days (`balancesAt`, valued at each day's NBP rate) and the forecast from today.
+ * is the real total for the past days, valued at each day's NBP rate, and the forecast from today. The real balance of the
+ * last past day is read once (`balancesAt`); the balance of each day before it is rolled back with the daily movement of
+ * the rollups, the analytics and the excluded twins (`rollBackBalances`).
  */
 export async function readCalendarMonth(deps: ReadDeps, orgId: string, year: number, month: number): Promise<CalendarMonth> {
   const { db } = deps
@@ -107,6 +110,8 @@ export async function readCalendarMonth(deps: ReadDeps, orgId: string, year: num
   const { first, last } = monthRange(year, month)
   const pastDays: string[] = []
   for (let d = first; d <= last && d < today; d = addDays(d, 1)) pastDays.push(d)
+  // The anchor of the balances: the last past day; none when the month has no past day.
+  const anchor = pastDays[pastDays.length - 1]
 
   // One snapshot: the forecast inputs and every month read, so the accounts and their balances agree with the rollups.
   const read = await readSnapshot(db, async (r) => {
@@ -116,6 +121,13 @@ export async function readCalendarMonth(deps: ReadDeps, orgId: string, year: num
     if (first <= today) {
       for (const snap of await Promise.all([...accountIds].map((id) => r.query(cellsQuery(db, orgId, id, first, last, false))))) {
         for (const d of snap.docs) docs.set(d.id, flatten(d.data()))
+      }
+    }
+    // The excluded twins up to the anchor: an operation excluded from analytics still moves the balance.
+    const excluded: RollupDocs = new Map()
+    if (anchor !== undefined) {
+      for (const snap of await Promise.all([...accountIds].map((id) => r.query(cellsQuery(db, orgId, id, first, anchor, true))))) {
+        for (const d of snap.docs) excluded.set(d.id, flatten(d.data()))
       }
     }
     const facts = factsFromRollupDocs(selectRollupDocs(docs, accountIds, { from: first, to: last }, 'cashflow'))
@@ -129,12 +141,18 @@ export async function readCalendarMonth(deps: ReadDeps, orgId: string, year: num
     const plannedSnap = await r.query(plannedBetween(db, orgId, first, last).select(...ROW_FIELDS).limit(PLANNED_SCAN))
     const planned = plannedSnap.docs.map((d) => parsePlannedRow(d.id, d.data())).filter(nonNull)
 
-    let balances = new Map<string, Map<string, number>>()
-    if (pastDays.length > 0) {
-      const counted = await countArrivals(r, deps, orgId, inputs.context.accounts, pastDays, today)
+    // Every past day of each account: the real balance of the anchor, rolled back over the month's movement.
+    const balances = new Map<string, Map<string, number>>()
+    if (anchor !== undefined) {
+      const { accounts } = inputs.context
+      const counted = await countArrivals(r, deps, orgId, accounts, [anchor], today)
       if ([...counted.values()].reduce((a, b) => a + b, 0) > REPORT_SCAN_CAP) throw new ReportError('too_many_operations', { cap: REPORT_SCAN_CAP })
       const stats: BalanceReadStats = { docsRead: 0, aggregates: 0, ids: new Set(), counted }
-      balances = await balancesAt(r, deps, orgId, inputs.context.accounts, pastDays, today, stats)
+      const anchors = await balancesAt(r, deps, orgId, accounts, [anchor], today, stats)
+      for (const a of accounts) {
+        const movementByDay = new Map(pastDays.map((day) => [day, accountMovementMinor([docs.get(cashDocId(a.id, day)), excluded.get(excludedDocId(cashDocId(a.id, day)))])]))
+        balances.set(a.id, rollBackBalances(anchor, anchors.get(a.id)?.get(anchor) ?? a.balanceMinor, movementByDay, first))
+      }
     }
     // The size before filtering: a row that does not parse still means the scan limit was reached.
     return { inputs, movement, planned, balances, truncated: plannedSnap.size >= PLANNED_SCAN }
