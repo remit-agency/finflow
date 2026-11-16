@@ -256,4 +256,16 @@ test.describe('server reports (emulators)', () => {
     await page.getByLabel('Станом на').selectOption('prevYearEnd')
     await expect(page.getByTestId('balance-money-total')).toContainText(zl(1000))
   })
+
+  test('a crypto account counts once in the Balance sheet: in section I, not again in section III', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'rp-crypto', 'PLN')
+    await waitForShell(page, user.companyName)
+    await seedLedgerAccount(request, user.orgId, 'acc-bank', { name: 'Konto A', balance: 1000, currency: 'PLN' })
+    await seedLedgerAccount(request, user.orgId, 'acc-wallet', { name: 'Wallet', balance: 500, currency: 'PLN', type: 'crypto' })
+    await page.goto(`/${user.orgId}/analytics/balance`)
+    await waitForShell(page, user.companyName)
+    // Section III is the money accounts only; «Всього активи» is 1 000 + 500, not 1 000 + 500 twice.
+    await expect(page.getByTestId('balance-money-total')).toContainText(zl(1000))
+    await expect(page.getByText('Всього активи', { exact: true }).locator('..')).toContainText(zl(1500))
+  })
 })

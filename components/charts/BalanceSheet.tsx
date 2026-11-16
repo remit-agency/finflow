@@ -5,6 +5,7 @@ import type { BalanceSheetLine } from '@/lib/utils/report-view'
 import { useTranslations } from 'next-intl'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { TOKEN_COLORS } from '@/lib/ui/colors'
+import { balanceSheetTotals, type BalanceSheetFields } from '@/lib/domain/reports/balance-sheet'
 
 interface BalanceSheetProps {
   /** The accounts at the chosen day, from the server (S12): each in its own currency and in the company currency. */
@@ -15,21 +16,7 @@ interface BalanceSheetProps {
   loading?: boolean
 }
 
-interface EditableFields {
-  // Assets I — Fixed
-  realestate: number
-  equipment: number
-  // Assets II — Current
-  inventory: number
-  receivables: number
-  // Liabilities I — Equity
-  charter_capital: number
-  additional_capital: number
-  // Liabilities II — Debt
-  loans: number
-}
-
-const DEFAULT_FIELDS: EditableFields = {
+const DEFAULT_FIELDS: BalanceSheetFields = {
   realestate: 0,
   equipment: 0,
   inventory: 0,
@@ -126,7 +113,7 @@ export default function BalanceSheet({ lines, orgId = 'default', currency, loadi
   const { money } = useFormatters()
   const storageKey = `balance-sheet-${orgId}`
 
-  const [fields, setFields] = useState<EditableFields>(DEFAULT_FIELDS)
+  const [fields, setFields] = useState<BalanceSheetFields>(DEFAULT_FIELDS)
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -142,7 +129,7 @@ export default function BalanceSheet({ lines, orgId = 'default', currency, loadi
 
   // Save to localStorage on change
   const updateField = useCallback(
-    (key: keyof EditableFields, value: number) => {
+    (key: keyof BalanceSheetFields, value: number) => {
       setFields((prev) => {
         const next = { ...prev, [key]: value }
         try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch { /* noop */ }
@@ -154,30 +141,12 @@ export default function BalanceSheet({ lines, orgId = 'default', currency, loadi
 
   if (loading) return <Skeleton />
 
-  // --- Assets calculations ---
+  const {
+    cryptoTotal, fixedTotal, currentTotal, moneyTotal, totalAssets, retainedEarnings, equityTotal, debtTotal, totalLiabilities,
+  } = balanceSheetTotals(lines, fields)
   const cryptoAccounts = lines.filter((a) => a.type === 'crypto')
-  const cryptoTotal = cryptoAccounts.reduce((s, a) => s + (a.base ?? 0), 0)
-
-  // Section I — Fixed assets
-  const fixedTotal = fields.realestate + fields.equipment + cryptoTotal
-
-  // Section II — Current assets
-  const currentTotal = fields.inventory + fields.receivables
-
-  // Section III — Money (auto from accounts)
-  const moneyTotal = lines.reduce((s, a) => s + (a.base ?? 0), 0)
-
-  const totalAssets = fixedTotal + currentTotal + moneyTotal
-
-  // --- Liabilities calculations ---
-  // Section I — Equity
-  const retainedEarnings = moneyTotal // auto = sum of all money accounts
-  const equityTotal = fields.charter_capital + fields.additional_capital + retainedEarnings
-
-  // Section II — Debt
-  const debtTotal = fields.loans
-
-  const totalLiabilities = equityTotal + debtTotal
+  // Section III lists the non-crypto accounts only: the crypto ones are in section I.
+  const moneyAccounts = lines.filter((a) => a.type !== 'crypto')
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6" style={{ fontVariantNumeric: 'tabular-nums' }}>
@@ -211,10 +180,10 @@ export default function BalanceSheet({ lines, orgId = 'default', currency, loadi
 
         {/* III. Money */}
         <SectionHeader roman="III" title={t('money')} total={moneyTotal} currency={currency} testId="balance-money-total" />
-        {lines.length === 0 ? (
+        {moneyAccounts.length === 0 ? (
           <p className="text-sm text-ink-muted italic py-1">{t('noAccounts')}</p>
         ) : (
-          lines.map((acc) => (
+          moneyAccounts.map((acc) => (
             <div key={acc.id} className="flex items-center justify-between gap-3 py-1">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: acc.color }} />
