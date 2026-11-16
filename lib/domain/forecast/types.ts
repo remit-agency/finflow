@@ -6,6 +6,9 @@ export const FORECAST_DAYS = 90
 export const MAX_CAUSES = 3
 /** Payments one day panel lists at most. */
 export const DAY_ROWS = 100
+/** The years a calendar month may be read for (the API and the calendar page share this range). */
+export const CALENDAR_MIN_YEAR = 2000
+export const CALENDAR_MAX_YEAR = 2100
 
 /** One planned payment that pushes the balance down on the gap day. */
 export interface GapCause {

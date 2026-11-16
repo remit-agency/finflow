@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
@@ -9,6 +8,7 @@ import { CalendarGrid } from '@/components/forecast/CalendarGrid'
 import { CashGapBanner } from '@/components/forecast/CashGapBanner'
 import { DayPanel } from '@/components/forecast/DayPanel'
 import { Button } from '@/components/ui/button'
+import { parseMonthKey } from '@/lib/domain/forecast/query'
 import { FORECAST_DAYS } from '@/lib/domain/forecast/types'
 import { isDay } from '@/lib/domain/ledger/days'
 import { useCalendarMonth } from '@/lib/hooks/useCalendarMonth'
@@ -17,9 +17,6 @@ import { useShell } from '@/lib/hooks/useShell'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { addDaysUtc, daysInMonthUtc, dayKeyUtc, formatMonthTitle, shiftMonth } from '@/lib/utils/calendar-grid'
 import { todayDay } from '@/lib/utils/today'
-
-/** `?month=YYYY-MM`: a calendar month (1-12). */
-const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
 
 /** The payment calendar (S13): the month grid or the chart, the cash gap banner and the day panel. The state is in the address. */
 export default function CalendarPage() {
@@ -30,14 +27,14 @@ export default function CalendarPage() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  // Warsaw's day: the month shown by default is the one Poland is in.
-  const [todayKey] = useState(() => todayDay())
   const canEdit = can('data.write')
 
-  const monthParam = searchParams.get('month') ?? ''
-  const shownKey = MONTH.test(monthParam) ? monthParam : todayKey.slice(0, 7)
-  const year = Number(shownKey.slice(0, 4))
-  const month = Number(shownKey.slice(5, 7))
+  // Warsaw's month is the default and the fallback for a `?month=` the calendar cannot read. The day is read on every render:
+  // a tab left open past midnight must not keep the old day.
+  const warsawToday = todayDay()
+  const shown = parseMonthKey(searchParams.get('month')) ?? { year: Number(warsawToday.slice(0, 4)), month: Number(warsawToday.slice(5, 7)) }
+  const { year, month } = shown
+  const shownKey = `${year}-${String(month).padStart(2, '0')}`
   const dayParam = searchParams.get('day')
   // A day opens the panel only when it is a real day of the month shown.
   const day = isDay(dayParam) && dayParam.slice(0, 7) === shownKey ? dayParam : null
@@ -48,6 +45,8 @@ export default function CalendarPage() {
   // The hook keeps the last answer while another month is read: only this month's answer is shown.
   const current = calendar !== null && calendar.year === year && calendar.month === month ? calendar : null
   const failed = calendarError && current === null
+  // The server's day once the month is loaded (the same clock the forecast uses); the browser's Warsaw day until then.
+  const todayKey = current?.today ?? warsawToday
 
   // The forecast reaches FORECAST_DAYS after today; a month that ends later is only partly forecast.
   const horizon = dayKeyUtc(addDaysUtc(new Date(`${todayKey}T00:00:00Z`), FORECAST_DAYS))
@@ -92,6 +91,11 @@ export default function CalendarPage() {
         <h2 className="min-w-40 text-center text-base font-semibold text-ink tabular-nums">
           {formatMonthTitle({ year, month: month - 1 }, locale)}
         </h2>
+        {current !== null && (
+          <span data-testid="cal-currency" className="text-sm font-medium text-ink-muted">
+            {current.currency}
+          </span>
+        )}
         <Button type="button" variant="outline" size="icon-sm" aria-label={t('next')} title={t('next')} data-testid="cal-next" onClick={() => stepMonth(1)}>
           <ChevronRightIcon aria-hidden />
         </Button>

@@ -7,6 +7,7 @@ import { fromMinor } from '@/lib/domain/ledger/money'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { cn } from '@/lib/utils'
 import { buildMonthGrid, dayKeyUtc, formatDayLongUtc, weekdayHeaders, type MonthGridCell } from '@/lib/utils/calendar-grid'
+import { wholeUnits } from '@/lib/utils/forecast-view'
 
 interface Props {
   month: CalendarMonth
@@ -28,7 +29,9 @@ export function CalendarGrid({ month, selectedDay, onOpenDay }: Props) {
   const weeks = useMemo(() => buildMonthGrid({ year: month.year, month: month.month - 1 }), [month.year, month.month])
   const headers = useMemo(() => weekdayHeaders(locale), [locale])
   const byDate = useMemo(() => new Map(month.days.map((d) => [d.date, d] as const)), [month.days])
-  const whole = (minor: number) => number(fromMinor(minor), { maximumFractionDigits: 0, minimumFractionDigits: 0 })
+  const whole = (minor: number) => number(wholeUnits(fromMinor(minor)), { maximumFractionDigits: 0, minimumFractionDigits: 0 })
+  // An amount that rounds to zero is not written in the cell (the day panel has the exact figure).
+  const shows = (minor: number) => wholeUnits(fromMinor(minor)) !== 0
 
   const outside = (c: MonthGridCell) => (
     <div key={dayKeyUtc(c.date)} className="min-h-14 min-w-0 bg-canvas p-1 text-xs text-ink-subtle opacity-60 sm:min-h-24 sm:p-1.5">
@@ -67,12 +70,12 @@ export function CalendarGrid({ month, selectedDay, onOpenDay }: Props) {
           </span>
           {(planned || overdue) && <span aria-hidden data-testid="cal-dot" className={cn('size-1.5 rounded-full sm:hidden', overdue ? 'bg-expense' : 'bg-brand-soft-foreground')} />}
         </span>
-        {d !== undefined && d.incomeBase > 0 && <span className="hidden truncate text-[11px] tabular-nums text-income sm:block">{`+${whole(d.incomeBase)}`}</span>}
-        {d !== undefined && d.expenseBase > 0 && <span className="hidden truncate text-[11px] tabular-nums text-expense sm:block">{`−${whole(d.expenseBase)}`}</span>}
-        {d !== undefined && planned && (
+        {d !== undefined && shows(d.incomeBase) &&<span className="hidden truncate text-[11px] tabular-nums text-income sm:block">{`+${whole(d.incomeBase)}`}</span>}
+        {d !== undefined && shows(d.expenseBase) &&<span className="hidden truncate text-[11px] tabular-nums text-expense sm:block">{`−${whole(d.expenseBase)}`}</span>}
+        {d !== undefined && (shows(d.plannedIncomeBase) || shows(d.plannedExpenseBase)) && (
           <span data-testid="cal-planned" className="hidden flex-col text-[11px] italic tabular-nums sm:flex">
-            {d.plannedIncomeBase > 0 && <span className="truncate text-income">{`+${whole(d.plannedIncomeBase)}`}</span>}
-            {d.plannedExpenseBase > 0 && <span className="truncate text-expense">{`−${whole(d.plannedExpenseBase)}`}</span>}
+            {shows(d.plannedIncomeBase) && <span className="truncate text-income">{`+${whole(d.plannedIncomeBase)}`}</span>}
+            {shows(d.plannedExpenseBase) && <span className="truncate text-expense">{`−${whole(d.plannedExpenseBase)}`}</span>}
           </span>
         )}
         {d !== undefined && overdue && (

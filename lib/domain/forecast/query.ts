@@ -1,6 +1,7 @@
 import { isDay } from '@/lib/domain/ledger/days'
 import { MAX_MINOR } from '@/lib/domain/ledger/money'
 import { ReportError } from '@/lib/domain/reports/errors'
+import { CALENDAR_MAX_YEAR, CALENDAR_MIN_YEAR } from './types'
 
 function bad(field: string): never {
   throw new ReportError('invalid_input', { field })
@@ -22,7 +23,20 @@ function wholeNumber(text: string, key: string, min: number, max: number): numbe
 /** `GET /calendar?year=2026&month=11` (month 1-12). */
 export function parseCalendarQuery(p: URLSearchParams): { year: number; month: number } {
   for (const key of p.keys()) if (key !== 'year' && key !== 'month') bad(key)
-  return { year: wholeNumber(single(p, 'year'), 'year', 2000, 2100), month: wholeNumber(single(p, 'month'), 'month', 1, 12) }
+  return {
+    year: wholeNumber(single(p, 'year'), 'year', CALENDAR_MIN_YEAR, CALENDAR_MAX_YEAR),
+    month: wholeNumber(single(p, 'month'), 'month', 1, 12),
+  }
+}
+
+/** The calendar page's `?month=YYYY-MM`: a month the calendar read accepts; anything else (absent included) is null. */
+export function parseMonthKey(text: string | null): { year: number; month: number } | null {
+  const m = /^(\d{4})-(\d{2})$/.exec(text ?? '')
+  if (m === null) return null
+  const year = Number(m[1])
+  const month = Number(m[2])
+  if (year < CALENDAR_MIN_YEAR || year > CALENDAR_MAX_YEAR || month < 1 || month > 12) return null
+  return { year, month }
 }
 
 /** `GET /calendar/day?date=YYYY-MM-DD`. */

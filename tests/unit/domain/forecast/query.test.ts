@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { ReportError } from '@/lib/domain/reports/errors'
-import { parseCalendarQuery, parseCashMinimum, parseDayQuery } from '@/lib/domain/forecast/query'
+import { parseCalendarQuery, parseCashMinimum, parseDayQuery, parseMonthKey } from '@/lib/domain/forecast/query'
+
+describe('parseMonthKey', () => {
+  it('takes YYYY-MM for a month the calendar API reads (years 2000-2100)', () => {
+    expect(parseMonthKey('2026-11')).toEqual({ year: 2026, month: 11 })
+    expect(parseMonthKey('2000-01')).toEqual({ year: 2000, month: 1 })
+    expect(parseMonthKey('2100-12')).toEqual({ year: 2100, month: 12 })
+  })
+  it('refuses a year the API rejects, a bad month and any other shape', () => {
+    expect(parseMonthKey('1999-05')).toBeNull()
+    expect(parseMonthKey('2101-01')).toBeNull()
+    expect(parseMonthKey('2026-13')).toBeNull()
+    expect(parseMonthKey('2026-00')).toBeNull()
+    expect(parseMonthKey('2026-1')).toBeNull()
+    expect(parseMonthKey('2026-11-01')).toBeNull()
+    expect(parseMonthKey('')).toBeNull()
+    expect(parseMonthKey(null)).toBeNull()
+  })
+})
 
 const code = (fn: () => unknown): string => {
   try {
