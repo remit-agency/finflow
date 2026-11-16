@@ -867,6 +867,9 @@
       "saveFailed": "Nie udało się zapisać",
       "currencyLocked": "Nie można zmienić waluty, dopóki firma ma operacje.",
       "ownerOnly": "Dane firmy może zmieniać tylko właściciel.",
+      "minimumLabel": "Minimalne saldo",
+      "minimumHint": "Ostrzeżenie o luce w gotówce działa, gdy prognoza jest niższa niż ta kwota. 0 oznacza saldo poniżej zera.",
+      "minimumInvalid": "Podaj kwotę od 0",
       "currencies": {
         "UAH": "UAH — hrywna ukraińska",
         "EUR": "EUR — euro",
@@ -1260,6 +1263,50 @@
       "done": "Seria usunięta"
     },
     "cancel": "Anuluj"
+  },
+  "forecast": {
+    "gap": {
+      "title": "{date}: saldo spadnie do {balance} (minimum {minimum})",
+      "titleToday": "Saldo jest już poniżej minimum: {balance} (minimum {minimum})",
+      "cause": "Największa płatność: {label}, {amount}",
+      "causeNoLabel": "Największa płatność: {amount}",
+      "approximate": "Szacunkowo: kwoty w innej walucie wg ostatniego kursu NBP",
+      "incomplete": "Prognoza może być niepełna",
+      "unvalued": "Nie uwzględniono kwot bez kursu: {count}",
+      "open": "Pokaż w kalendarzu"
+    },
+    "calendar": {
+      "title": "Kalendarz płatności",
+      "subtitle": "Rzeczywistość, plan i prognoza salda dzień po dniu",
+      "view": {
+        "label": "Widok",
+        "calendar": "Kalendarz",
+        "chart": "Wykres"
+      },
+      "prev": "Poprzedni miesiąc",
+      "next": "Następny miesiąc",
+      "today": "Dzisiaj",
+      "income": "Wpływy",
+      "expense": "Wydatki",
+      "planned": "Plan",
+      "balance": "Saldo",
+      "forecastBalance": "Prognoza",
+      "minimum": "Minimum",
+      "gapDay": "Luka w gotówce",
+      "overdue": "Zaległe: {count}",
+      "noForecast": "Dalej niż {days} dni saldo nie jest prognozowane",
+      "loading": "Ładowanie…",
+      "error": "Nie udało się wczytać kalendarza",
+      "dayOpen": "Płatności {date}"
+    },
+    "day": {
+      "title": "Płatności {date}",
+      "planned": "Zaplanowane",
+      "actual": "Zaksięgowane",
+      "empty": "Brak płatności w tym dniu",
+      "truncated": "Pokazano pierwsze {count} płatności",
+      "close": "Zamknij"
+    }
   },
   "reports": {
     "source": {
