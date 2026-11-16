@@ -162,6 +162,55 @@ test.describe('server reports (emulators)', () => {
     expect((await page.goto('/not.a.company'))?.status()).toBe(404)
   })
 
+  test('the sidebar total adds the EUR account at the NBP rate, marked ≈, and shows the Balance total', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'rp-side-eur', 'PLN')
+    await waitForShell(page, user.companyName)
+    await seedLedgerAccount(request, user.orgId, 'acc-a', { name: 'Konto A', balance: 1000, currency: 'PLN' })
+    await seedLedgerAccount(request, user.orgId, 'acc-eur', { name: 'Konto EUR', balance: 200, currency: 'EUR' })
+    await page.goto(`/${user.orgId}/analytics/balance`)
+    await waitForShell(page, user.companyName)
+    const total = page.getByTestId('accounts-total')
+    // 1 000 zł + 200 EUR at 4,30 (the stub's rate for EUR into PLN): 1 860 zł. The rates load after the accounts: wait for them.
+    await expect(total).not.toHaveAttribute('aria-busy', 'true')
+    await expect(page.getByTestId('accounts-total-approx')).toHaveText('≈')
+    await expect(total.locator('.sr-only')).toHaveText(`≈ ${zl(1860)}`)
+    await expect(total).toHaveAttribute('title', 'Включає рахунки в інших валютах за останнім курсом НБП')
+    // The Balance page's «Всього активи» shows the same amount.
+    await expect(page.getByText('Всього активи', { exact: true }).locator('..')).toContainText(zl(1860))
+  })
+
+  test('the sidebar total of a company with only złoty accounts has no ≈ and asks for no rate', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'rp-side-pln', 'PLN')
+    await waitForShell(page, user.companyName)
+    await seedLedgerAccount(request, user.orgId, 'acc-a', { name: 'Konto A', balance: 1000, currency: 'PLN' })
+    await seedLedgerAccount(request, user.orgId, 'acc-b', { name: 'Konto B', balance: 250.5, currency: 'PLN' })
+    const rates: string[] = []
+    page.on('request', (req) => {
+      if (req.url().includes('/api/rates')) rates.push(req.url())
+    })
+    await page.goto(`/${user.orgId}/analytics/balance`)
+    await waitForShell(page, user.companyName)
+    const total = page.getByTestId('accounts-total')
+    await expect(total.locator('.sr-only')).toHaveText(zl(1250.5))
+    await expect(page.getByTestId('accounts-total-approx')).toHaveCount(0)
+    expect(await total.getAttribute('title')).toBeNull()
+    expect(rates).toEqual([])
+  })
+
+  test('a currency without an NBP rate is left out of the sidebar total and the tooltip counts it', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'rp-side-gbp', 'PLN')
+    await waitForShell(page, user.companyName)
+    await seedLedgerAccount(request, user.orgId, 'acc-a', { name: 'Konto A', balance: 1000, currency: 'PLN' })
+    // The NBP stub publishes EUR, USD and UAH only: GBP has no rate, so the route answers without one.
+    await seedLedgerAccount(request, user.orgId, 'acc-gbp', { name: 'Konto GBP', balance: 300, currency: 'GBP' })
+    await page.goto(`/${user.orgId}/analytics/balance`)
+    await waitForShell(page, user.companyName)
+    const total = page.getByTestId('accounts-total')
+    await expect(total).not.toHaveAttribute('aria-busy', 'true')
+    await expect(total.locator('.sr-only')).toHaveText(`≈ ${zl(1000)}`)
+    await expect(total).toHaveAttribute('title', /Не враховано рахунків без курсу: 1$/)
+  })
+
   test('a refusal of the read limit says to narrow the period instead of showing a figure', async ({ page }) => {
     // The server side of the limit is in tests/integration/reports-read.test.ts; here the page's answer to it.
     const user = await registerViaUi(page, 'rp-limit', 'PLN')

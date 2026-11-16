@@ -197,6 +197,8 @@
       "connectBank": "Connect a bank",
       "openBanking": "Open Banking, beta",
       "totalIn": "Total in {currency}",
+      "approximate": "Includes accounts in other currencies at the latest NBP rate",
+      "unvalued": "Accounts without a rate are not counted: {count}",
       "mine": "My accounts",
       "all": "All accounts",
       "none": "No accounts yet",

@@ -136,7 +136,7 @@ test.describe('app shell (emulators)', () => {
     await expect(sidebar).toHaveAttribute('data-collapsed', 'false')
   })
 
-  test('choosing an account in the sidebar filters the journal; the total counts only the company currency', async ({ page, request }) => {
+  test('choosing an account in the sidebar filters the journal; the total adds the EUR account at the NBP rate, marked ≈', async ({ page, request }) => {
     const user = await registerViaUi(page, 'filter')
     await waitForShell(page, user.companyName)
     await seedJournal(request, user.orgId)
@@ -146,9 +146,13 @@ test.describe('app shell (emulators)', () => {
     const sidebar = accountsSidebar(page)
     await expect(sidebar.getByRole('listitem').filter({ hasText: 'Euro' })).toBeVisible()
 
-    // Registration uses UAH. Total = 300 + 450.50; the EUR account is neither added nor mentioned.
+    // Registration uses UAH. Total = 300 + 450.50 + 200 EUR at 43 UAH (the NBP stub: EUR 4.30 and UAH 0.10 per złoty) = 9 350,50.
+    // The EUR account is converted, so the total is marked ≈ (the label itself is unchanged).
     await expect(sidebar.getByText('Разом у UAH', { exact: true })).toBeVisible()
-    await expect(page.getByTestId('accounts-total')).toContainText('750,50')
+    await expect(page.getByTestId('accounts-total')).not.toHaveAttribute('aria-busy', 'true')
+    await expect(page.getByTestId('accounts-total-approx')).toHaveText('≈')
+    // The amount and the marker; the currency label is the browser's (grn in Chrome, ₴ in Node's ICU), so it is not spelled out.
+    await expect(page.getByTestId('accounts-total').locator('.sr-only')).toHaveText(/^≈ 9\s350,50\s\S+$/)
     await expect(page.getByTestId('accounts-summary')).not.toContainText('EUR')
 
     const rowAlpha = page.getByRole('row').filter({ hasText: 'Оплата від Alpha' })
