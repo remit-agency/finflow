@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCalendarMonth, type CalendarInput } from '@/lib/domain/forecast/calendar'
+import { buildCalendarMonth, monthRange, type CalendarInput } from '@/lib/domain/forecast/calendar'
 import { buildForecast } from '@/lib/domain/forecast/build'
 import type { PlannedRow } from '@/lib/domain/recurring/types'
 
@@ -31,6 +31,13 @@ function input(over: Partial<CalendarInput> = {}): CalendarInput {
     ...over,
   }
 }
+
+describe('monthRange', () => {
+  it('gives the first and the last day of a month, leap years included', () => {
+    expect(monthRange(2026, 11)).toEqual({ first: '2026-11-01', last: '2026-11-30' })
+    expect(monthRange(2028, 2)).toEqual({ first: '2028-02-01', last: '2028-02-29' })
+  })
+})
 
 describe('buildCalendarMonth', () => {
   it('has one entry per day of the month and tells past, today and future apart', () => {
@@ -71,9 +78,26 @@ describe('buildCalendarMonth', () => {
     expect(m.days[9]).toMatchObject({ date: '2027-06-10', kind: 'future', plannedExpenseBase: 12_000, endBalanceBase: null, belowMinimum: false })
   })
 
-  it('leaves transfers out and counts a payment without a rate as unvalued', () => {
-    const m = buildCalendarMonth(input({ planned: [row('t', '2026-11-18', 90_000, 'transfer'), { ...row('e', '2026-11-19', 1_000), currency: 'EUR' }] }))
+  it('leaves transfers out', () => {
+    const m = buildCalendarMonth(input({ planned: [row('t', '2026-11-18', 90_000, 'transfer')] }))
     expect(m.days[17].plannedExpenseBase).toBe(0)
-    expect(m.unvalued).toBeGreaterThanOrEqual(1)
+    expect(m.unvalued).toBe(0)
+  })
+
+  it('does not count a payment inside the forecast window twice: the forecast already counts it as unvalued', () => {
+    const planned = [{ ...row('e', '2026-11-18', 1_000), currency: 'EUR' }]
+    const forecast = buildForecast({ today: TODAY, baseCurrency: 'PLN', minimumMinor: 80_000, startBase: 100_000, startIncomplete: false, foreignAccounts: false, planned, rates: new Map(), names: {}, truncated: false })
+    expect(forecast.unvalued).toBe(1)
+    const m = buildCalendarMonth(input({ planned, forecast }))
+    expect(m.unvalued).toBe(1)
+  })
+
+  it('a payment without a rate beyond the forecast window is unvalued and makes a valued foreign one approximate', () => {
+    const m = buildCalendarMonth(input({ year: 2027, month: 6, movement: new Map(), pastBalances: new Map(), planned: [{ ...row('far', '2027-06-10', 12_000), currency: 'EUR' }] }))
+    expect(m.unvalued).toBe(input().forecast.unvalued + 1)
+    expect(m.approximate).toBe(input().forecast.approximate)
+    const valued = buildCalendarMonth(input({ year: 2027, month: 6, movement: new Map(), pastBalances: new Map(), planned: [{ ...row('far', '2027-06-10', 12_000), currency: 'EUR' }], rates: new Map([['EUR', 4.5]]) }))
+    expect(valued.approximate).toBe(true)
+    expect(valued.unvalued).toBe(0)
   })
 })

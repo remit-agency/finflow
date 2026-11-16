@@ -52,9 +52,23 @@ describe('buildForecast', () => {
     expect(f.days[2].endBalanceBase).toBe(100_000)
   })
 
-  it('ignores a payment after the last forecast day', () => {
-    const f = buildForecast(input({ planned: [row('far', '2027-03-01', 90_000)] }))
-    expect(f.days[FORECAST_DAYS].endBalanceBase).toBe(100_000)
+  it('a payment on the last forecast day (today + 90) is counted', () => {
+    const f = buildForecast(input({ planned: [row('last', '2027-02-14', 30_000)] }))
+    expect(f.days[FORECAST_DAYS]).toMatchObject({ date: '2027-02-14', plannedExpenseBase: 30_000, endBalanceBase: 70_000 })
+  })
+
+  it('a payment after the last forecast day (today + 91) changes nothing', () => {
+    const baseline = buildForecast(input())
+    const f = buildForecast(input({ planned: [row('after', '2027-02-15', 30_000)] }))
+    expect(f.days).toEqual(baseline.days)
+    expect(f.gap).toEqual(baseline.gap)
+    expect(f.unvalued).toBe(0)
+  })
+
+  it('an EUR payment without a rate after the last forecast day (today + 91) is neither unvalued nor approximate', () => {
+    const f = buildForecast(input({ planned: [row('after', '2027-02-15', 10_000, 'expense', { currency: 'EUR' })] }))
+    expect(f.unvalued).toBe(0)
+    expect(f.approximate).toBe(false)
   })
 
   it('finds the first day below the minimum and names the largest expenses of that day', () => {
