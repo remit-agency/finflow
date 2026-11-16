@@ -15,6 +15,9 @@ const row = (id: string, paymentDate: string, amountMinor: number, type: Planned
   manual: false,
 })
 
+/** Every past day of November 2026 with a real balance, as the reads supply them. */
+const allPastValued = (): Map<string, number | null> => new Map(Array.from({ length: 15 }, (_, i) => [`2026-11-${String(i + 1).padStart(2, '0')}`, 90_000] as [string, number | null]))
+
 function input(over: Partial<CalendarInput> = {}): CalendarInput {
   const planned = [row('p1', '2026-11-18', 30_000), row('late', '2026-11-10', 5_000)]
   const forecast = buildForecast({ today: TODAY, baseCurrency: 'PLN', minimumMinor: 80_000, startBase: 100_000, startIncomplete: false, foreignAccounts: false, planned, rates: new Map(), names: {}, truncated: false })
@@ -79,7 +82,7 @@ describe('buildCalendarMonth', () => {
   })
 
   it('leaves transfers out', () => {
-    const m = buildCalendarMonth(input({ planned: [row('t', '2026-11-18', 90_000, 'transfer')] }))
+    const m = buildCalendarMonth(input({ planned: [row('t', '2026-11-18', 90_000, 'transfer')], pastBalances: allPastValued() }))
     expect(m.days[17].plannedExpenseBase).toBe(0)
     expect(m.unvalued).toBe(0)
   })
@@ -88,8 +91,21 @@ describe('buildCalendarMonth', () => {
     const planned = [{ ...row('e', '2026-11-18', 1_000), currency: 'EUR' }]
     const forecast = buildForecast({ today: TODAY, baseCurrency: 'PLN', minimumMinor: 80_000, startBase: 100_000, startIncomplete: false, foreignAccounts: false, planned, rates: new Map(), names: {}, truncated: false })
     expect(forecast.unvalued).toBe(1)
-    const m = buildCalendarMonth(input({ planned, forecast }))
+    const m = buildCalendarMonth(input({ planned, forecast, pastBalances: allPastValued() }))
     expect(m.unvalued).toBe(1)
+  })
+
+  it('a past day without a balance (an account has no rate) makes the month unvalued once, however many days lack one', () => {
+    const base = input({ pastBalances: new Map([['2026-11-02', 90_000], ['2026-11-03', null], ['2026-11-15', null]]) })
+    const m = buildCalendarMonth(base)
+    expect(m.unvalued).toBe(base.forecast.unvalued + 1)
+    expect(m.days[1].endBalanceBase).toBe(90_000)
+    expect(m.days[2].endBalanceBase).toBeNull()
+  })
+
+  it('a valued past balance does not make the month unvalued', () => {
+    const m = buildCalendarMonth(input({ pastBalances: allPastValued() }))
+    expect(m.unvalued).toBe(input().forecast.unvalued)
   })
 
   it('a payment without a rate beyond the forecast window is unvalued and makes a valued foreign one approximate', () => {

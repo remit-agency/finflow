@@ -29,12 +29,14 @@ function plannedBetween(db: Firestore, orgId: string, from: string, to: string):
 
 const nonNull = <T>(v: T | null): v is T => v !== null
 
-interface Loaded {
-  forecast: Forecast
-  context: ReportContext
-  /** Currency -> the latest rate to the company currency. */
-  rates: Map<string, number>
+/** What the forecast is built from, read through one `Reader` (one snapshot). */
+interface ForecastInputs {
   today: string
+  context: ReportContext
+  /** The overdue rows (counted as due today) and the upcoming ones up to the horizon. */
+  planned: PlannedRow[]
+  names: Record<string, string>
+  truncated: boolean
 }
 
 async function readSeriesNames(r: Reader, db: Firestore, orgId: string): Promise<Record<string, string>> {
@@ -47,47 +49,51 @@ async function readSeriesNames(r: Reader, db: Firestore, orgId: string): Promise
   return names
 }
 
-/** The forecast and what it was built from: one read-only snapshot, then the NBP rates (the latest table for each currency). */
-async function load(deps: ReadDeps, orgId: string): Promise<Loaded> {
+/** The forecast inputs of one snapshot: the company's accounts and minimum, the planned rows up to the horizon, the series names. */
+async function readForecastInputs(r: Reader, deps: ReadDeps, orgId: string, today: string): Promise<ForecastInputs> {
   const { db } = deps
-  const today = deps.today()
   const last = addDays(today, FORECAST_DAYS)
-  const read = await readSnapshot(db, async (r) => {
-    const context = await readContext(r, db, orgId, false)
-    const [overdue, upcoming, names] = await Promise.all([
-      r.query(overdueQuery(db, orgId, today).orderBy('paymentDate').select(...ROW_FIELDS).limit(PLANNED_SCAN)),
-      r.query(plannedBetween(db, orgId, today, last).select(...ROW_FIELDS).limit(PLANNED_SCAN)),
-      readSeriesNames(r, db, orgId),
-    ])
-    const planned = [...overdue.docs, ...upcoming.docs].map((d) => parsePlannedRow(d.id, d.data())).filter(nonNull)
-    return { context, planned, names, truncated: overdue.size >= PLANNED_SCAN || upcoming.size >= PLANNED_SCAN }
-  })
-  const base = read.context.baseCurrency
-  const { book } = await quoteRates(deps.resolveRate, base, balanceRates(read.context.accounts, today, base))
+  const context = await readContext(r, db, orgId, false)
+  const [overdue, upcoming, names] = await Promise.all([
+    r.query(overdueQuery(db, orgId, today).orderBy('paymentDate').select(...ROW_FIELDS).limit(PLANNED_SCAN)),
+    r.query(plannedBetween(db, orgId, today, last).select(...ROW_FIELDS).limit(PLANNED_SCAN)),
+    readSeriesNames(r, db, orgId),
+  ])
+  const planned = [...overdue.docs, ...upcoming.docs].map((d) => parsePlannedRow(d.id, d.data())).filter(nonNull)
+  return { today, context, planned, names, truncated: overdue.size >= PLANNED_SCAN || upcoming.size >= PLANNED_SCAN }
+}
+
+/** The forecast from its inputs, after the snapshot: the NBP rates (the latest table for each currency) and the balances. */
+async function assemble(deps: ReadDeps, inputs: ForecastInputs): Promise<{ forecast: Forecast; rates: Map<string, number> }> {
+  const { today, context } = inputs
+  const base = context.baseCurrency
+  const { book } = await quoteRates(deps.resolveRate, base, balanceRates(context.accounts, today, base))
   const rates = new Map<string, number>()
-  for (const a of read.context.accounts) {
+  for (const a of context.accounts) {
     const quote = book.get(rateKey(a.currency, valuationDate(today)))
     if (a.currency !== base && quote !== undefined) rates.set(a.currency, quote.rate)
   }
-  const start = balancesReport({ date: today, baseCurrency: base, accounts: read.context.accounts, balances: new Map(), rates: book })
+  const start = balancesReport({ date: today, baseCurrency: base, accounts: context.accounts, balances: new Map(), rates: book })
   const input: ForecastInput = {
     today,
     baseCurrency: base,
-    minimumMinor: read.context.cashMinimumMinor,
+    minimumMinor: context.cashMinimumMinor,
     startBase: start.totalBase,
     startIncomplete: !start.complete,
-    foreignAccounts: read.context.accounts.some((a) => a.currency !== base),
-    planned: read.planned,
+    foreignAccounts: context.accounts.some((a) => a.currency !== base),
+    planned: inputs.planned,
     rates,
-    names: read.names,
-    truncated: read.truncated,
+    names: inputs.names,
+    truncated: inputs.truncated,
   }
-  return { forecast: buildForecast(input), context: read.context, rates, today }
+  return { forecast: buildForecast(input), rates }
 }
 
 /** `GET /forecast`: the 90-day balance forecast and the cash gap. */
 export async function readForecast(deps: ReadDeps, orgId: string): Promise<Forecast> {
-  return (await load(deps, orgId)).forecast
+  const today = deps.today()
+  const inputs = await readSnapshot(deps.db, (r) => readForecastInputs(r, deps, orgId, today))
+  return (await assemble(deps, inputs)).forecast
 }
 
 /**
@@ -97,15 +103,15 @@ export async function readForecast(deps: ReadDeps, orgId: string): Promise<Forec
  */
 export async function readCalendarMonth(deps: ReadDeps, orgId: string, year: number, month: number): Promise<CalendarMonth> {
   const { db } = deps
-  const loaded = await load(deps, orgId)
-  const { today, context, forecast } = loaded
+  const today = deps.today()
   const { first, last } = monthRange(year, month)
-  const base = context.baseCurrency
   const pastDays: string[] = []
   for (let d = first; d <= last && d < today; d = addDays(d, 1)) pastDays.push(d)
 
+  // One snapshot: the forecast inputs and every month read, so the accounts and their balances agree with the rollups.
   const read = await readSnapshot(db, async (r) => {
-    const accountIds = new Set(context.accounts.map((a) => a.id))
+    const inputs = await readForecastInputs(r, deps, orgId, today)
+    const accountIds = new Set(inputs.context.accounts.map((a) => a.id))
     const docs: RollupDocs = new Map()
     if (first <= today) {
       for (const snap of await Promise.all([...accountIds].map((id) => r.query(cellsQuery(db, orgId, id, first, last, false))))) {
@@ -120,18 +126,23 @@ export async function readCalendarMonth(deps: ReadDeps, orgId: string, year: num
         movement.set(day, { incomeBase: m.incomeBase + cell.inBase, expenseBase: m.expenseBase + cell.outBase })
       }
     }
-    const planned = (await r.query(plannedBetween(db, orgId, first, last).select(...ROW_FIELDS).limit(PLANNED_SCAN))).docs.map((d) => parsePlannedRow(d.id, d.data())).filter(nonNull)
+    const plannedSnap = await r.query(plannedBetween(db, orgId, first, last).select(...ROW_FIELDS).limit(PLANNED_SCAN))
+    const planned = plannedSnap.docs.map((d) => parsePlannedRow(d.id, d.data())).filter(nonNull)
 
     let balances = new Map<string, Map<string, number>>()
     if (pastDays.length > 0) {
-      const counted = await countArrivals(r, deps, orgId, context.accounts, pastDays, today)
+      const counted = await countArrivals(r, deps, orgId, inputs.context.accounts, pastDays, today)
       if ([...counted.values()].reduce((a, b) => a + b, 0) > REPORT_SCAN_CAP) throw new ReportError('too_many_operations', { cap: REPORT_SCAN_CAP })
       const stats: BalanceReadStats = { docsRead: 0, aggregates: 0, ids: new Set(), counted }
-      balances = await balancesAt(r, deps, orgId, context.accounts, pastDays, today, stats)
+      balances = await balancesAt(r, deps, orgId, inputs.context.accounts, pastDays, today, stats)
     }
-    return { movement, planned, balances, truncated: planned.length >= PLANNED_SCAN }
+    // The size before filtering: a row that does not parse still means the scan limit was reached.
+    return { inputs, movement, planned, balances, truncated: plannedSnap.size >= PLANNED_SCAN }
   })
 
+  const { context } = read.inputs
+  const base = context.baseCurrency
+  const { forecast, rates } = await assemble(deps, read.inputs)
   // The real total of each past day, valued at that day's NBP rate.
   const needs = pastDays.flatMap((day) => balanceRates(context.accounts, day, base))
   const { book } = await quoteRates(deps.resolveRate, base, needs)
@@ -141,7 +152,7 @@ export async function readCalendarMonth(deps: ReadDeps, orgId: string, year: num
     const report = balancesReport({ date: day, baseCurrency: base, accounts: context.accounts, balances: atDay, rates: book })
     pastBalances.set(day, report.complete ? report.totalBase : null)
   }
-  const built = buildCalendarMonth({ year, month, today, currency: base, movement: read.movement, planned: read.planned, rates: loaded.rates, pastBalances, forecast })
+  const built = buildCalendarMonth({ year, month, today, currency: base, movement: read.movement, planned: read.planned, rates, pastBalances, forecast })
   return { ...built, truncated: built.truncated || read.truncated }
 }
 

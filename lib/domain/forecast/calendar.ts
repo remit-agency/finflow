@@ -73,6 +73,8 @@ export function buildCalendarMonth(input: CalendarInput): CalendarMonth {
       gap: forecast.gap?.date === date,
     })
   }
+  // A past day without a real balance (an account has no rate) is one unvalued figure for the month, however many days lack one.
+  const pastUnvalued = days.some((d) => d.kind === 'past' && d.endBalanceBase === null)
   return {
     year,
     month,
@@ -82,7 +84,7 @@ export function buildCalendarMonth(input: CalendarInput): CalendarMonth {
     days,
     gapDate: forecast.gap?.date ?? null,
     approximate,
-    unvalued,
+    unvalued: pastUnvalued ? unvalued + 1 : unvalued,
     truncated: forecast.truncated,
   }
 }
