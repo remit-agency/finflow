@@ -1,3 +1,4 @@
+import { fromMinor, mulRate, toMinor } from '@/lib/domain/ledger/money'
 import type { Account } from '@/types'
 
 // How an account type reads in lists (the journal's second line under the account name) is
@@ -6,30 +7,55 @@ import type { Account } from '@/types'
 export interface AccountsSummary {
   /** The company currency the total is expressed in. */
   currency: string
-  /** Sum of the balances of the accounts in `currency`, rounded to cents. */
+  /** The sum of the accounts in `currency` and of the other currencies converted at their rate, rounded to cents. */
   total: number
-  /** How many accounts the total includes (accounts in other currencies are left out). */
+  /** How many accounts the total includes (the company-currency ones and the converted foreign ones). */
   count: number
+  /** True when another currency is among the accounts: the total then depends on NBP rates and is marked «≈». */
+  approximate: boolean
+  /** The foreign accounts left out because their currency has no rate. */
+  unvalued: number
+}
+
+/** The other currencies of the accounts, distinct and sorted: the ones that need a rate. */
+export function foreignCurrencies(accounts: ReadonlyArray<Pick<Account, 'currency'>>, companyCurrency: string): string[] {
+  return [...new Set(accounts.map((a) => a.currency).filter((c) => c !== companyCurrency))].sort()
 }
 
 /**
- * Sidebar total («Разом у {currency}»): only accounts whose currency equals the company currency.
- * There are no exchange rates before S04, so other currencies are neither converted nor mentioned.
+ * Sidebar total («Разом у {currency}»). An account in the company currency is added as it is; an account in another
+ * currency is converted with its NBP rate (`rates`: currency -> rate into the company currency) exactly as the Balance
+ * report converts it (`mulRate` on its minor units, per account). A currency without a rate is left out and counted
+ * in `unvalued`. Pure: the rates are read by the caller (`useSidebarRates`).
  */
 export function summarizeAccounts(
   accounts: ReadonlyArray<Pick<Account, 'balance' | 'currency'>>,
   companyCurrency: string,
+  rates: ReadonlyMap<string, number> = new Map(),
 ): AccountsSummary {
-  let total = 0
+  let totalMinor = 0
   let count = 0
+  let approximate = false
+  let unvalued = 0
   for (const account of accounts) {
-    if (account.currency !== companyCurrency) continue
-    total += account.balance
+    const minor = toMinor(account.balance)
+    if (account.currency === companyCurrency) {
+      totalMinor += minor
+      count += 1
+      continue
+    }
+    approximate = true
+    const rate = rates.get(account.currency)
+    if (rate === undefined) {
+      unvalued += 1
+      continue
+    }
+    totalMinor += mulRate(minor, rate)
     count += 1
   }
-  const rounded = Math.round(total * 100) / 100
-  // Normalise -0 (e.g. a tiny negative remainder) so the UI never renders "-0,00".
-  return { currency: companyCurrency, total: rounded === 0 ? 0 : rounded, count }
+  // Integer minor units: the sum is exact. -0 is normalised so the UI never renders "-0,00".
+  const total = totalMinor === 0 ? 0 : fromMinor(totalMinor)
+  return { currency: companyCurrency, total, count, approximate, unvalued }
 }
 
 /**

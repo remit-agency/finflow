@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { effectiveSelection, summarizeAccounts } from '@/lib/utils/accounts'
+import { effectiveSelection, foreignCurrencies, summarizeAccounts } from '@/lib/utils/accounts'
 
 const account = (balance: number, currency: string) => ({ balance, currency })
 
 describe('summarizeAccounts', () => {
   it('gives a zero total for no accounts', () => {
-    expect(summarizeAccounts([], 'PLN')).toEqual({ currency: 'PLN', total: 0, count: 0 })
+    expect(summarizeAccounts([], 'PLN')).toEqual({ currency: 'PLN', total: 0, count: 0, approximate: false, unvalued: 0 })
   })
 
   it('sums a single account in the company currency', () => {
-    expect(summarizeAccounts([account(1500.5, 'PLN')], 'PLN')).toEqual({ currency: 'PLN', total: 1500.5, count: 1 })
+    expect(summarizeAccounts([account(1500.5, 'PLN')], 'PLN')).toEqual({ currency: 'PLN', total: 1500.5, count: 1, approximate: false, unvalued: 0 })
   })
 
-  it('counts only the accounts in the company currency', () => {
-    const accounts = [account(1000, 'PLN'), account(200, 'EUR'), account(50.25, 'PLN'), account(9, 'USD')]
-    expect(summarizeAccounts(accounts, 'PLN')).toEqual({ currency: 'PLN', total: 1050.25, count: 2 })
+  it('sums only the company-currency accounts when there are no foreign accounts', () => {
+    const accounts = [account(1000, 'PLN'), account(50.25, 'PLN')]
+    expect(summarizeAccounts(accounts, 'PLN')).toEqual({ currency: 'PLN', total: 1050.25, count: 2, approximate: false, unvalued: 0 })
   })
 
-  it('gives zero when no account is in the company currency', () => {
-    expect(summarizeAccounts([account(10, 'EUR')], 'PLN')).toEqual({ currency: 'PLN', total: 0, count: 0 })
+  it('gives zero when no account is in the company currency and no rate is given', () => {
+    expect(summarizeAccounts([account(10, 'EUR')], 'PLN')).toEqual({ currency: 'PLN', total: 0, count: 0, approximate: true, unvalued: 1 })
   })
 
   it('includes negative balances', () => {
@@ -26,6 +26,8 @@ describe('summarizeAccounts', () => {
       currency: 'UAH',
       total: -150.5,
       count: 2,
+      approximate: false,
+      unvalued: 0,
     })
   })
 
@@ -35,7 +37,52 @@ describe('summarizeAccounts', () => {
   })
 
   it('compares currency codes exactly', () => {
-    expect(summarizeAccounts([account(5, 'pln')], 'PLN')).toEqual({ currency: 'PLN', total: 0, count: 0 })
+    expect(summarizeAccounts([account(5, 'pln')], 'PLN')).toEqual({ currency: 'PLN', total: 0, count: 0, approximate: true, unvalued: 1 })
+  })
+
+  it('converts a foreign account at its rate: 200 EUR at 4.30 is 860 on top of 1000 PLN', () => {
+    const rates = new Map([['EUR', 4.3]])
+    expect(summarizeAccounts([account(1000, 'PLN'), account(200, 'EUR')], 'PLN', rates)).toEqual({
+      currency: 'PLN',
+      total: 1860,
+      count: 2,
+      approximate: true,
+      unvalued: 0,
+    })
+  })
+
+  it('leaves out a currency without a rate and counts its accounts as unvalued', () => {
+    const rates = new Map([['EUR', 4.3]])
+    const accounts = [account(1000, 'PLN'), account(200, 'EUR'), account(5, 'GBP'), account(7, 'GBP')]
+    expect(summarizeAccounts(accounts, 'PLN', rates)).toEqual({ currency: 'PLN', total: 1860, count: 2, approximate: true, unvalued: 2 })
+  })
+
+  it('converts a negative foreign balance with the balance report rounding (half away from zero)', () => {
+    // -15 535,26 PLN at 11.36437 is -17 654 844 minor units: the Balance report's mulRate, per account.
+    const rates = new Map([['PLN', 11.36437]])
+    expect(summarizeAccounts([account(-15535.26, 'PLN')], 'UAH', rates).total).toBe(-176548.44)
+  })
+
+  it('is approximate whenever a foreign account exists, even one that is left out', () => {
+    expect(summarizeAccounts([account(10, 'PLN')], 'PLN', new Map([['EUR', 4.3]])).approximate).toBe(false)
+    expect(summarizeAccounts([account(10, 'PLN'), account(1, 'EUR')], 'PLN', new Map([['EUR', 4.3]])).approximate).toBe(true)
+    expect(summarizeAccounts([account(10, 'PLN'), account(1, 'EUR')], 'PLN', new Map()).approximate).toBe(true)
+  })
+
+  it('never returns -0 after a conversion that nets to zero', () => {
+    const total = summarizeAccounts([account(-0.01, 'EUR')], 'PLN', new Map([['EUR', 0.4]])).total
+    expect(Object.is(total, 0)).toBe(true)
+  })
+})
+
+describe('foreignCurrencies', () => {
+  it('lists the distinct other currencies, sorted, without the company currency', () => {
+    const accounts = [account(1, 'USD'), account(1, 'PLN'), account(1, 'EUR'), account(1, 'USD')]
+    expect(foreignCurrencies(accounts, 'PLN')).toEqual(['EUR', 'USD'])
+  })
+
+  it('is empty when every account is in the company currency', () => {
+    expect(foreignCurrencies([account(1, 'UAH'), account(2, 'UAH')], 'UAH')).toEqual([])
   })
 })
 
