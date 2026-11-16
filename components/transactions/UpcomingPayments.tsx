@@ -3,14 +3,11 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
-import { CalendarClockIcon, CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react'
+import { ChevronDownIcon } from 'lucide-react'
 import { MoveDateDialog } from '@/components/recurring/MoveDateDialog'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { PlannedRowLine } from '@/components/recurring/PlannedRowLine'
 import { NativeSelect } from '@/components/ui/native-select'
-import { fromMinor } from '@/lib/domain/ledger/money'
 import { upcomingBlock } from '@/lib/domain/recurring/overview'
-import { isOverdue } from '@/lib/domain/recurring/rows'
 import { DEFAULT_UPCOMING_PERIOD, UPCOMING_PERIODS, type PlannedRow, type UpcomingPeriod } from '@/lib/domain/recurring/types'
 import { usePlanActions } from '@/lib/hooks/usePlanActions'
 import { useUpcoming } from '@/lib/hooks/useUpcoming'
@@ -46,9 +43,8 @@ interface Props {
  */
 export function UpcomingPayments({ orgId, accounts, canEdit, accountId, today }: Props) {
   const t = useTranslations('journal.upcoming')
-  const tRec = useTranslations('recurring')
   const tPlans = useTranslations('journal.plans')
-  const { locale, money } = useFormatters()
+  const { locale } = useFormatters()
   const period = useSyncExternalStore(periodStore.subscribe, periodStore.getSnapshot, periodStore.getServerSnapshot)
   const { read, busy } = useUpcoming(orgId, period)
   const plans = usePlanActions(orgId, today)
@@ -58,47 +54,21 @@ export function UpcomingPayments({ orgId, accounts, canEdit, accountId, today }:
   const total = read.overdueCount + read.upcomingCount
   const shown = read.overdue.length + read.upcoming.length
 
-  const row = (r: PlannedRow) => {
-    const name = (r.seriesId !== undefined ? read.names[r.seriesId] : undefined) ?? r.description ?? tPlans('unnamed')
-    const date = formatDayShortUtc(new Date(`${r.paymentDate}T00:00:00Z`), locale)
-    const amount = money(fromMinor(r.amountMinor), r.currency)
-    const account = accounts.find((a) => a.id === r.accountId)?.name ?? '—'
-    const overdue = isOverdue({ status: 'planned', paymentDate: r.paymentDate }, today)
-    const busy = plans.busyId !== null
-    return (
-      <li key={r.id} data-testid="upcoming-row" data-overdue={overdue || undefined} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-sm">
-        <span className="w-14 shrink-0 tabular-nums text-ink-muted">{date}</span>
-        <span className={cn('w-28 shrink-0 font-medium tabular-nums', r.type === 'income' ? 'text-income' : 'text-ink')}>{amount}</span>
-        <span className="min-w-0 flex-1 truncate text-ink">
-          {name}
-          <span className="text-ink-muted">{` · ${account}`}</span>
-        </span>
-        <span className="flex gap-1">
-          {overdue && (
-            <Badge variant="chip" data-testid="upcoming-overdue" className="bg-expense-soft text-expense">
-              {tRec('planned.overdue')}
-            </Badge>
-          )}
-          {r.estimated && <Badge variant="chip">{tRec('planned.estimated')}</Badge>}
-        </span>
-        {canEdit && (
-          <span role="group" aria-label={tRec('planned.rowActions', { name, amount, date })} className="flex shrink-0 gap-1">
-            <Button type="button" size="icon-sm" variant="soft" disabled={busy} title={tRec('planned.markPaid')} aria-label={tRec('planned.markPaid')} onClick={() => plans.markPaid(r)}>
-              <CheckIcon aria-hidden />
-            </Button>
-            <Button type="button" size="icon-sm" variant="outline" disabled={busy} title={tRec('planned.move')} aria-label={tRec('planned.move')} onClick={() => plans.setMoving(r)}>
-              <CalendarClockIcon aria-hidden />
-            </Button>
-            {r.seriesId !== undefined && r.occurrence !== undefined && (
-              <Button type="button" size="icon-sm" variant="outline" disabled={busy} title={tRec('planned.skip')} aria-label={tRec('planned.skip')} onClick={() => plans.skip(r)}>
-                <XIcon aria-hidden />
-              </Button>
-            )}
-          </span>
-        )}
-      </li>
-    )
-  }
+  const row = (r: PlannedRow) => (
+    <PlannedRowLine
+      key={r.id}
+      row={r}
+      name={(r.seriesId !== undefined ? read.names[r.seriesId] : undefined) ?? r.description ?? tPlans('unnamed')}
+      accountName={accounts.find((a) => a.id === r.accountId)?.name ?? '—'}
+      dateLabel={formatDayShortUtc(new Date(`${r.paymentDate}T00:00:00Z`), locale)}
+      showDate
+      today={today}
+      canEdit={canEdit}
+      plans={plans}
+      testId="upcoming-row"
+      overdueTestId="upcoming-overdue"
+    />
+  )
 
   return (
     <section data-testid="upcoming" aria-labelledby="upcoming-title" aria-busy={busy} className="overflow-hidden rounded-panel border border-line bg-canvas">
