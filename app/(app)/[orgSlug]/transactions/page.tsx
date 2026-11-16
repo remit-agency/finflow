@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { X } from 'lucide-react'
+import { CashGapBanner } from '@/components/forecast/CashGapBanner'
 import { ConfirmDialog } from '@/components/forms/transaction/ConfirmDialog'
 import { BulkEditDialog } from '@/components/transactions/BulkEditDialog'
 import { ConvertTransferDialog } from '@/components/transactions/ConvertTransferDialog'
@@ -27,6 +28,7 @@ import { convertSourceOf, mergePairOf } from '@/lib/domain/transfers/selection'
 import type { FailedOutcome, MadeOutcome, TransferOutcome, TransferSuggestion } from '@/lib/domain/transfers/types'
 import { toUiTransaction } from '@/lib/firebase/ledger-map'
 import { useCounterparties } from '@/lib/hooks/useCounterparties'
+import { useForecast } from '@/lib/hooks/useForecast'
 import { useJournal } from '@/lib/hooks/useJournal'
 import { useJournalSelection } from '@/lib/hooks/useJournalSelection'
 import { useShell } from '@/lib/hooks/useShell'
@@ -104,6 +106,9 @@ export default function TransactionsPage() {
   // Own transfers (S10b): the suggestions banner and its dialog, for the people who may write.
   const suggestions = useTransferSuggestions(canEdit ? orgId : null)
   const [suggestOpen, setSuggestOpen] = useState(false)
+
+  // The cash gap banner (S13) is for every role, viewers too: it does not depend on canEdit.
+  const { forecast } = useForecast(orgId)
   const [suggestFailures, setSuggestFailures] = useState<ReadonlyMap<string, string>>(new Map())
 
   // «Зробити переказом» and «Об’єднати в переказ» are offered only for a selection the ledger's own rules accept.
@@ -405,6 +410,7 @@ export default function TransactionsPage() {
       )}
 
       {canEdit && suggestions.pairs.length > 0 && <TransferSuggestionsBanner count={suggestions.pairs.length} onOpen={openSuggestions} />}
+      {forecast !== null && <CashGapBanner orgId={orgId} forecast={forecast} />}
       {canEdit && <PlanMatches orgId={orgId} accounts={accounts} />}
       {/* The planned payments are this block, not rows of the list, while the list shows what happened (status «Факт»). */}
       {filters.status === 'actual' && <UpcomingPayments orgId={orgId} accounts={accounts} canEdit={canEdit} accountId={selectedAccountId ?? undefined} today={todayDay()} />}
