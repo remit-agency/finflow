@@ -143,7 +143,7 @@ export async function deleteAccount(orgId: string, accountId: string): Promise<v
   await call('DELETE', `${org(orgId)}/accounts/${encodeURIComponent(accountId)}`)
 }
 
-export async function updateOrganization(orgId: string, patch: { name?: string; currency?: string }): Promise<void> {
+export async function updateOrganization(orgId: string, patch: { name?: string; currency?: string; cashMinimumMinor?: number }): Promise<void> {
   await call('PATCH', org(orgId), patch)
 }
 

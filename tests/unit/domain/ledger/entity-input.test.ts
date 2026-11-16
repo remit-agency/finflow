@@ -47,4 +47,15 @@ describe('parseOrgPatch', () => {
     expect(code(() => parseOrgPatch({}))).toBe('invalid_input:body')
     expect(code(() => parseOrgPatch({ plan: 'pro' }))).toBe('invalid_input:plan')
   })
+
+  it('takes the cash minimum as a whole number of minor units from 0', () => {
+    expect(parseOrgPatch({ cashMinimumMinor: 250_000 })).toEqual({ cashMinimumMinor: 250_000 })
+    expect(parseOrgPatch({ name: 'Acme', cashMinimumMinor: 0 })).toEqual({ name: 'Acme', cashMinimumMinor: 0 })
+  })
+
+  it('refuses a negative, fractional, huge or non-number cash minimum', () => {
+    for (const bad of [-1, 1.5, 10 ** 13 + 1, '100', null]) {
+      expect(() => parseOrgPatch({ cashMinimumMinor: bad })).toThrow()
+    }
+  })
 })

@@ -19,6 +19,8 @@ export type AccountPatch = Partial<AccountInput>
 export interface OrgPatch {
   name?: string
   currency?: string
+  /** The company minimum balance the cash gap warning compares with, minor units of the company currency. */
+  cashMinimumMinor?: number
 }
 
 function name(v: unknown): string {
@@ -64,13 +66,17 @@ export function parseAccountPatch(body: unknown): AccountPatch {
 
 export function parseOrgPatch(body: unknown): OrgPatch {
   const r = asRecord(body)
-  onlyKeys(r, ['name', 'currency'])
-  if (r.name === undefined && r.currency === undefined) bad('body')
+  onlyKeys(r, ['name', 'currency', 'cashMinimumMinor'])
+  if (r.name === undefined && r.currency === undefined && r.cashMinimumMinor === undefined) bad('body')
   const out: OrgPatch = {}
   if (r.name !== undefined) out.name = name(r.name)
   if (r.currency !== undefined) {
     if (!(LEDGER_CURRENCIES as readonly unknown[]).includes(r.currency)) bad('currency')
     out.currency = r.currency as string
+  }
+  if (r.cashMinimumMinor !== undefined) {
+    if (typeof r.cashMinimumMinor !== 'number' || !Number.isInteger(r.cashMinimumMinor) || r.cashMinimumMinor < 0 || r.cashMinimumMinor > MAX_MINOR) bad('cashMinimumMinor')
+    out.cashMinimumMinor = r.cashMinimumMinor
   }
   return out
 }

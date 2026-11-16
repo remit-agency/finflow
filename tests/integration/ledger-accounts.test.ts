@@ -75,9 +75,18 @@ describe('accounts', () => {
 
 describe('updateOrganization', () => {
   it('renames and changes the currency of an empty company', async () => {
-    expect(await updateOrganization(deps, ORG, UID, parseOrgPatch({ name: 'New', currency: 'EUR' }))).toEqual({ name: 'New', currency: 'EUR' })
+    expect(await updateOrganization(deps, ORG, UID, parseOrgPatch({ name: 'New', currency: 'EUR' }))).toEqual({ name: 'New', currency: 'EUR', cashMinimumMinor: 0 })
     expect(await readDoc(db, `organizations/${ORG}`)).toMatchObject({ name: 'New', currency: 'EUR', ownerId: UID })
     expect(await auditActions(db, ORG)).toEqual(['org.update'])
+  })
+
+  it('saves the company cash minimum, audits it, and keeps it when a rename has no minimum', async () => {
+    expect(await updateOrganization(deps, ORG, UID, parseOrgPatch({ cashMinimumMinor: 250_000 }))).toEqual({ name: 'Acme', currency: 'PLN', cashMinimumMinor: 250_000 })
+    expect(await readDoc(db, `organizations/${ORG}`)).toMatchObject({ cashMinimumMinor: 250_000 })
+    const audit = await db.collection(`organizations/${ORG}/audit`).get()
+    expect(audit.docs.map((d) => d.get('before.cashMinimumMinor'))).toEqual([0])
+    expect(audit.docs.map((d) => d.get('after.cashMinimumMinor'))).toEqual([250_000])
+    expect((await updateOrganization(deps, ORG, UID, parseOrgPatch({ name: 'Renamed' }))).cashMinimumMinor).toBe(250_000)
   })
 
   it('freezes the currency once there is an operation, but still allows a rename', async () => {

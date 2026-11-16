@@ -5,6 +5,7 @@
 // the queries are counted first in the same snapshot: more than the cap is a refusal before any document is read.
 import { FieldPath, type Firestore, type Query, type QueryDocumentSnapshot } from 'firebase-admin/firestore'
 import { filterForAnalytics, includesExcluded } from '@/lib/domain/analytics-filter/filter'
+import { parseCashMinimum } from '@/lib/domain/forecast/query'
 import { categoryTypesOf, type CategoryTypes } from '@/lib/domain/analytics-filter/kinds'
 import { matchesSharedChoices } from '@/lib/domain/journal/filter'
 import { addDays, isDay, monthsBetween } from '@/lib/domain/ledger/days'
@@ -59,6 +60,8 @@ const MAX_PERIOD_DAYS = MAX_PERIOD_MONTHS * 31
 
 export interface ReportContext {
   baseCurrency: string
+  /** The company cash minimum (minor units of `baseCurrency`), 0 when unset. */
+  cashMinimumMinor: number
   accounts: LedgerAccount[]
   categories: ReportCategory[]
   categoryTypes: CategoryTypes
@@ -141,7 +144,13 @@ export async function readContext(r: Reader, db: Firestore, orgId: string, withC
   const [accountsSnap, categoriesSnap] = await Promise.all([r.query(accountsCol(db, orgId)), withCategories ? r.query(categoriesCol(db, orgId)) : Promise.resolve(null)])
   const accounts = accountsSnap.docs.map((d) => parseAccount(d.id, d.data())).filter((a): a is LedgerAccount => a !== null)
   const categories = (categoriesSnap?.docs ?? []).map((d) => parseReportCategory(d.id, d.data())).filter((c): c is ReportCategory => c !== null)
-  return { baseCurrency: org.get('currency') as string, accounts, categories, categoryTypes: categoryTypesOf(categories) }
+  return {
+    baseCurrency: org.get('currency') as string,
+    cashMinimumMinor: parseCashMinimum(org.get('cashMinimumMinor')),
+    accounts,
+    categories,
+    categoryTypes: categoryTypesOf(categories),
+  }
 }
 
 /** One document query of a read plan, with the projection it reads (`fields`, all fields when absent). */
