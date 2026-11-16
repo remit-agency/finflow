@@ -18,16 +18,18 @@ export interface RecurringRead<T> {
 }
 
 /**
- * A read of the planned payments (S11, S12e): on open, when `orgId` or `key` changes (the read's own input, a period), on
- * `refresh` and after any change in this browser (a plan, a series, a match). `fetcher` must read what `key` names.
+ * A read of the planned payments (S11, S12e, S13): on open, when `orgId` or `key` changes (the read's own input, a period),
+ * on `refresh` and after any change in this browser (a plan, a series, a match). `fetcher` must read what `key` names.
+ * A null `key` reads nothing (no period or day selected yet).
  */
-export function useRecurringRead<T>(orgId: string, key: string, fetcher: (signal: AbortSignal) => Promise<T>): RecurringRead<T> {
+export function useRecurringRead<T>(orgId: string, key: string | null, fetcher: (signal: AbortSignal) => Promise<T>): RecurringRead<T> {
   const [round, setRound] = useState(0)
   // The read is named by `orgId` and `key`: a new `fetcher` on each render must not read again.
   const run = useEffectEvent(fetcher)
   const [state, setState] = useState<{ orgId: string; key: string; data: T | null; error: boolean } | null>(null)
 
   useEffect(() => {
+    if (key === null) return
     const ac = new AbortController()
     run(ac.signal).then(
       (data) => {

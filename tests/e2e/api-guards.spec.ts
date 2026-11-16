@@ -99,6 +99,9 @@ test.describe('API guards', () => {
       { method: 'GET', path: '/api/orgs/x/recurring/suggestions' },
       { method: 'GET', path: '/api/orgs/x/recurring/upcoming' },
       { method: 'POST', path: '/api/orgs/x/recurring/matches', data: { undo: ['pl_s1_2026-11-10'] } },
+      { method: 'GET', path: '/api/orgs/x/forecast' },
+      { method: 'GET', path: '/api/orgs/x/calendar?year=2026&month=11' },
+      { method: 'GET', path: '/api/orgs/x/calendar/day?date=2026-11-24' },
     ]
     for (const { method, path, data } of calls) {
       const res = await request.fetch(path, { method, headers: origin, data })

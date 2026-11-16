@@ -10,7 +10,7 @@ export const runtime = 'nodejs'
 const MAX_BODY_BYTES = 1024
 type Ctx = { params: Promise<{ orgId: string }> }
 
-// PATCH /api/orgs/{orgId}  { name?, currency? }  (owner only)
+// PATCH /api/orgs/{orgId}  { name?, currency?, cashMinimumMinor? }  (owner only)
 export async function PATCH(req: Request, { params }: Ctx) {
   try {
     const { uid } = await requireUser(req)
