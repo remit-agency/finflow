@@ -6,6 +6,7 @@ import { clean } from '@/lib/domain/banking/map'
 import { judgeOp, overlapsBank } from '@/lib/domain/import/plan'
 import type { ImportStepRequest, StepStatement } from '@/lib/domain/import/request'
 import type { ImportOp, RefusalReason } from '@/lib/domain/import/types'
+import type { ImportStepResult } from '@/lib/domain/import/view'
 import { parseAccount } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import { parseTransactionInput } from '@/lib/domain/ledger/input'
@@ -26,20 +27,7 @@ import { parseImportDoc, type ImportDoc } from './types'
 /** A step that died leaves its lock; after this long another step may take over (as the bank sync does). */
 const LOCK_MS = 60_000
 
-export interface ImportStepResult {
-  importId: string
-  created: number
-  /** Lines already in the account: marked by an earlier import (`seen`), or the same operation a bank sync wrote (`bank`). */
-  skipped: { seen: number; bank: number }
-  refused: Array<{ day: string; amountMinor: number; reason: RefusalReason }>
-  /** True on the last step of a statement. */
-  done: boolean
-  /** Set on the last step: the account balance, the statement's closing balance and their difference (balance − closing). */
-  balanceMinor: number | null
-  closingMinor: number | null
-  differenceMinor: number | null
-  fitted: boolean
-}
+export type { ImportStepResult }
 
 interface Totals {
   created: number

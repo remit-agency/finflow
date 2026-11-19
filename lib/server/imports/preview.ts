@@ -3,7 +3,8 @@ import type { BankOpView } from '@/lib/domain/import/plan'
 import { judgeOp, overlapsBank } from '@/lib/domain/import/plan'
 import { normalizeSource, parseMt940 } from '@/lib/domain/import/mt940'
 import type { PreviewRequest } from '@/lib/domain/import/request'
-import { MAX_IMPORT_BYTES, MAX_IMPORT_OPS, type ImportOp, type OpStatus, type ParseIssue, type ParsedStatement, type RefusalReason, type StatementBalance } from '@/lib/domain/import/types'
+import { MAX_IMPORT_BYTES, MAX_IMPORT_OPS, type ImportOp, type OpStatus, type ParsedStatement, type RefusalReason } from '@/lib/domain/import/types'
+import type { PreviewResult, PreviewStatement } from '@/lib/domain/import/view'
 import { bankAccountsCol } from '@/lib/server/banking/paths'
 import { parseBankAccount, type BankAccount } from '@/lib/server/banking/types'
 import { accountsCol } from '@/lib/server/ledger/paths'
@@ -18,31 +19,7 @@ import { parseImportDoc, type ImportDoc } from './types'
 /** The latest import documents searched for the account of a statement's source (S14). */
 const RECENT_IMPORTS = 20
 
-export interface PreviewStatement {
-  index: number
-  /** `:25:` normalized (an IBAN when it is one); null when the file has none. */
-  source: string | null
-  number: string | null
-  currency: string | null
-  opening: StatementBalance | null
-  closing: StatementBalance | null
-  /** Day of the first and of the last operation; null when the statement has none. */
-  from: string | null
-  to: string | null
-  reconciliation: number | null
-  /** The account this statement most likely belongs to (its source seen in an import or an active bank account); null when unknown. */
-  suggestedAccountId: string | null
-  /** Present when the caller chose an account for this statement. */
-  chosen?: { accountId: string; accountCurrency: string; balanceMinor: number; counts: { new: number; seen: number; bank: number; refused: number } }
-  /** With a chosen account every operation has its status; without one none does. */
-  operations: Array<ImportOp & { status?: OpStatus }>
-}
-
-export interface PreviewResult {
-  statements: PreviewStatement[]
-  issues: ParseIssue[]
-  opCount: number
-}
+export type { PreviewResult, PreviewStatement }
 
 /**
  * Reads a statement file without writing anything (S14). Without `accountIds` it parses and suggests an account per

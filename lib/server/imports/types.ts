@@ -1,7 +1,8 @@
 import { Timestamp } from 'firebase-admin/firestore'
 import { isDay } from '@/lib/domain/ledger/days'
+import type { ImportCounts, ImportPeriod, ImportStatementRef, ImportStatus, ImportUndoCounts, ImportView } from '@/lib/domain/import/view'
 
-export type ImportStatus = 'applied' | 'undoing' | 'undone'
+export type { ImportStatus, ImportView }
 /** Per account: was it empty when the import first touched it ('pending' = fit its opening balance at the end). */
 export type FitState = 'pending' | 'no' | 'done'
 
@@ -12,27 +13,14 @@ export interface ImportDoc {
   accountIds: string[]
   createdAt: Timestamp
   createdBy: string
-  period: { from: string | null; to: string | null }
-  counts: { created: number; skipped: number; refused: number }
+  period: ImportPeriod
+  counts: ImportCounts
   /** One entry per statement written: its source (`:25:`), the account it went to and its period. */
-  statements: Array<{ source: string | null; accountId: string; from: string | null; to: string | null }>
+  statements: ImportStatementRef[]
   fit: Record<string, FitState>
   status: ImportStatus
   undoneAt?: Timestamp
-  undo: { deleted: number; kept: number }
-}
-
-export interface ImportView {
-  id: string
-  fileName: string
-  createdAt: string
-  accountIds: string[]
-  period: ImportDoc['period']
-  counts: ImportDoc['counts']
-  statements: ImportDoc['statements']
-  status: ImportStatus
-  undoneAt?: string
-  undo: ImportDoc['undo']
+  undo: ImportUndoCounts
 }
 
 const STATUSES: readonly string[] = ['applied', 'undoing', 'undone']

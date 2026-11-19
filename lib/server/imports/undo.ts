@@ -1,5 +1,6 @@
 import 'server-only'
 import { FieldPath, FieldValue, Timestamp, type DocumentReference } from 'firebase-admin/firestore'
+import type { UndoResult } from '@/lib/domain/import/view'
 import { BANK_CLIENT_ID_PREFIX } from '@/lib/domain/ledger/input'
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import { bankSeenCol } from '@/lib/server/banking/paths'
@@ -13,14 +14,7 @@ import { parseImportDoc, type ImportDoc } from './types'
 /** Operations deleted per undo step (S14): one step is one request, so it stays well inside the time limit. */
 export const UNDO_STEP = 25
 
-export interface UndoResult {
-  deleted: number
-  /** The operations left in place, with why: `changed` (a person changed them after the import) or the ledger's refusal code. */
-  kept: Array<{ id: string; reason: string }>
-  /** The id to pass as the cursor of the next step; null on the last one. */
-  next: string | null
-  done: boolean
-}
+export type { UndoResult }
 
 /**
  * Removes one page (UNDO_STEP) of an import's operations (S14). An operation is deleted only while it is untouched since
