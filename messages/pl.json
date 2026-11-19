@@ -197,6 +197,8 @@
       "connectBank": "Połącz bank",
       "openBanking": "Open Banking, beta",
       "totalIn": "Razem w {currency}",
+      "approximate": "Obejmuje konta w innych walutach wg ostatniego kursu NBP",
+      "unvalued": "Nie uwzględniono kont bez kursu: {count}",
       "mine": "Moje konta",
       "all": "Wszystkie konta",
       "none": "Nie ma jeszcze kont",

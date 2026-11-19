@@ -16,10 +16,11 @@ import {
 import { deleteAccount, LedgerApiError } from '@/lib/api/ledger-client'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { useShell } from '@/lib/hooks/useShell'
+import { useSidebarRates } from '@/lib/hooks/useSidebarRates'
 import { isJournalPath } from '@/lib/shell/modules'
 import { settingsPath } from '@/lib/shell/settings-sections'
 import { cn } from '@/lib/utils'
-import { summarizeAccounts } from '@/lib/utils/accounts'
+import { foreignCurrencies, summarizeAccounts } from '@/lib/utils/accounts'
 import type { Account } from '@/types'
 
 interface AccountsSidebarProps {
@@ -60,9 +61,17 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
   const canWrite = can('data.write')
   const canBank = can('bank.manage')
   const collapsed = variant === 'panel' && sidebarCollapsed
-  // Only accounts in the company currency; other currencies are not mentioned before S04.
+  // The total is in the company currency over all accounts; an account document without a currency is read in it,
+  // as its row shows it. The NBP rates of the other currencies come from the hook (no request without any).
+  const companyCurrency = org?.currency ?? ''
+  const totalAccounts = accounts.map((a) => ({ balance: a.balance, currency: a.currency || companyCurrency }))
+  const { rates, ready } = useSidebarRates(companyCurrency, foreignCurrencies(totalAccounts, companyCurrency))
   // Not before both the org and the accounts are loaded: an empty list would show a false 0,00.
-  const summary = org && !accountsLoading ? summarizeAccounts(accounts, org.currency) : null
+  const summary = org && !accountsLoading ? summarizeAccounts(totalAccounts, org.currency, rates) : null
+  // A total with another currency is approximate («≈»). While the rates load it is dimmed (aria-busy): the number may change.
+  const pending = summary !== null && summary.approximate && !ready
+  const unvaluedNote = summary !== null && ready && summary.unvalued > 0 ? t('unvalued', { count: summary.unvalued }) : null
+  const approxTitle = summary?.approximate ? [t('approximate'), unvaluedNote].filter(Boolean).join('. ') : undefined
   // An account document without a currency must not break the whole list (Intl throws on a missing
   // currency code): its balance is shown in the company currency, like a legacy document would.
   const accountMoney = (account: Account) => money(account.balance, account.currency || org?.currency || 'PLN')
@@ -161,15 +170,26 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
               <p className="text-xs text-ink-muted">{t('totalIn', { currency: summary.currency })}</p>
               <p
                 data-testid="accounts-total"
+                aria-busy={pending || undefined}
+                title={approxTitle}
                 className={cn(
-                  'mt-1 truncate text-2xl font-bold tracking-tight tabular-nums',
+                  'mt-1 truncate text-2xl font-bold tracking-tight tabular-nums transition-opacity',
                   summary.total < 0 ? 'text-expense' : 'text-ink',
+                  pending && 'opacity-50',
                 )}
               >
-                {/* The full amount as one text node for assistive tech (and text queries); the
+                {/* The full amount as one text node for assistive tech (and text queries), approximate included; the
                     visual copy shows the decimals and the currency smaller and muted. */}
-                <span className="sr-only">{money(summary.total, summary.currency)}</span>
+                <span className="sr-only">
+                  {summary.approximate ? '≈ ' : ''}
+                  {money(summary.total, summary.currency)}
+                </span>
                 <span aria-hidden>
+                  {summary.approximate && (
+                    <span data-testid="accounts-total-approx" className="mr-1 text-lg font-semibold text-ink-muted">
+                      ≈
+                    </span>
+                  )}
                   {total.whole}
                   <span className="text-base font-semibold text-ink-muted">
                     {total.fraction}
