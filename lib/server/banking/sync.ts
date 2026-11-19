@@ -58,7 +58,7 @@ const RULE_REFUSALS: ReadonlySet<LedgerErrorCode> = new Set(['category_not_found
  * of a rule.
  */
 export async function createWithRules(
-  deps: BankDeps,
+  deps: Pick<BankDeps, 'ledger'>,
   orgId: string,
   uid: string,
   input: TransactionInput,

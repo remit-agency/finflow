@@ -13,10 +13,11 @@ export type AuditAction =
 /**
  * What made a change when it was not a plain edit of the operation: the rules (S10), a tag's flag (S10t), making or
  * splitting a transfer (S10b: the operation changed type, went into the transfer, or came back out of it), or planned
- * payments (S11: a series created, rewrote or deleted its plans, a match linked a bank operation to a plan, a skip).
+ * payments (S11: a series created, rewrote or deleted its plans, a match linked a bank operation to a plan, a skip), or
+ * the undo of a statement import (S14: `import-undo` on each operation it deletes).
  */
 export interface AuditMeta {
-  via?: 'rule' | 'tag' | 'transfer' | 'plan'
+  via?: 'rule' | 'tag' | 'transfer' | 'plan' | 'import-undo'
 }
 
 /** The audit entry to `create()` in the same transaction as the change it records. */
