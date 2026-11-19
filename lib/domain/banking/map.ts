@@ -45,7 +45,8 @@ export function parseDecimalMinor(s: unknown): number | null {
   return m[1] === '-' ? -minor : minor
 }
 
-function clean(text: string | null | undefined, max: number): string | undefined {
+/** Text as a bank or a statement gives it, one line, at most `max` characters; undefined when nothing is left. */
+export function clean(text: string | null | undefined, max: number): string | undefined {
   if (typeof text !== 'string') return undefined
   const t = text.replace(/\s+/g, ' ').trim()
   return t.length === 0 ? undefined : t.slice(0, max)

@@ -99,7 +99,7 @@ function errorCode(e: unknown): string | number {
  * The rules a step applies. When they cannot be read, the step goes on without them (logged by code only): an operation
  * is never lost, and never aborted, because its rules could not be read (S10).
  */
-async function readStepRules(deps: BankDeps, orgId: string): Promise<Rule[]> {
+export async function readStepRules(deps: Pick<BankDeps, 'db'>, orgId: string): Promise<Rule[]> {
   try {
     return await loadUsableRules(deps.db, orgId)
   } catch (e) {
