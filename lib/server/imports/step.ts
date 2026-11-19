@@ -3,10 +3,10 @@ import { randomUUID } from 'node:crypto'
 import { FieldValue, Timestamp, type DocumentReference } from 'firebase-admin/firestore'
 import { bankDifference, fittedOpening } from '@/lib/domain/banking/fit'
 import { clean } from '@/lib/domain/banking/map'
-import { judgeOp, overlapsBank, type BankOpView } from '@/lib/domain/import/plan'
+import { judgeOp, overlapsBank } from '@/lib/domain/import/plan'
 import type { ImportStepRequest, StepStatement } from '@/lib/domain/import/request'
 import type { ImportOp, RefusalReason } from '@/lib/domain/import/types'
-import { parseAccount, parseTransaction } from '@/lib/domain/ledger/doc'
+import { parseAccount } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import { parseTransactionInput } from '@/lib/domain/ledger/input'
 import { MAX_MINOR } from '@/lib/domain/ledger/money'
@@ -18,6 +18,7 @@ import { updateAccount } from '@/lib/server/ledger/accounts'
 import { accountsCol, transactionsCol } from '@/lib/server/ledger/paths'
 import { ImportError } from './errors'
 import type { ImportDeps } from './deps'
+import { bankOpsOf, seenKeysOf } from './bank-ops'
 import { importKey } from './key'
 import { importLocksCol, importsCol } from './paths'
 import { parseImportDoc, type ImportDoc } from './types'
@@ -64,7 +65,8 @@ export async function importStep(deps: ImportDeps, orgId: string, uid: string, r
   }
 }
 
-async function loadAccount(deps: ImportDeps, orgId: string, accountId: string): Promise<LedgerAccount> {
+/** The account of an id, or `account_not_found`. */
+export async function loadAccount(deps: ImportDeps, orgId: string, accountId: string): Promise<LedgerAccount> {
   const snap = await accountsCol(deps.db, orgId).doc(accountId).get()
   const account = snap.exists ? parseAccount(snap.id, snap.data()) : null
   if (!account) throw new ImportError('account_not_found')
@@ -143,11 +145,10 @@ async function accountIsEmpty(deps: ImportDeps, orgId: string, accountId: string
 
 async function writeOperations(deps: ImportDeps, orgId: string, uid: string, account: LedgerAccount, importId: string, req: ImportStepRequest, totals: Totals): Promise<void> {
   if (req.operations.length === 0) return
-  const seenCol = bankSeenCol(deps.db, orgId)
   const keys = req.operations.map((op) => importKey(account.id, op))
-  const snaps = await deps.db.getAll(...keys.map((key) => seenCol.doc(key)))
-  const seen = new Set(snaps.filter((s) => s.exists).map((s) => s.id))
-  const bankOps = await bankOpsOf(deps, orgId, account.id, req.operations)
+  const seen = await seenKeysOf(deps.db, orgId, keys)
+  const days = req.operations.map((op) => op.day).sort()
+  const bankOps = await bankOpsOf(deps.db, orgId, account.id, days[0], days[days.length - 1])
 
   // The rules are read once per step, and only when a new operation arrives (S10).
   let rules: Rule[] | null = null
@@ -229,26 +230,6 @@ function fileBankInfo(importId: string, op: ImportOp): BankInfo {
   if (counterpartyName !== undefined) bank.counterpartyName = counterpartyName
   if (remittance !== undefined) bank.remittance = remittance
   return bank
-}
-
-/** The bank operations of the account on the days of this step, by day: what `overlapsBank` compares a line with. */
-async function bankOpsOf(deps: ImportDeps, orgId: string, accountId: string, ops: readonly ImportOp[]): Promise<Map<string, BankOpView[]>> {
-  const byDay = new Map<string, BankOpView[]>()
-  if (ops.length === 0) return byDay
-  const days = ops.map((op) => op.day).sort()
-  const snap = await transactionsCol(deps.db, orgId)
-    .where('accountId', '==', accountId)
-    .where('paymentDate', '>=', days[0])
-    .where('paymentDate', '<=', days[days.length - 1])
-    .get()
-  for (const doc of snap.docs) {
-    const tx = parseTransaction(doc.id, doc.data())
-    if (!tx || tx.status !== 'actual' || tx.bank?.accountRef === undefined) continue
-    if (tx.type !== 'income' && tx.type !== 'expense') continue
-    const view: BankOpView = { type: tx.type, amountMinor: tx.amountMinor, ...(tx.bank.entryReference === undefined ? {} : { entryReference: tx.bank.entryReference }) }
-    byDay.set(tx.paymentDate, [...(byDay.get(tx.paymentDate) ?? []), view])
-  }
-  return byDay
 }
 
 async function recordTotals(ref: DocumentReference, accountId: string, statement: StepStatement, totals: Totals): Promise<void> {
