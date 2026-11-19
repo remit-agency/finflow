@@ -64,3 +64,6 @@ ui-debug.log*
 
 # Brainstorming visual companion sessions (local mockups)
 .superpowers/
+
+# Real MT940 statements of the owner (S14): local only, never committed
+/.local/
