@@ -1,4 +1,4 @@
-import type { ImportOp, OpStatus, ParseIssue, RefusalReason, StatementBalance } from './types'
+import type { ImportOp, LineIssue, OpStatus, ParseIssue, RefusalReason, StatementBalance } from './types'
 
 /** The shapes the import API returns (S14). Pure types: the browser client and the server both import them. */
 
@@ -69,6 +69,8 @@ export interface PreviewStatement {
   from: string | null
   to: string | null
   reconciliation: number | null
+  /** The parse issues of this statement's lines (the file's are on `PreviewResult`). */
+  issues: LineIssue[]
   /** The account this statement most likely belongs to (its source seen in an import or an active bank account); null when unknown. */
   suggestedAccountId: string | null
   /** Present when the caller chose an account for this statement. */

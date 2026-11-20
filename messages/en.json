@@ -616,6 +616,11 @@
     "skip": "Skip this statement",
     "counts": "New: {new} · already in: {seen} · from the bank: {bank} · refused: {refused}",
     "noAdd": "The statement does not add up: difference {diff}",
+    "issue": {
+      "bad_61": "Line {line}: could not read the entry",
+      "bad_balance": "Line {line}: could not read the balance",
+      "orphan_86": "Line {line}: could not read the description"
+    },
     "currencyMismatch": "The statement currency ({statement}) differs from the account currency ({account})",
     "run": "Import",
     "progress": "{done} of {total}",

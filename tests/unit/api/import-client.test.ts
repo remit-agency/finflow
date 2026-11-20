@@ -23,7 +23,7 @@ function ops(n: number): ImportOp[] {
   }))
 }
 
-const statement: StepStatement = { source: 'PL123', currency: 'PLN', from: '2026-11-01', to: '2026-11-30', closingMinor: 5000 }
+const statement: StepStatement = { source: 'PL123', currency: 'PLN', from: '2026-11-01', to: '2026-11-30', closingMinor: 5000, complete: true }
 
 function stepAnswer(importId: string, extra: Record<string, unknown> = {}) {
   return {

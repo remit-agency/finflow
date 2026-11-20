@@ -88,7 +88,7 @@ async function runStep(deps: ImportDeps, orgId: string, uid: string, account: Le
     // Recorded even when the step aborts: the operations written so far are facts of the import.
     await recordTotals(ref, account.id, req.statement, totals)
   }
-  const end = req.last ? await finishStatement(deps, orgId, uid, ref, account.id, req.statement.closingMinor) : { fitted: false, balanceMinor: null, closingMinor: null, differenceMinor: null }
+  const end = req.last ? await finishStatement(deps, orgId, uid, ref, account.id, req.statement) :{ fitted: false, balanceMinor: null, closingMinor: null, differenceMinor: null }
   return { importId, created: totals.created, skipped: { seen: totals.seen, bank: totals.bank }, refused: totals.refused, done: req.last, ...end }
 }
 
@@ -230,24 +230,32 @@ async function recordTotals(ref: DocumentReference, accountId: string, statement
   })
 }
 
-/** The last step of a statement: fits the opening balance when this import found the account empty, then reports the difference. */
+/**
+ * The last step of a statement: fits the opening balance when this import found the account empty, the statement is complete
+ * (the client read it with no issue and it adds up) and its currency is the account's; then reports the difference. A
+ * statement that is not complete, or of another currency, never fits: its difference is still reported.
+ */
 async function finishStatement(
   deps: ImportDeps,
   orgId: string,
   uid: string,
   ref: DocumentReference,
   accountId: string,
-  closing: number | null,
+  statement: StepStatement,
 ): Promise<{ fitted: boolean; balanceMinor: number; closingMinor: number | null; differenceMinor: number | null }> {
+  const closing = statement.closingMinor
   const doc = parseImportDoc((await ref.get()).data())
   let fitted = false
-  if (doc?.fit[accountId] === 'pending' && closing !== null) {
+  if (doc?.fit[accountId] === 'pending' && closing !== null && statement.complete) {
+    // Read after the operations of this step are written: the fit is computed from the balance as it stands now.
     const account = await loadAccount(deps, orgId, accountId)
-    const opening = fittedOpening(closing, account.balanceMinor, account.openingMinor)
-    if (Math.abs(opening) <= MAX_MINOR) {
-      await updateAccount(deps.ledger, orgId, uid, accountId, { openingMinor: opening })
-      await ref.update({ [`fit.${accountId}`]: 'done' })
-      fitted = true
+    if (statement.currency === account.currency) {
+      const opening = fittedOpening(closing, account.balanceMinor, account.openingMinor)
+      if (Math.abs(opening) <= MAX_MINOR) {
+        await updateAccount(deps.ledger, orgId, uid, accountId, { openingMinor: opening })
+        await ref.update({ [`fit.${accountId}`]: 'done' })
+        fitted = true
+      }
     }
   }
   const after = await loadAccount(deps, orgId, accountId)

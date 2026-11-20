@@ -38,7 +38,7 @@ function stepOf(stmt: PreviewStatement, operations: ImportOp[], accountId = 'a1'
   return {
     fileName: FILE,
     accountId,
-    statement: { source: stmt.source, currency: stmt.currency, from: stmt.from, to: stmt.to, closingMinor: stmt.closing?.amountMinor ?? null },
+    statement: { source: stmt.source, currency: stmt.currency, from: stmt.from, to: stmt.to, closingMinor: stmt.closing?.amountMinor ?? null, complete: stmt.issues.length === 0 && stmt.reconciliation === 0 },
     operations,
     last: false,
   }
@@ -54,7 +54,7 @@ beforeEach(async () => {
 
 describe('previewImport: suggested accounts', () => {
   it('suggests the account of an earlier import of the same source, while that account exists', async () => {
-    await importStep(depsFor(), ORG, UID, { fileName: FILE, accountId: 'a1', statement: { source: SOURCE, currency: 'PLN', from: '2026-10-20', to: '2026-10-20', closingMinor: null }, operations: [], last: false })
+    await importStep(depsFor(), ORG, UID, { fileName: FILE, accountId: 'a1', statement: { source: SOURCE, currency: 'PLN', from: '2026-10-20', to: '2026-10-20', closingMinor: null, complete: true }, operations: [], last: false })
     const text = statementText(A, 'C261020PLN100,')
     expect((await preview(text)).statements[0].suggestedAccountId).toBe('a1')
 

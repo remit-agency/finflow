@@ -36,7 +36,7 @@ function line(over: Partial<ImportOp> = {}): ImportOp {
 const SECOND = line({ day: '2026-10-21', type: 'expense', amountMinor: 4_000, reference: 'R2', counterpartyName: 'Klient', remittance: 'Zakup', ordinal: 0 })
 
 function statement(over: Partial<ImportStepRequest['statement']> = {}): ImportStepRequest['statement'] {
-  return { source: 'PL61109010140000071219812874', currency: 'PLN', from: '2026-10-20', to: '2026-10-21', closingMinor: null, ...over }
+  return { source: 'PL61109010140000071219812874', currency: 'PLN', from: '2026-10-20', to: '2026-10-21', closingMinor: null, complete: true, ...over }
 }
 
 function step(over: Partial<ImportStepRequest> = {}): ImportStepRequest {
@@ -191,6 +191,23 @@ describe('importStep: writes the operations of a statement', () => {
     expect(busy).toMatchObject({ fitted: false, balanceMinor: 5_000, closingMinor: 100_000, differenceMinor: -95_000 })
     expect(await readDoc(db, `organizations/${ORG}/accounts/a2`)).toMatchObject({ openingMinor: 0, balanceMinor: 5_000 })
     expect(await importDoc(busy.importId)).toMatchObject({ fit: { a2: 'no' } })
+  })
+
+  it('does not fit the opening balance from a statement of another currency, nor from a statement with no lines', async () => {
+    const eur = await importStep(depsFor(), ORG, UID, step({ statement: statement({ currency: 'EUR', closingMinor: 500_000 }), operations: [], last: true }))
+    expect(eur).toMatchObject({ fitted: false, done: true, closingMinor: 500_000 })
+    expect(await readDoc(db, `organizations/${ORG}/accounts/a1`)).toMatchObject({ openingMinor: 0 })
+    expect(await importDoc(eur.importId)).toMatchObject({ fit: { a1: 'pending' } })
+  })
+
+  it('fits only a statement the client marks complete; an incomplete one reports its difference and keeps the opening', async () => {
+    const incomplete = await importStep(depsFor(), ORG, UID, step({
+      statement: statement({ closingMinor: 137_950, complete: false }),
+      operations: [line({ reference: 'R3', amountMinor: 2_000 })],
+      last: true,
+    }))
+    expect(incomplete).toMatchObject({ fitted: false, balanceMinor: 2_000, closingMinor: 137_950, differenceMinor: -135_950 })
+    expect(await readDoc(db, `organizations/${ORG}/accounts/a1`)).toMatchObject({ openingMinor: 0 })
   })
 
   it('an unknown account is account_not_found; an unknown import is not_found', async () => {

@@ -15,6 +15,11 @@ export interface StepStatement {
   from: string | null
   to: string | null
   closingMinor: number | null
+  /**
+   * True only when the client read the statement with no parse issue and its lines add up to the closing balance. Only a
+   * complete statement may fit the opening balance of an empty account (S14).
+   */
+  complete: boolean
 }
 export interface ImportStepRequest {
   importId?: string
@@ -57,6 +62,7 @@ export function parseImportStep(body: unknown): Parsed<ImportStepRequest> {
   if (from === undefined) return { ok: false, field: 'statement.from' }
   if (to === undefined) return { ok: false, field: 'statement.to' }
   if (closing === undefined) return { ok: false, field: 'statement.closingMinor' }
+  if (typeof s.complete !== 'boolean') return { ok: false, field: 'statement.complete' }
   if (!Array.isArray(body.operations) || body.operations.length > IMPORT_STEP) return { ok: false, field: 'operations' }
   const operations: ImportOp[] = []
   for (let i = 0; i < body.operations.length; i++) {
@@ -67,7 +73,7 @@ export function parseImportStep(body: unknown): Parsed<ImportStepRequest> {
   if (typeof body.last !== 'boolean') return { ok: false, field: 'last' }
   return {
     ok: true,
-    value: { ...(body.importId === undefined ? {} : { importId: body.importId as string }), fileName: body.fileName.trim(), accountId: body.accountId, statement: { source, currency, from, to, closingMinor: closing }, operations, last: body.last },
+    value: { ...(body.importId === undefined ? {} : { importId: body.importId as string }), fileName: body.fileName.trim(), accountId: body.accountId, statement: { source, currency, from, to, closingMinor: closing, complete: s.complete }, operations, last: body.last },
   }
 }
 

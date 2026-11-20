@@ -39,7 +39,7 @@ const SECOND = line({ day: '2026-10-21', type: 'expense', amountMinor: 4_000, re
 const THIRD = line({ amountMinor: 2_000, reference: 'R3', remittance: 'Trzecia', ordinal: 0 })
 
 function statement(over: Partial<ImportStepRequest['statement']> = {}): ImportStepRequest['statement'] {
-  return { source: 'PL61109010140000071219812874', currency: 'PLN', from: '2026-10-20', to: '2026-10-21', closingMinor: null, ...over }
+  return { source: 'PL61109010140000071219812874', currency: 'PLN', from: '2026-10-20', to: '2026-10-21', closingMinor: null, complete: true, ...over }
 }
 
 function step(over: Partial<ImportStepRequest> = {}): ImportStepRequest {

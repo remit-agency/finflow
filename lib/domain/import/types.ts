@@ -43,6 +43,8 @@ export interface ParsedStatement {
   operations: ImportOp[]
   /** `opening + Σ signed operations − closing`; null when a balance is missing. 0 means the statement adds up. */
   reconciliation: number | null
+  /** The issues of the lines of this statement (the file's issues, in order, are `ParseResult.issues`). */
+  issues: LineIssue[]
 }
 
 export type ParseIssueCode = 'no_statement' | 'bad_61' | 'bad_balance' | 'orphan_86'
@@ -51,6 +53,12 @@ export interface ParseIssue {
   /** 1-based line of the tag in the file. */
   line: number
   tag?: string
+}
+
+/** An issue of a statement's lines: every code but `no_statement`, which is about the file as a whole. */
+export type LineIssueCode = Exclude<ParseIssueCode, 'no_statement'>
+export interface LineIssue extends ParseIssue {
+  code: LineIssueCode
 }
 
 /** Partial facts are kept: statements that parsed are returned even when other lines gave issues. */

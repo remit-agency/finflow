@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { NativeSelect } from '@/components/ui/native-select'
 import { fromMinor } from '@/lib/domain/ledger/money'
-import type { OpStatus, RefusalReason } from '@/lib/domain/import/types'
+import type { LineIssueCode, OpStatus, RefusalReason } from '@/lib/domain/import/types'
 import type { PreviewStatement } from '@/lib/domain/import/view'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import type { Account } from '@/types'
@@ -18,6 +18,13 @@ export const REASON_KEY = {
   currency_mismatch: 'reason.currency_mismatch',
   amount: 'reason.amount',
 } as const satisfies Record<RefusalReason, string>
+
+// The parse issues of a statement's lines: a line that could not be read is listed, the rest of the statement is kept.
+const ISSUE_KEY = {
+  bad_61: 'issue.bad_61',
+  bad_balance: 'issue.bad_balance',
+  orphan_86: 'issue.orphan_86',
+} as const satisfies Record<LineIssueCode, string>
 
 const STATUS_KEY = {
   new: 'status.new',
@@ -90,6 +97,13 @@ export function StatementCard({ statement, position, accounts, accountId, disabl
         <p role="status" className="rounded-[6px] bg-amber-50 px-2.5 py-1.5 text-sm text-amber-900">
           {t('noAdd', { diff: amount(statement.reconciliation) })}
         </p>
+      )}
+      {statement.issues.length > 0 && (
+        <ul role="status" className="list-inside list-disc rounded-[6px] bg-amber-50 px-2.5 py-1.5 text-sm text-amber-900">
+          {statement.issues.map((issue, i) => (
+            <li key={i}>{t(ISSUE_KEY[issue.code], { line: issue.line })}</li>
+          ))}
+        </ul>
       )}
       {mismatch && account && statement.currency && (
         <p className="rounded-[6px] bg-amber-50 px-2.5 py-1.5 text-sm text-amber-900">

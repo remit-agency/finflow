@@ -616,6 +616,11 @@
     "skip": "Pomiń wyciąg",
     "counts": "Nowych: {new} · już są: {seen} · z banku: {bank} · odrzuconych: {refused}",
     "noAdd": "Wyciąg się nie zgadza: różnica {diff}",
+    "issue": {
+      "bad_61": "Wiersz {line}: nie udało się odczytać zapisu",
+      "bad_balance": "Wiersz {line}: nie udało się odczytać salda",
+      "orphan_86": "Wiersz {line}: nie udało się odczytać opisu"
+    },
     "currencyMismatch": "Waluta wyciągu ({statement}) różni się od waluty rachunku ({account})",
     "run": "Importuj",
     "progress": "{done} z {total}",

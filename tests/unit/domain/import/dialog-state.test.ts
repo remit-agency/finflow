@@ -38,6 +38,7 @@ function statement(index: number, over: Partial<PreviewStatement> = {}): Preview
     from: '2026-11-01',
     to: '2026-11-03',
     reconciliation: 0,
+    issues: [],
     suggestedAccountId: 'acc-1',
     operations: [op({ status: 'new' }), op({ ordinal: 1, status: 'seen' })],
     ...over,
@@ -265,7 +266,51 @@ describe('runPlan', () => {
 
   it('carries the statement fields of the request', () => {
     const plan = runPlan(counted([statement(0)]))
-    expect(plan[0].statement).toEqual({ source: 'PL61109010140000071219812874', currency: 'PLN', from: '2026-11-01', to: '2026-11-03', closingMinor: 1000 })
+    expect(plan[0].statement).toEqual({ source: 'PL61109010140000071219812874', currency: 'PLN', from: '2026-11-01', to: '2026-11-03', closingMinor: 1000, complete: true })
+  })
+
+  it('marks a statement complete only when it parsed with no issue and adds up', () => {
+    const complete = (over: Partial<PreviewStatement>) => runPlan(counted([statement(0, over)]))[0].statement.complete
+    expect(complete({})).toBe(true)
+    expect(complete({ issues: [{ code: 'bad_61', line: 7, tag: '61' }] })).toBe(false)
+    expect(complete({ reconciliation: 500 })).toBe(false)
+    expect(complete({ reconciliation: null })).toBe(false)
+  })
+
+  it('is not complete when every line of the statement is refused', () => {
+    const refused = statement(0, { operations: [op({ status: 'refused:future_date' })] })
+    expect(runPlan(counted([refused]))[0].statement.complete).toBe(false)
+  })
+
+  it('keeps the parse issues of the file in the preview the dialog shows', () => {
+    const issues = [{ code: 'orphan_86' as const, line: 12, tag: '86' }]
+    const state = run(initialDialogState, { type: 'pick', fileName: 'a.sta', size: 10 }, { type: 'decoded', text: 'x' }, { type: 'previewed', preview: preview([statement(0, { issues })], issues) })
+    expect(state.preview?.issues).toEqual(issues)
+    expect(state.preview?.statements[0].issues).toEqual(issues)
+  })
+
+  it('numbers identical lines of two statements of one account in file order, so that they do not collapse', () => {
+    const same = op({ ordinal: 0, reference: null, counterpartyName: 'SHOP', remittance: 'Kawa', status: 'new' })
+    const first = statement(0, { suggestedAccountId: 'acc-1', operations: [same] })
+    const second = statement(1, { suggestedAccountId: 'acc-1', operations: [{ ...same }] })
+    const plan = runPlan(counted([first, second], ['acc-1', 'acc-1']))
+    expect(plan.map((item) => item.operations.map((o) => o.ordinal))).toEqual([[0], [1]])
+  })
+
+  it('keeps identical lines of statements of different accounts at ordinal 0', () => {
+    const same = op({ ordinal: 0, reference: null, counterpartyName: 'SHOP', remittance: 'Kawa', status: 'new' })
+    const first = statement(0, { suggestedAccountId: 'acc-1', operations: [same] })
+    const second = statement(1, { suggestedAccountId: 'acc-2', operations: [{ ...same }] })
+    const plan = runPlan(counted([first, second], ['acc-1', 'acc-2']))
+    expect(plan.map((item) => item.operations.map((o) => o.ordinal))).toEqual([[0], [0]])
+  })
+
+  it('numbers the lines of an account over all its statements, so a line seen in an earlier statement keeps its place', () => {
+    const same = op({ ordinal: 0, reference: null, counterpartyName: 'SHOP', remittance: 'Kawa', status: 'new' })
+    const seenFirst = statement(0, { suggestedAccountId: 'acc-1', operations: [{ ...same, status: 'seen' }] })
+    const newSecond = statement(1, { suggestedAccountId: 'acc-1', operations: [{ ...same }] })
+    const plan = runPlan(counted([seenFirst, newSecond], ['acc-1', 'acc-1']))
+    expect(plan[1].operations.map((o) => o.ordinal)).toEqual([1])
   })
 
   it('is empty before the counting', () => {

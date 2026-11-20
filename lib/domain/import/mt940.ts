@@ -1,6 +1,9 @@
 import { isDay } from '@/lib/domain/ledger/days'
 import { withOrdinals } from './identity'
-import type { ParseIssue, ParseResult, ParsedStatement, RawOp, StatementBalance } from './types'
+import type { LineIssue, ParseIssue, ParseResult, ParsedStatement, RawOp, StatementBalance } from './types'
+
+/** The `no_statement` issue is the file's, never a statement's: a statement keeps only the issues of its lines. */
+const isLineIssue = (issue: ParseIssue): issue is LineIssue => issue.code !== 'no_statement'
 
 interface Rec {
   tag: string
@@ -128,7 +131,7 @@ interface Draft {
   ops: RawOp[]
 }
 
-function finish(d: Draft, index: number): ParsedStatement {
+function finish(d: Draft, index: number, issues: LineIssue[]): ParsedStatement {
   const signed = d.ops.reduce((sum, o) => sum + (o.type === 'income' ? o.amountMinor : -o.amountMinor), 0)
   return {
     index,
@@ -139,6 +142,7 @@ function finish(d: Draft, index: number): ParsedStatement {
     closing: d.closing,
     operations: withOrdinals(d.ops),
     reconciliation: d.opening !== null && d.closing !== null ? d.opening.amountMinor + signed - d.closing.amountMinor : null,
+    issues,
   }
 }
 
@@ -154,15 +158,18 @@ export function parseMt940(text: string): ParseResult {
   let draft: Draft | null = null
   let pending: RawOp | null = null
   let afterClosing = false
+  // The issues from here on belong to the open statement: the file's list only grows, so a slice of it is its own.
+  let issueStart = 0
 
   const close = () => {
-    if (draft !== null) statements.push(finish(draft, statements.length))
+    if (draft !== null) statements.push(finish(draft, statements.length, issues.slice(issueStart).filter(isLineIssue)))
     draft = null
     pending = null
     afterClosing = false
   }
   const open = (): Draft => {
     draft = { source: null, number: null, opening: null, closing: null, ops: [] }
+    issueStart = issues.length
     return draft
   }
 

@@ -51,7 +51,7 @@ function dayRange(ops: readonly ImportOp[]): { from: string | null; to: string |
 }
 
 function describeStatement(stmt: ParsedStatement, suggestedAccountId: string | null): Omit<PreviewStatement, 'operations' | 'chosen'> {
-  return { index: stmt.index, source: stmt.source, number: stmt.number, currency: stmt.currency, opening: stmt.opening, closing: stmt.closing, ...dayRange(stmt.operations), reconciliation: stmt.reconciliation, suggestedAccountId }
+  return { index: stmt.index, source: stmt.source, number: stmt.number, currency: stmt.currency, opening: stmt.opening, closing: stmt.closing, ...dayRange(stmt.operations), reconciliation: stmt.reconciliation, issues: stmt.issues, suggestedAccountId }
 }
 
 function withoutChoice(stmt: ParsedStatement, suggestedAccountId: string | null): PreviewStatement {

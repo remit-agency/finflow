@@ -7,7 +7,7 @@ const step = (over: Record<string, unknown> = {}) => ({
   importId: 'imp_1',
   fileName: 'extract.sta',
   accountId: 'acc_1',
-  statement: { source: 'PL61109010140000071219812874', currency: 'PLN', from: '2026-10-01', to: '2026-10-31', closingMinor: 12345 },
+  statement: { source: 'PL61109010140000071219812874', currency: 'PLN', from: '2026-10-01', to: '2026-10-31', closingMinor: 12345, complete: true },
   operations: [op()],
   last: true,
   ...over,
@@ -26,9 +26,16 @@ describe('parseImportStep', () => {
     ['fileName', step({ fileName: '' })],
     ['importId', step({ importId: 'a/b' })],
     ['statement.currency', step({ statement: { ...step().statement, currency: 'pln' } })],
+    ['statement.complete', step({ statement: { ...step().statement, complete: 'yes' } })],
+    ['statement.complete', step({ statement: { ...step().statement, complete: undefined } })],
     ['last', step({ last: 'yes' })],
   ])('refuses a bad body and names the field %s', (field, body) => {
     expect(parseImportStep(body)).toEqual({ ok: false, field })
+  })
+
+  it('keeps statement.complete as the client sent it', () => {
+    const parsed = parseImportStep(step({ statement: { ...step().statement, complete: false } }))
+    expect(parsed.ok && parsed.value.statement.complete).toBe(false)
   })
 })
 

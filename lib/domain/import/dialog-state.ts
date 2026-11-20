@@ -1,6 +1,7 @@
+import { ordinalsByAccount } from './identity'
 import type { StepStatement } from './request'
 import { MAX_IMPORT_BYTES, type ImportOp, type RefusalReason } from './types'
-import type { PreviewResult } from './view'
+import type { PreviewResult, PreviewStatement } from './view'
 
 /**
  * The import dialog as a pure state machine (no React, no I/O): the component reads a file, asks the server and dispatches
@@ -92,39 +93,43 @@ export function needsCount(countedFor: ReadonlyArray<string | null> | null, acco
 }
 
 /**
+ * A statement is complete when it parsed with no issue, its lines add up to the closing balance, and at least one of its lines
+ * is not refused (a statement whose lines are all refused, or that has none, is never complete: it cannot fit a balance).
+ */
+export function isComplete(statement: PreviewStatement): boolean {
+  return statement.issues.length === 0 && statement.reconciliation === 0 && statement.operations.some((op) => op.status !== undefined && !op.status.startsWith('refused:'))
+}
+
+/**
  * The statements the run writes, in file order. A statement with a chosen account is kept even when it has no new operation:
- * its last step still fits the balance. Nothing is planned before the counting (`countedFor` is null).
+ * its last step still fits the balance. The ordinals are those of `ordinalsByAccount`: the same numbering the preview showed.
+ * Nothing is planned before the counting (`countedFor` is null).
  */
 export function runPlan(state: DialogState): RunItem[] {
   if (state.preview === null || state.countedFor === null) return []
-  const items: RunItem[] = []
+  const chosen: Array<{ index: number; accountId: string; statement: PreviewStatement }> = []
   state.preview.statements.forEach((statement, index) => {
     const accountId = state.accounts[index] ?? null
-    if (accountId === null) return
-    items.push({
-      index,
-      accountId,
-      statement: {
-        source: statement.source,
-        currency: statement.currency,
-        from: statement.from,
-        to: statement.to,
-        closingMinor: statement.closing?.amountMinor ?? null,
-      },
-      operations: statement.operations
-        .filter((op) => op.status === 'new')
-        .map((op) => ({
-          day: op.day,
-          type: op.type,
-          amountMinor: op.amountMinor,
-          reference: op.reference,
-          counterpartyName: op.counterpartyName,
-          remittance: op.remittance,
-          ordinal: op.ordinal,
-        })),
-    })
+    if (accountId !== null) chosen.push({ index, accountId, statement })
   })
-  return items
+  const ordinals = ordinalsByAccount(chosen.map(({ accountId, statement }) => ({ accountId, ops: statement.operations })))
+  return chosen.map(({ index, accountId, statement }, i) => ({
+    index,
+    accountId,
+    statement: {
+      source: statement.source,
+      currency: statement.currency,
+      from: statement.from,
+      to: statement.to,
+      closingMinor: statement.closing?.amountMinor ?? null,
+      complete: isComplete(statement),
+    },
+    operations: statement.operations.flatMap((op, j) =>
+      op.status === 'new'
+        ? [{ day: op.day, type: op.type, amountMinor: op.amountMinor, reference: op.reference, counterpartyName: op.counterpartyName, remittance: op.remittance, ordinal: ordinals[i][j] }]
+        : [],
+    ),
+  }))
 }
 
 /** The run is possible once the accounts are counted and at least one operation is new. */
