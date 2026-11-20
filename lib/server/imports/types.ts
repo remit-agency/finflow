@@ -1,19 +1,20 @@
 import { Timestamp } from 'firebase-admin/firestore'
 import { isDay } from '@/lib/domain/ledger/days'
 import { MAX_MINOR, isMinor } from '@/lib/domain/ledger/money'
-import type { ImportCounts, ImportKind, ImportPeriod, ImportStatementRef, ImportStatus, ImportUndoCounts, ImportView } from '@/lib/domain/import/view'
+import type {
+  ImportCounts,
+  ImportEntityCounts,
+  ImportKind,
+  ImportPeriod,
+  ImportStatementRef,
+  ImportStatus,
+  ImportUndoCounts,
+  ImportView,
+} from '@/lib/domain/import/view'
 
-export type { ImportKind, ImportStatus, ImportView }
+export type { ImportEntityCounts, ImportKind, ImportStatus, ImportView }
 /** Per account: was it empty when the import first touched it ('pending' = fit its opening balance at the end). */
 export type FitState = 'pending' | 'no' | 'done'
-
-/** Entities a Finmap import created (S14b): counted when they are created by the import, never when they matched. */
-export interface ImportEntityCounts {
-  accounts: number
-  categories: number
-  counterparties: number
-  tags: number
-}
 
 /** organizations/{org}/imports/{id}: one per file run (S14, S14b). */
 export interface ImportDoc {
@@ -170,6 +171,7 @@ export function importView(id: string, doc: ImportDoc): ImportView {
     accountIds: doc.accountIds,
     period: doc.period,
     counts: doc.counts,
+    entities: doc.entities,
     statements: doc.statements,
     status: doc.status,
     undo: doc.undo,

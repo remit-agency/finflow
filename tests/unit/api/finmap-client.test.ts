@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const notify = vi.fn()
 vi.mock('@/lib/api/ledger-events', () => ({ notifyLedgerChanged: () => notify() }))
 
-import { runFinmapImport, type FinmapResult, type FinmapRunArgs } from '@/lib/api/finmap-client'
+import { normKey } from '@/lib/domain/import/finmap/fold'
+import { countAlreadyImported, runFinmapImport, type FinmapResult, type FinmapRunArgs } from '@/lib/api/finmap-client'
 import type { FinmapCounts, FinmapExisting, FinmapPlan, PlannedOp } from '@/lib/domain/import/finmap/types'
 
 // Synthetic names only.
@@ -367,6 +368,62 @@ describe('runFinmapImport: request size', () => {
     const s = serverWith()
     await run([planOp(0), planOp(1, { identity: ['h'.repeat(300 * 1024)] }), planOp(2)])
     expect(counts(s.steps('batch'))).toEqual([1, 1, 1])
+  })
+})
+
+describe('runFinmapImport: the accounts it created', () => {
+  it('names the new accounts with the ids the set-up step gave them', async () => {
+    serverWith({ setup: () => json({ ...SETUP_OK, accounts: { [normKey('Konto Nowe')]: 'acc-new' } }) })
+    const result = await run([planOp(1, { account: 'Konto Nowe' })], {
+      accounts: [{ name: 'Konto Nowe', type: 'bank', currency: 'EUR', currentBalanceMinor: null }],
+    })
+    expect(result.createdAccounts).toEqual([{ id: 'acc-new', name: 'Konto Nowe', currency: 'EUR' }])
+  })
+})
+
+describe('countAlreadyImported: the preview count', () => {
+  it('checks only the operations whose accounts FinFlow has, and counts the ones the server saw', async () => {
+    const server = serverWith({ check: (body) => json({ seen: (body.operations as unknown[]).map((_, i) => i === 0) }) })
+    const plan = planOf([planOp(1), planOp(2, { account: 'Konto Nowe' }), planOp(3)])
+    const n = await countAlreadyImported('org1', plan, EXISTING)
+    expect(n).toBe(1)
+    const sent = server.steps('check')
+    expect(sent).toHaveLength(1)
+    expect(sent[0].body.operations).toEqual([
+      { accountId: 'acc-a', toAccountId: null, identity: ['t1', '101'], ordinal: 0 },
+      { accountId: 'acc-a', toAccountId: null, identity: ['t3', '103'], ordinal: 0 },
+    ])
+  })
+
+  it('sends no request when no operation is on an account FinFlow has', async () => {
+    const server = serverWith()
+    expect(await countAlreadyImported('org1', planOf([planOp(1, { account: 'Konto Nowe' })]), EXISTING)).toBe(0)
+    expect(server.steps('check')).toHaveLength(0)
+  })
+
+  it('checks in chunks of at most 500 keys and reports progress over the checkable operations', async () => {
+    serverWith()
+    const ops = Array.from({ length: 1200 }, (_, i) => planOp(i))
+    const progress: Array<[number, number]> = []
+    await countAlreadyImported('org1', planOf(ops), EXISTING, { onProgress: (d, t) => progress.push([d, t]) })
+    expect(progress).toEqual([
+      [500, 1200],
+      [1000, 1200],
+      [1200, 1200],
+    ])
+  })
+
+  it('stops when its signal is aborted, sending no further check', async () => {
+    const controller = new AbortController()
+    const server = serverWith({
+      check: (body) => {
+        controller.abort()
+        return json({ seen: (body.operations as unknown[]).map(() => false) })
+      },
+    })
+    const ops = Array.from({ length: 600 }, (_, i) => planOp(i))
+    await expect(countAlreadyImported('org1', planOf(ops), EXISTING, { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(server.steps('check')).toHaveLength(1)
   })
 })
 

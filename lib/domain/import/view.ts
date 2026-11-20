@@ -23,6 +23,14 @@ export interface ImportCounts {
   refused: number
 }
 
+/** Entities a Finmap import created (S14b): counted when the import creates them, never when they matched. */
+export interface ImportEntityCounts {
+  accounts: number
+  categories: number
+  counterparties: number
+  tags: number
+}
+
 export interface ImportUndoCounts {
   deleted: number
   kept: number
@@ -44,6 +52,8 @@ export interface ImportView {
   accountIds: string[]
   period: ImportPeriod
   counts: ImportCounts
+  /** Zero for an MT940 import and for a document written before S14b. */
+  entities: ImportEntityCounts
   statements: ImportStatementRef[]
   status: ImportStatus
   undoneAt?: string

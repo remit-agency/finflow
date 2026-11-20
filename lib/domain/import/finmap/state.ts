@@ -104,11 +104,14 @@ export function accountSettingOf(state: FinmapDialogState<FinmapRunResult>, name
   return state.accounts.get(normKey(name)) ?? { type: 'bank', currency: state.companyCurrency, balanceText: '' }
 }
 
-/** Currencies of the new accounts of the plan, keyed by `normKey` of the name (the planner's option). */
+/**
+ * Currencies the user chose for new accounts, keyed by `normKey` of the name (the planner's option). Every chosen setting counts, so
+ * a re-plan that drops a name from the file and brings it back keeps its currency; an account without a choice takes the planner's default.
+ */
 export function newAccountCurrencies(state: FinmapDialogState<FinmapRunResult>): Record<string, string> {
   // A null prototype: an account named like an Object property must not read one.
   const out: Record<string, string> = Object.create(null)
-  for (const name of state.plan?.create.accounts ?? []) out[normKey(name)] = accountSettingOf(state, name).currency
+  for (const [key, setting] of state.accounts) out[key] = setting.currency
   return out
 }
 

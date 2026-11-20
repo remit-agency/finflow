@@ -82,6 +82,8 @@ export interface FinmapResult {
   /** Accounts whose opening balance the finish step fitted. */
   fitted: number
   differences: FinmapFinishResponse['differences']
+  /** The accounts this run created, with their ids and names (the differences name them). */
+  createdAccounts: Array<{ id: string; name: string; currency: string }>
   entities: FinmapEntityCounts
   /** Tags left off their operations (more than ten on one operation); the first ten in sheet order are kept. */
   tagsDropped: number
@@ -155,6 +157,54 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw new DOMException('The import was aborted', 'AbortError')
 }
 
+/**
+ * Which of these keys an earlier import wrote: requests of at most CHECK_LIMIT keys within the byte budget, in order. Shared by the
+ * run and by the preview count (`countAlreadyImported`), so both chunk the same way.
+ */
+async function seenFlags(orgId: string, keys: FinmapCheckOp[], signal: AbortSignal | undefined, onProgress?: (done: number, total: number) => void): Promise<boolean[]> {
+  const seen = new Array<boolean>(keys.length).fill(false)
+  let done = 0
+  for (const chunk of chunkBySize(
+    keys.map((_, i) => i),
+    CHECK_LIMIT,
+    CHECK_BUDGET_BYTES,
+    (i) => jsonBytes(keys[i]),
+  )) {
+    throwIfAborted(signal)
+    const r = await finmapCheck(orgId, chunk.map((i) => keys[i]), signal)
+    chunk.forEach((i, j) => {
+      if (r.seen[j]) seen[i] = true
+    })
+    done += chunk.length
+    onProgress?.(done, keys.length)
+  }
+  return seen
+}
+
+/**
+ * How many operations of `plan` an earlier Finmap import already wrote (the preview's «already imported»). Only operations whose
+ * accounts FinFlow has already can be checked: the others are new accounts, which cannot hold a duplicate. Read-only.
+ */
+export async function countAlreadyImported(
+  orgId: string,
+  plan: FinmapPlan,
+  existing: FinmapExisting,
+  args: { signal?: AbortSignal; onProgress?: (done: number, total: number) => void } = {},
+): Promise<number> {
+  const accountIds = new Map<string, string>()
+  for (const a of existing.accounts) if (!accountIds.has(normKey(a.name))) accountIds.set(normKey(a.name), a.id)
+  const keys: FinmapCheckOp[] = []
+  for (const op of plan.operations) {
+    const accountId = accountIds.get(normKey(op.account))
+    if (accountId === undefined) continue
+    const toAccountId = op.toAccount === null ? null : (accountIds.get(normKey(op.toAccount)) ?? undefined)
+    if (toAccountId === undefined) continue
+    keys.push({ accountId, toAccountId, identity: op.identity, ordinal: op.ordinal })
+  }
+  const seen = await seenFlags(orgId, keys, args.signal, args.onProgress)
+  return seen.filter(Boolean).length
+}
+
 const isAbort = (e: unknown): boolean => (e as { name?: unknown } | null)?.name === 'AbortError'
 
 /** A conflict (a concurrent write changed a document the batch read) or a failed request: the same batch can be sent again. */
@@ -204,6 +254,7 @@ export async function runFinmapImport(orgId: string, args: FinmapRunArgs): Promi
     refused: { total: 0, byReason: {}, sample: [] },
     fitted: 0,
     differences: [],
+    createdAccounts: [],
     entities: { ...ZERO_ENTITIES },
     tagsDropped: 0,
   }
@@ -220,6 +271,10 @@ export async function runFinmapImport(orgId: string, args: FinmapRunArgs): Promi
     }, signal)
     result.importId = setup.importId
     result.entities = setup.created
+    result.createdAccounts = args.accounts.flatMap((a) => {
+      const id = setup.accounts[normKey(a.name)]
+      return id === undefined ? [] : [{ id, name: a.name, currency: a.currency }]
+    })
 
     const resolved = resolveOps(plan.operations, setup, args.existing)
     result.tagsDropped = resolved.tagsDropped
@@ -232,15 +287,12 @@ export async function runFinmapImport(orgId: string, args: FinmapRunArgs): Promi
       const op = plan.operations[i]
       return !newAccounts.has(normKey(op.account)) && (op.toAccount === null || !newAccounts.has(normKey(op.toAccount)))
     })
-    const seen = new Array<boolean>(ops.length).fill(false)
     const checkOf = (i: number): FinmapCheckOp => ({ accountId: ops[i].accountId, toAccountId: ops[i].toAccountId, identity: ops[i].identity, ordinal: ops[i].ordinal })
-    for (const chunk of chunkBySize(checkable, CHECK_LIMIT, CHECK_BUDGET_BYTES, (i) => jsonBytes(checkOf(i)))) {
-      throwIfAborted(signal)
-      const r = await finmapCheck(orgId, chunk.map(checkOf), signal)
-      chunk.forEach((i, j) => {
-        if (r.seen[j]) seen[i] = true
-      })
-    }
+    const flags = await seenFlags(orgId, checkable.map(checkOf), signal)
+    const seen = new Array<boolean>(ops.length).fill(false)
+    checkable.forEach((i, j) => {
+      if (flags[j]) seen[i] = true
+    })
     const seenCount = seen.filter(Boolean).length
     result.skipped += seenCount
     done += seenCount

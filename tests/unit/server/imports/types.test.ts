@@ -57,6 +57,12 @@ describe('parseImportDoc (S14b additions)', () => {
 })
 
 describe('importView (S14b)', () => {
+  it('carries the entity counts into the view, zero for an MT940 import', () => {
+    const finmap = parseImportDoc({ ...legacy(), kind: 'finmap', entities: { accounts: 2, categories: 5, counterparties: 7, tags: 1 } })!
+    expect(importView('i3', finmap).entities).toEqual({ accounts: 2, categories: 5, counterparties: 7, tags: 1 })
+    expect(importView('i4', parseImportDoc(legacy())!).entities).toEqual({ accounts: 0, categories: 0, counterparties: 0, tags: 0 })
+  })
+
   it('carries the kind of the import, MT940 for an old document', () => {
     const doc = parseImportDoc(legacy())
     expect(doc).not.toBeNull()
