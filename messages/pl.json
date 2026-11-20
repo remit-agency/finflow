@@ -628,6 +628,8 @@
       "createCounterparties": "Kontrahentów: {n}",
       "createTags": "Tagów: {n}",
       "matched": "Już są w FinFlow: kont {accounts}, kategorii {categories}, kontrahentów {counterparties}, tagów {tags}",
+      "matchedAccountsHint": "Kwoty są brane w walucie każdego istniejącego konta:",
+      "matchedAccount": "{name}: {currency}",
       "alreadyImported": "Już zaimportowano wcześniej: {n}",
       "checking": "Sprawdzam, co już zaimportowano: {done} z {total}",
       "refusedHeading": "Odrzucone wiersze: {n}",

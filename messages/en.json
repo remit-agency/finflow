@@ -628,6 +628,8 @@
       "createCounterparties": "Counterparties: {n}",
       "createTags": "Tags: {n}",
       "matched": "Already in FinFlow: accounts {accounts}, categories {categories}, counterparties {counterparties}, tags {tags}",
+      "matchedAccountsHint": "Amounts are taken in the currency of each existing account:",
+      "matchedAccount": "{name}: {currency}",
       "alreadyImported": "Already imported earlier: {n}",
       "checking": "Checking what is already imported: {done} of {total}",
       "refusedHeading": "Rows refused: {n}",

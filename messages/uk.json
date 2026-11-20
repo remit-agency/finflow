@@ -628,6 +628,8 @@
       "createCounterparties": "Контрагентів: {n}",
       "createTags": "Тегів: {n}",
       "matched": "Вже є у FinFlow: рахунків {accounts}, категорій {categories}, контрагентів {counterparties}, тегів {tags}",
+      "matchedAccountsHint": "Суми беруться у валюті кожного наявного рахунку:",
+      "matchedAccount": "{name}: {currency}",
       "alreadyImported": "Вже імпортовано раніше: {n}",
       "checking": "Перевіряю, що вже імпортовано: {done} з {total}",
       "refusedHeading": "Відхилено рядків: {n}",

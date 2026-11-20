@@ -10,6 +10,7 @@ import {
   canRun,
   companyLimitOf,
   entitiesOverLimit,
+  matchedAccountsOf,
   finmapDialogReducer,
   initialFinmapState,
   newAccountCurrencies,
@@ -165,6 +166,25 @@ describe('failed', () => {
     expect(finmapDialogReducer(s, { type: 'failed', error: { code: 'failed' } })).toBe(s)
     const chosen = choosing()
     expect(finmapDialogReducer(chosen, { type: 'failed', error: { code: 'failed' } })).toBe(chosen)
+  })
+})
+
+describe('matchedAccountsOf', () => {
+  it('lists the existing accounts the plan uses (as the account or the transfer target), with their currency, by name', () => {
+    const plan = planWith({
+      operations: [{ ...OP, account: 'Konto Alfa' }, { ...OP, kind: 'transfer', account: 'konto  beta', toAccount: 'Konto Gamma', lines: [3, 4] }],
+    })
+    const accounts = [
+      { name: 'Konto Alfa', currency: 'PLN' },
+      { name: 'Konto Beta', currency: 'EUR' },
+      { name: 'Konto Gamma', currency: 'USD' },
+      { name: 'Konto Nieużyta', currency: 'PLN' },
+    ]
+    expect(matchedAccountsOf(plan, accounts)).toEqual([
+      { name: 'Konto Alfa', currency: 'PLN' },
+      { name: 'Konto Beta', currency: 'EUR' },
+      { name: 'Konto Gamma', currency: 'USD' },
+    ])
   })
 })
 

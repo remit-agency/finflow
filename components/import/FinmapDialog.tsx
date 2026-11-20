@@ -13,6 +13,7 @@ import {
   canRun,
   finmapDialogReducer,
   initialFinmapState,
+  matchedAccountsOf,
   newAccountCurrencies,
   setupAccounts,
   type FinmapDialogState,
@@ -306,6 +307,7 @@ export function FinmapDialog({ orgId, onClose }: Props) {
         {plan && (
           <FinmapPreview
             plan={plan}
+            matchedAccounts={matchedAccountsOf(plan, accounts)}
             rowsRead={state.rowsRead}
             alreadyImported={state.alreadyImported}
             checking={state.checking}
@@ -360,6 +362,8 @@ type WarningKey = 'commentCut' | 'subcounterparty' | 'project' | 'accrualIgnored
 
 interface PreviewProps {
   plan: FinmapPlan
+  /** The accounts FinFlow already has that the plan uses, with their currency. */
+  matchedAccounts: Array<{ name: string; currency: string }>
   rowsRead: number | null
   alreadyImported: number | null
   checking: { done: number; total: number } | null
@@ -370,7 +374,7 @@ interface PreviewProps {
 }
 
 /** What the file would do, counted: nothing is written here. */
-function FinmapPreview({ plan, rowsRead, alreadyImported, checking, includePlanned, pairTransfers, locked, onOption }: PreviewProps) {
+function FinmapPreview({ plan, matchedAccounts, rowsRead, alreadyImported, checking, includePlanned, pairTransfers, locked, onOption }: PreviewProps) {
   const t = useTranslations('import.finmap')
   const { date, number } = useFormatters()
   const c = plan.counts
@@ -416,6 +420,16 @@ function FinmapPreview({ plan, rowsRead, alreadyImported, checking, includePlann
             tags: number(plan.matched.tags),
           })}
         </p>
+        {matchedAccounts.length > 0 && (
+          <div className="text-ink-muted">
+            <p>{t('matchedAccountsHint')}</p>
+            <ul className="list-inside list-disc tabular-nums">
+              {matchedAccounts.map((a) => (
+                <li key={a.name}>{t('matchedAccount', { name: a.name, currency: a.currency })}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         {alreadyImported !== null && <p className="font-medium tabular-nums">{t('alreadyImported', { n: number(alreadyImported) })}</p>}
         {checking !== null && (
           <p role="status" className="text-ink-muted tabular-nums">

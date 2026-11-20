@@ -160,6 +160,15 @@ export function companyLimitOf(plan: FinmapPlan, have: CompanyCounts): CompanyLi
   return null
 }
 
+/**
+ * The accounts of the company the plan uses (as the account or as a transfer's target), with their currency: the file has no
+ * currency of its own, so the preview shows the one each matched account has, in which its amounts are taken.
+ */
+export function matchedAccountsOf(plan: FinmapPlan, accounts: ReadonlyArray<{ name: string; currency: string }>): Array<{ name: string; currency: string }> {
+  const used = new Set(plan.operations.flatMap((op) => (op.toAccount === null ? [op.account] : [op.account, op.toAccount])).map(normKey))
+  return accounts.filter((a) => used.has(normKey(a.name))).map((a) => ({ name: a.name, currency: a.currency }))
+}
+
 /** A balance as typed: `{ok: true, minor: null}` for empty, `{ok: true, minor}` for a decimal, `{ok: false}` otherwise. */
 export type BalanceParse = { ok: true; minor: number | null } | { ok: false }
 
