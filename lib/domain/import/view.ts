@@ -4,6 +4,9 @@ import type { ImportOp, LineIssue, OpStatus, ParseIssue, RefusalReason, Statemen
 
 export type ImportStatus = 'applied' | 'undoing' | 'undone'
 
+/** `mt940`: a bank statement file (S14). `finmap`: a Finmap «Płatności» export (S14b). A document without a kind is `mt940`. */
+export type ImportKind = 'mt940' | 'finmap'
+
 /** An applied import can be undone; an undo that stopped part way (`undoing`) is undone again: it resumes from the start. */
 export function canUndo(status: ImportStatus): boolean {
   return status === 'applied' || status === 'undoing'
@@ -35,6 +38,7 @@ export interface ImportStatementRef {
 
 export interface ImportView {
   id: string
+  kind: ImportKind
   fileName: string
   createdAt: string
   accountIds: string[]

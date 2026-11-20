@@ -105,6 +105,7 @@ async function openImport(deps: ImportDeps, orgId: string, uid: string, req: Imp
   const ref = importsCol(deps.db, orgId).doc()
   const doc: ImportDoc = {
     schemaVersion: 1,
+    kind: 'mt940',
     fileName: req.fileName,
     accountIds: [],
     createdAt: Timestamp.fromDate(deps.now()),
@@ -113,6 +114,8 @@ async function openImport(deps: ImportDeps, orgId: string, uid: string, req: Imp
     counts: { created: 0, skipped: 0, refused: 0 },
     statements: [],
     fit: {},
+    fitTargets: {},
+    entities: { accounts: 0, categories: 0, counterparties: 0, tags: 0 },
     status: 'applied',
     undo: { deleted: 0, kept: 0 },
   }
