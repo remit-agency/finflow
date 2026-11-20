@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImportOp } from '@/lib/domain/import/types'
 import type { ImportStepRequest } from '@/lib/domain/import/request'
 import { parseSeriesInput } from '@/lib/domain/recurring/input'
@@ -15,6 +15,12 @@ import { makeTransfer } from '@/lib/server/ledger/transfer'
 import { verifyLedger } from '@/lib/server/ledger/verify'
 import { deleteTransaction, updateTransaction } from '@/lib/server/ledger/write'
 import { ORG, UID, balanceOf, clearFirestore, makeDeps, readDoc, seedAccount, seedCategory, seedOrg, seedTag, testDb } from './helpers'
+
+// The ledger's delete is wrapped (it calls through) so a test can change the operation between the undo's read and its delete.
+vi.mock('@/lib/server/ledger/write', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/server/ledger/write')>()
+  return { ...actual, deleteTransaction: vi.fn(actual.deleteTransaction) }
+})
 
 const db = testDb()
 const txPath = (id: string) => `organizations/${ORG}/transactions/${id}`
@@ -234,8 +240,77 @@ describe('undoStep: removes an import', () => {
     const undone = await undoStep(depsAt(T2), ORG, UID, res.importId)
     expect(undone).toEqual({ deleted: 1, kept: [], next: null, done: true })
     expect(await readDoc(db, txPath(bkId(line())))).toBeUndefined()
-    expect(await readDoc(db, seenPath(keyOf(line())))).toBeDefined()
+    // A mark whose operation is gone would make a re-import skip the line for good, so the undo removes it at its last step.
+    expect(await readDoc(db, seenPath(keyOf(line())))).toBeUndefined()
     expect(await balanceOf(db, ORG, 'a1')).toBe(0)
+  })
+
+  it('a mark is put back after a ledger refusal only while its operation is there: one deleted by someone else meanwhile leaves no mark and is not kept', async () => {
+    const deps = depsAt(T1)
+    const res = await importStep(deps, ORG, UID, step())
+    const real = await vi.importActual<typeof import('@/lib/server/ledger/write')>('@/lib/server/ledger/write')
+    vi.mocked(deleteTransaction).mockImplementationOnce(async (...args) => {
+      // Someone deletes the operation after the undo read it and before the undo deletes it.
+      await db.doc(txPath(bkId(line()))).delete()
+      return real.deleteTransaction(...args)
+    })
+
+    const undone = await undoStep(depsAt(T2), ORG, UID, res.importId)
+    expect(undone).toEqual({ deleted: 1, kept: [], next: null, done: true })
+    expect(await readDoc(db, seenPath(keyOf(line())))).toBeUndefined()
+  })
+
+  it('an operation edited between the undo read and its delete is kept as changed, and its mark stays', async () => {
+    const deps = depsAt(T1)
+    await seedCategory(db, ORG, 'k-income', 'income')
+    const res = await importStep(deps, ORG, UID, step({ operations: [line()] }))
+    const real = await vi.importActual<typeof import('@/lib/server/ledger/write')>('@/lib/server/ledger/write')
+    vi.mocked(deleteTransaction).mockImplementationOnce(async (...args) => {
+      await updateTransaction(deps.ledger, ORG, UID, bkId(line()), { categoryId: 'k-income' })
+      return real.deleteTransaction(...args)
+    })
+
+    const undone = await undoStep(depsAt(T2), ORG, UID, res.importId)
+    expect(undone).toEqual({ deleted: 0, kept: [{ id: bkId(line()), reason: 'changed' }], next: null, done: true })
+    expect(await readDoc(db, txPath(bkId(line())))).toMatchObject({ categoryId: 'k-income' })
+    expect(await readDoc(db, seenPath(keyOf(line())))).toBeDefined()
+  })
+
+  it('deleteTransaction with an expected version that is no longer the stored one is a conflict and deletes nothing', async () => {
+    const deps = depsAt(T1)
+    await seedCategory(db, ORG, 'k-income', 'income')
+    await importStep(deps, ORG, UID, step({ operations: [line()] }))
+    const before = (await db.doc(txPath(bkId(line()))).get()).updateTime
+    await updateTransaction(deps.ledger, ORG, UID, bkId(line()), { categoryId: 'k-income' })
+
+    await expect(deleteTransaction(deps.ledger, ORG, UID, bkId(line()), 'import-undo', before)).rejects.toMatchObject({ code: 'conflict' })
+    expect(await readDoc(db, txPath(bkId(line())))).toBeDefined()
+  })
+
+  it('the undo removes the marks of its operations that a person deleted, so a re-import brings all ten operations back', async () => {
+    const deps = depsAt(T1)
+    const ops = Array.from({ length: 10 }, (_, i) => line({ reference: `Q${i}`, amountMinor: 1_000 + i }))
+    const res = await importStep(deps, ORG, UID, step({ operations: ops }))
+    await deleteTransaction(deps.ledger, ORG, UID, bkId(ops[3]))
+    await deleteTransaction(deps.ledger, ORG, UID, bkId(ops[7]))
+
+    expect(await undoStep(depsAt(T2), ORG, UID, res.importId)).toMatchObject({ deleted: 8, kept: [], done: true })
+    expect(await seenCount()).toBe(0)
+
+    const again = await importStep(depsAt(T3), ORG, UID, step({ operations: ops }))
+    expect(again).toMatchObject({ created: 10, skipped: { seen: 0, bank: 0 } })
+    expect(await txCount()).toBe(10)
+  })
+
+  it('an undo waits for the step lock of each account of the import: while one is held it is already_running and deletes nothing', async () => {
+    const deps = depsAt(T1)
+    const res = await importStep(deps, ORG, UID, step())
+    await db.doc(`organizations/${ORG}/importLocks/a1`).set({ until: Date.parse(T2) + 30_000, token: 'other' })
+
+    await expect(undoStep(depsAt(T2), ORG, UID, res.importId)).rejects.toMatchObject({ code: 'already_running' })
+    expect(await txCount()).toBe(2)
+    expect(await importDoc(res.importId)).toMatchObject({ status: 'applied' })
+    expect(await readDoc(db, `organizations/${ORG}/importLocks/a1`)).toMatchObject({ token: 'other' })
   })
 
   it('a ledger refusal keeps the operation with the LedgerError code, puts its mark back, and the step continues', async () => {

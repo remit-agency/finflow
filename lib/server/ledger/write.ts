@@ -483,8 +483,13 @@ export async function updateTransaction(
   })
 }
 
-export async function deleteTransaction(deps: LedgerDeps, orgId: string, uid: string, txId: string, via?: 'import-undo'): Promise<WriteResult> {
+/**
+ * `expectVersion` (the import undo passes the version it read): a stored operation that is no longer that version is a
+ * `conflict`, so an edit made after the read is never deleted unseen.
+ */
+export async function deleteTransaction(deps: LedgerDeps, orgId: string, uid: string, txId: string, via?: 'import-undo', expectVersion?: Timestamp): Promise<WriteResult> {
   const prior = await loadPrior(deps, orgId, txId)
+  if (expectVersion !== undefined && !prior.version.isEqual(expectVersion)) throw new LedgerError('conflict')
   // S11: a planned occurrence a person deletes is marked deleted (the generator never brings it back; an undo does).
   const mark = markChangeOf(prior.tx, null)
   return commit(deps, orgId, uid, {

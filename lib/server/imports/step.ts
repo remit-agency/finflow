@@ -61,7 +61,8 @@ export async function loadAccount(deps: ImportDeps, orgId: string, accountId: st
   return account
 }
 
-async function acquire(deps: ImportDeps, ref: DocumentReference, token: string): Promise<void> {
+/** Takes the step lock of an account, or `already_running` while another holder's lease runs. */
+export async function acquire(deps: ImportDeps, ref: DocumentReference, token: string): Promise<void> {
   await deps.db.runTransaction(async (t) => {
     const snap = await t.get(ref)
     const nowMs = deps.now().getTime()
@@ -71,7 +72,8 @@ async function acquire(deps: ImportDeps, ref: DocumentReference, token: string):
   })
 }
 
-async function release(deps: ImportDeps, ref: DocumentReference, token: string): Promise<void> {
+/** Frees the step lock when it is still this holder's. */
+export async function release(deps: ImportDeps, ref: DocumentReference, token: string): Promise<void> {
   await deps.db.runTransaction(async (t) => {
     const snap = await t.get(ref)
     if (snap.data()?.token === token) t.update(ref, { until: 0, token: null })
