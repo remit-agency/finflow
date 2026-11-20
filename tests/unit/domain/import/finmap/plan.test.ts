@@ -81,7 +81,8 @@ describe('planFinmap: categories', () => {
   it('a built-in "no category" name is no category, in either case', () => {
     const plan = planFinmap(sheet(
       { category: 'Kategorie wydatków' },
-      { from: null, to: 'Konto B', category: 'KATEGORIE DOCHODÓW' },
+      // Another amount: with the same day, minute and amount these two would pair (no real category on either side).
+      { from: null, to: 'Konto B', category: 'KATEGORIE DOCHODÓW', amountMinor: 2000 },
     ), existing(), opts())
     expect(plan.operations.map((o) => o.category)).toEqual([null, null])
     expect(plan.create.categories).toEqual([])
@@ -224,5 +225,162 @@ describe('planFinmap: identity and ordinals', () => {
       ['Konto B', [4], 0],
       ['Konto A', [5], 2],
     ])
+  })
+})
+
+const EXPENSE = { from: 'Konto A', to: null, amountMinor: 500, comment: null }
+const INCOME = { from: null, to: 'Konto B', amountMinor: 500, comment: null }
+const twoAccounts = existing({
+  accounts: [{ id: 'a1', name: 'Konto A', currency: 'PLN' }, { id: 'b1', name: 'Konto B', currency: 'PLN' }],
+})
+
+describe('planFinmap: transfer pairing', () => {
+  it('an expense and an income at the same day, minute and amount on other accounts become one transfer', () => {
+    const plan = planFinmap(sheet({ ...EXPENSE, comment: 'Zakup' }, { ...INCOME, tags: ['x'] }), existing(), opts())
+    expect(plan.operations).toEqual([expect.objectContaining({
+      kind: 'transfer', status: 'actual', day: '2026-10-05', amountMinor: 500, account: 'Konto A', toAccount: 'Konto B',
+      toAmountMinor: null, category: null, counterparty: null, tags: ['x'], description: 'Zakup', accrual: null, lines: [2, 3],
+    })])
+    expect(plan.counts).toMatchObject({ rows: 2, transfer: 1, expense: 0, income: 0 })
+    expect(plan.create.accounts).toEqual(['Konto A', 'Konto B'])
+  })
+
+  it('the transfer takes the income comment when the expense has none; tags are the union in first-use order', () => {
+    const plan = planFinmap(sheet(
+      { ...EXPENSE, tags: ['a', 'b'] },
+      { ...INCOME, comment: 'Przelew', tags: ['B', 'c'] },
+    ), twoAccounts, opts())
+    expect(plan.operations[0]).toMatchObject({ description: 'Przelew', tags: ['a', 'b', 'c'] })
+  })
+
+  it('a paired transfer sits at the position of its first row in the sheet, for ordinals and order', () => {
+    const plan = planFinmap(sheet(EXPENSE, { ...EXPENSE, amountMinor: 700 }, INCOME), twoAccounts, opts())
+    expect(plan.operations.map((o) => [o.kind, o.lines])).toEqual([['transfer', [2, 4]], ['expense', [3]]])
+  })
+
+  it('the identity of a transfer is the two rows identities joined by "+", so it differs from either row alone', () => {
+    const paired = planFinmap(sheet(EXPENSE, INCOME), twoAccounts, opts())
+    const single = planFinmap(sheet(EXPENSE, INCOME), twoAccounts, opts({ pairTransfers: false }))
+    const expIdentity = ['46000.5', '500', 'expense', '', '', '', '', '']
+    const incIdentity = ['46000.5', '500', 'income', '', '', '', '', '']
+    expect(paired.operations[0].identity).toEqual([...expIdentity, '+', ...incIdentity])
+    expect(single.operations.map((o) => o.identity)).toEqual([expIdentity, incIdentity])
+  })
+
+  it('a transfer never carries an accrual: a valid period on a folded row is counted as ignored', () => {
+    const period = { from: '2026-01-01', to: '2026-03-31' }
+    const plan = planFinmap(sheet({ ...EXPENSE, period }, { ...INCOME }), twoAccounts, opts())
+    expect(plan.operations[0].accrual).toBeNull()
+    expect(plan.counts.warnings.accrualIgnored).toBe(1)
+  })
+
+  it('no pair when a side has a real category: counted in pairCandidatesLeft once per pair', () => {
+    const plan = planFinmap(sheet(
+      { ...EXPENSE, category: 'Transport' }, INCOME,
+      { ...EXPENSE, minute: 800 }, { ...INCOME, minute: 800, category: 'Dom' },
+    ), twoAccounts, opts({ pairTransfers: true }))
+    expect(plan.counts.transfer).toBe(0)
+    expect(plan.counts.pairCandidatesLeft).toBe(2)
+    expect(plan.counts).toMatchObject({ expense: 2, income: 2 })
+  })
+
+  it('no pair when a side has a counterparty, and it is counted', () => {
+    const plan = planFinmap(sheet({ ...EXPENSE, counterparty: 'Orlen' }, INCOME), twoAccounts, opts())
+    expect(plan.counts).toMatchObject({ transfer: 0, pairCandidatesLeft: 1 })
+  })
+
+  it('no pair when the group holds two expenses (and nothing is counted)', () => {
+    const plan = planFinmap(sheet(EXPENSE, { ...EXPENSE, from: 'Konto C' }, INCOME), twoAccounts, opts())
+    expect(plan.counts).toMatchObject({ transfer: 0, expense: 2, income: 1, pairCandidatesLeft: 0 })
+  })
+
+  it('no pair when both accounts are the same account (by name), and nothing is counted', () => {
+    const plan = planFinmap(sheet(EXPENSE, { ...INCOME, to: 'konto a' }), twoAccounts, opts())
+    expect(plan.counts).toMatchObject({ transfer: 0, pairCandidatesLeft: 0 })
+  })
+
+  it('no pair when the currencies differ, with or without a category (not counted)', () => {
+    const eur = existing({
+      accounts: [{ id: 'a1', name: 'Konto A', currency: 'PLN' }, { id: 'b1', name: 'Konto B', currency: 'EUR' }],
+    })
+    expect(planFinmap(sheet(EXPENSE, INCOME), eur, opts()).counts).toMatchObject({ transfer: 0, pairCandidatesLeft: 0 })
+    expect(planFinmap(sheet({ ...EXPENSE, category: 'Transport' }, INCOME), eur, opts()).counts)
+      .toMatchObject({ transfer: 0, pairCandidatesLeft: 0 })
+  })
+
+  it('a new account takes the company currency unless newAccountCurrency says otherwise', () => {
+    expect(planFinmap(sheet(EXPENSE, INCOME), existing({ companyCurrency: 'PLN' }), opts()).counts.transfer).toBe(1)
+    const oneKnown = existing({ companyCurrency: 'PLN', accounts: [{ id: 'a1', name: 'Konto A', currency: 'PLN' }] })
+    expect(planFinmap(sheet(EXPENSE, INCOME), oneKnown, opts({ newAccountCurrency: { 'konto b': 'EUR' } })).counts.transfer).toBe(0)
+    expect(planFinmap(sheet(EXPENSE, INCOME), oneKnown, opts({ newAccountCurrency: { 'konto b': 'PLN' } })).counts.transfer).toBe(1)
+  })
+
+  it('pairTransfers false: no transfer and pairCandidatesLeft is 0, even for a category case', () => {
+    const plan = planFinmap(sheet(EXPENSE, INCOME, { ...EXPENSE, minute: 800, category: 'Transport' }, { ...INCOME, minute: 800 }),
+      twoAccounts, opts({ pairTransfers: false }))
+    expect(plan.counts).toMatchObject({ transfer: 0, expense: 2, income: 2, pairCandidatesLeft: 0 })
+  })
+
+  it('planned rows are not paired', () => {
+    const plan = planFinmap(sheet({ ...EXPENSE, paymentDay: '2026-10-25' }, { ...INCOME, paymentDay: '2026-10-25' }),
+      twoAccounts, opts({ includePlanned: true }))
+    expect(plan.counts).toMatchObject({ transfer: 0, planned: 2 })
+  })
+})
+
+describe('planFinmap: determinism and totals', () => {
+  it('the same rows give the same plan', () => {
+    const rs = sheet(EXPENSE, INCOME, EXPENSE, {}, { category: 'Transport' }, { paymentDay: null })
+    expect(planFinmap(rs, twoAccounts, opts())).toEqual(planFinmap(rs, twoAccounts, opts()))
+  })
+
+  it('income + expense + 2 * transfer + refused equals the rows, for 200 seeded random sheets', () => {
+    let seed = 1
+    const rand = (): number => {
+      seed = (seed * 16807) % 2147483647
+      return seed / 2147483647
+    }
+    const pick = <T,>(xs: T[]): T => xs[Math.floor(rand() * xs.length)]
+    for (let round = 0; round < 200; round++) {
+      const n = 1 + Math.floor(rand() * 40)
+      const rs = sheet(...Array.from({ length: n }, () => ({
+        paymentDay: pick(['2026-10-05', '2026-10-05', '2026-10-06', '2026-10-25', null]),
+        minute: pick([600, 601]),
+        amountMinor: pick([1000, 1000, 2000, 0, null]),
+        from: pick(['Konto A', null]),
+        to: pick([null, 'Konto B', 'Konto A']),
+        category: pick([null, 'Transport']),
+        counterparty: pick([null, 'Orlen']),
+        tags: pick([[], ['x']]),
+        comment: pick([null, 'c']),
+      })))
+      const plan = planFinmap(rs, twoAccounts, opts({ includePlanned: rand() < 0.5, pairTransfers: rand() < 0.5 }))
+      const c = plan.counts
+      const refusedTotal = Object.values(c.refused).reduce((a, b) => a + (b ?? 0), 0)
+      expect(c.rows).toBe(n)
+      expect(c.income + c.expense + 2 * c.transfer + refusedTotal).toBe(n)
+    }
+  })
+})
+
+// One run on the owner-size scale with synthetic rows: about 40 000 rows, 700 expense+income pairs, many identical rows.
+// Prints the elapsed time; asserts counts only. Runs with FINMAP_LARGE=1.
+describe.skipIf(process.env.FINMAP_LARGE !== '1')('planFinmap at 40 000 rows', () => {
+  it('plans the rows and reports the time', () => {
+    const rs: FinmapRow[] = []
+    for (let k = 0; k < 700; k++) {
+      const day = new Date(Date.UTC(2026, 0, 1) + (k % 300) * 86400000).toISOString().slice(0, 10)
+      const common = { paymentDay: day, minute: (k * 7) % 1440, amountMinor: 100 + k, timeText: `t${k}` }
+      rs.push(row({ ...common, line: rs.length + 2, from: 'Konto A', to: null }))
+      rs.push(row({ ...common, line: rs.length + 2, from: null, to: 'Konto B' }))
+    }
+    while (rs.length < 40_000) {
+      rs.push(row({ line: rs.length + 2, paymentDay: '2026-12-01', minute: 600, amountMinor: 100 + (rs.length % 50), from: `Konto ${rs.length % 7}`, to: null, comment: 'Zakup', timeText: '46000.5' }))
+    }
+    const t0 = performance.now()
+    const plan = planFinmap(rs, twoAccounts, opts({ today: '2026-12-31' }))
+    const ms = Math.round(performance.now() - t0)
+    console.log(`planFinmap 40 000 rows: ${ms} ms (one run, synthetic rows)`)
+    expect(plan.counts).toMatchObject({ rows: 40_000, transfer: 700, expense: 38_600, income: 0 })
   })
 })

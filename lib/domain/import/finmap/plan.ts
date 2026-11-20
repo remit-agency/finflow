@@ -16,6 +16,8 @@ type RowKind = 'income' | 'expense'
 /** A row that is accepted for writing, before pairing. */
 interface Cand {
   row: FinmapRow
+  /** Position among the accepted rows, which is sheet order. */
+  pos: number
   kind: RowKind
   status: 'actual' | 'planned'
   day: string
@@ -27,6 +29,10 @@ interface Cand {
   tags: string[]
   comment: string | null
   accrual: { from: string; to: string } | null
+  /** Set on the earlier row of a transfer pair. */
+  partner: Cand | null
+  /** Set on the later row of a transfer pair: it is written inside the transfer. */
+  folded: boolean
 }
 
 /** The kind a row has by its account side: `from` only is an expense, `to` only an income; otherwise null. */
@@ -98,6 +104,82 @@ function singleOp(c: Cand, warnings: Warnings): PlannedOp {
 }
 
 /**
+ * One transfer from two rows (`first` is the earlier row in the sheet). The expense row gives the source account and the
+ * amount and the description (its comment, else the income's); the tags are the union in sheet order. Accruals and categories
+ * do not carry over, so a folded row's valid accrual is counted as ignored.
+ */
+function transferOp(first: Cand, second: Cand, warnings: Warnings): PlannedOp {
+  const exp = first.kind === 'expense' ? first : second
+  const inc = exp === first ? second : first
+  const tags: string[] = []
+  const seenTag = new Set<string>()
+  for (const t of [...first.tags, ...second.tags]) {
+    if (!seenTag.has(normKey(t))) {
+      seenTag.add(normKey(t))
+      tags.push(t)
+    }
+  }
+  if (first.accrual !== null) warnings.accrualIgnored++
+  if (second.accrual !== null) warnings.accrualIgnored++
+  return {
+    kind: 'transfer',
+    status: 'actual',
+    day: exp.day,
+    amountMinor: exp.amountMinor,
+    account: exp.account,
+    toAccount: inc.account,
+    toAmountMinor: null,
+    category: null,
+    counterparty: null,
+    tags,
+    description: cutComment(exp.comment ?? inc.comment, warnings),
+    accrual: null,
+    identity: [...finmapIdentity(exp.row), '+', ...finmapIdentity(inc.row)],
+    ordinal: 0,
+    lines: [first.row.line, second.row.line],
+  }
+}
+
+/**
+ * Pairs transfers among the actual rows. A group of the same day, minute and amount holding exactly one expense and one
+ * income on different accounts with the same currency becomes a transfer when neither side has a real category or a
+ * counterparty. Returns the number of such groups that were not paired only for those reasons (`pairCandidatesLeft`).
+ * Groups are kept in a Map in sheet order, so the result does not depend on anything but the rows.
+ */
+function pairOperations(cands: Cand[], currencyOf: (account: string) => string): number {
+  const groups = new Map<string, { expenses: Cand[]; incomes: Cand[] }>()
+  for (const c of cands) {
+    if (c.status !== 'actual') continue
+    const key = `${c.day}|${c.row.minute}|${c.amountMinor}`
+    let g = groups.get(key)
+    if (g === undefined) {
+      g = { expenses: [], incomes: [] }
+      groups.set(key, g)
+    }
+    if (c.kind === 'expense') g.expenses.push(c)
+    else g.incomes.push(c)
+  }
+  let left = 0
+  for (const { expenses, incomes } of groups.values()) {
+    if (expenses.length !== 1 || incomes.length !== 1) continue
+    const e = expenses[0]
+    const i = incomes[0]
+    if (normKey(e.account) === normKey(i.account)) continue
+    if (currencyOf(e.account) !== currencyOf(i.account)) continue
+    const plain = (c: Cand): boolean => c.category === null && c.counterparty === null
+    if (plain(e) && plain(i)) {
+      const first = e.pos < i.pos ? e : i
+      const second = first === e ? i : e
+      first.partner = second
+      second.folded = true
+    } else {
+      left++
+    }
+  }
+  return left
+}
+
+/**
  * Numbers operations that share `(account, toAccount, identity)` in the order of `ops`, from 0. `ops` is in sheet order, so
  * the same file always gives the same numbers.
  */
@@ -135,7 +217,7 @@ function namesOf(ops: PlannedOp[], existing: FinmapExisting): Pick<FinmapPlan, '
   const create: FinmapPlan['create'] = { accounts: [], categories: [], counterparties: [], tags: [] }
   const matchedKeys = { accounts: new Set<string>(), categories: new Set<string>(), counterparties: new Set<string>(), tags: new Set<string>() }
   const seen = new Set<string>()
-  const useName = (group: 'accounts' | 'counterparties' | 'tags', name: string, known: ReadonlySet<string>): void => {
+  const noteName = (group: 'accounts' | 'counterparties' | 'tags', name: string, known: ReadonlySet<string>): void => {
     const k = normKey(name)
     if (known.has(k)) {
       matchedKeys[group].add(k)
@@ -145,7 +227,7 @@ function namesOf(ops: PlannedOp[], existing: FinmapExisting): Pick<FinmapPlan, '
     }
   }
   const parentSpelling = new Map<string, string>()
-  const useCategory = (ref: CategoryRef): void => {
+  const noteCategory = (ref: CategoryRef): void => {
     const pk = catKey(ref.type, ref.parent)
     let parent = parentSpelling.get(pk)
     if (parent === undefined) {
@@ -170,11 +252,11 @@ function namesOf(ops: PlannedOp[], existing: FinmapExisting): Pick<FinmapPlan, '
   }
 
   for (const op of ops) {
-    useName('accounts', op.account, accountKeys)
-    if (op.toAccount !== null) useName('accounts', op.toAccount, accountKeys)
-    if (op.category !== null) useCategory(op.category)
-    if (op.counterparty !== null) useName('counterparties', op.counterparty, counterpartyKeys)
-    for (const tag of op.tags) useName('tags', tag, tagKeys)
+    noteName('accounts', op.account, accountKeys)
+    if (op.toAccount !== null) noteName('accounts', op.toAccount, accountKeys)
+    if (op.category !== null) noteCategory(op.category)
+    if (op.counterparty !== null) noteName('counterparties', op.counterparty, counterpartyKeys)
+    for (const tag of op.tags) noteName('tags', tag, tagKeys)
   }
   return {
     create,
@@ -231,16 +313,34 @@ export function planFinmap(rows: readonly FinmapRow[], existing: FinmapExisting,
       else warnings.accrualIgnored++
     }
     cands.push({
-      row, kind, status, day, account, amountMinor: amount, category: category.ref,
-      counterparty: row.counterparty, tags: row.tags, comment: row.comment, accrual,
+      row, pos: cands.length, kind, status, day, account, amountMinor: amount, category: category.ref,
+      counterparty: row.counterparty, tags: row.tags, comment: row.comment, accrual, partner: null, folded: false,
     })
   }
 
-  const operations = cands.map((c) => singleOp(c, warnings))
+  const currencyByKey = new Map<string, string>()
+  for (const a of existing.accounts) {
+    const k = normKey(a.name)
+    if (!currencyByKey.has(k)) currencyByKey.set(k, a.currency)
+  }
+  const currencyOf = (account: string): string => {
+    const k = normKey(account)
+    return currencyByKey.get(k) ?? options.newAccountCurrency?.[k] ?? existing.companyCurrency
+  }
+  // With pairing off, no group is looked at, so `pairCandidatesLeft` is 0.
+  const pairCandidatesLeft = options.pairTransfers ? pairOperations(cands, currencyOf) : 0
+
+  // A transfer sits at the position of its first row in the sheet (the earlier of its two rows), and the ordinals below are
+  // numbered in this order, so the same file always gives the same keys.
+  const operations: PlannedOp[] = []
+  for (const c of cands) {
+    if (c.folded) continue
+    operations.push(c.partner === null ? singleOp(c, warnings) : transferOp(c, c.partner, warnings))
+  }
   numberOrdinals(operations)
 
   const counts: FinmapCounts = {
-    rows: rows.length, income: 0, expense: 0, transfer: 0, planned: 0, pairCandidatesLeft: 0, refused, warnings,
+    rows: rows.length, income: 0, expense: 0, transfer: 0, planned: 0, pairCandidatesLeft, refused, warnings,
   }
   let from: string | null = null
   let to: string | null = null
