@@ -337,6 +337,25 @@ describe('finmapBatch', () => {
     expect((await readDoc(db, `${col(ORG, 'imports')}/${IMPORT}`))?.counts).toEqual({ created: 0, skipped: 0, refused: 0 })
   })
 
+  it('rethrows the error of a failed write, not the error of recording its totals after it', async () => {
+    // A refused operation makes the totals non-empty; the 2nd transaction (the group) and the 3rd (the totals) both fail.
+    const original = db.runTransaction.bind(db)
+    let calls = 0
+    const spy = vi.spyOn(db, 'runTransaction').mockImplementation(((fn: never, opts?: never) => {
+      calls++
+      if (calls === 2) return Promise.reject(new Error('the write failed'))
+      if (calls === 3) return Promise.reject(new Error('recording failed'))
+      return original(fn, opts)
+    }) as never)
+    try {
+      await expect(finmapBatch(depsFor(), ORG, UID, { importId: IMPORT, operations: [op(0, { day: '2026-11-02' }), op(1)] })).rejects.toThrow('the write failed')
+    } finally {
+      spy.mockRestore()
+    }
+    // The step locks were freed by the request's own finally (the 4th transaction, not mocked).
+    expect((await readDoc(db, `${col(ORG, 'importLocks')}/pln1`))?.until ?? 0).toBe(0)
+  })
+
   it('throws ledger_busy and writes nothing while the ledger is locked', async () => {
     const token = await acquireLock(makeDeps(db), ORG, 'test')
     try {

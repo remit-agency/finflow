@@ -128,8 +128,10 @@ export async function finmapBatch(deps: ImportDeps, orgId: string, uid: string, 
     try {
       await writeAll(deps, orgId, uid, req, totals)
     } finally {
-      // Recorded even when a transaction throws: the operations written so far are facts of the import.
-      await recordTotals(deps.db, importRef, totals)
+      // Recorded even when a transaction throws: the operations written so far are facts of the import. Crash window: a process
+      // that dies between a committed group and this call leaves the counts short; the operations and marks are complete, and
+      // undo reads only those (never `counts`).
+      await recordTotalsOrLog(deps.db, importRef, totals)
     }
   } finally {
     await releaseAll(deps, lockRefs, token)
@@ -399,6 +401,18 @@ async function recordTotals(db: Firestore, ref: DocumentReference, totals: Total
     if (doc !== null && totals.days.length > 0) update.period = widenPeriod(doc.period, totals.days)
     t.update(ref, update)
   })
+}
+
+/**
+ * `recordTotals` from a `finally`: a throw there would replace the error of the write that failed, so the failure is logged
+ * (its error name only, never a name of an entity) and the original outcome stands.
+ */
+async function recordTotalsOrLog(db: Firestore, ref: DocumentReference, totals: Totals): Promise<void> {
+  try {
+    await recordTotals(db, ref, totals)
+  } catch (e) {
+    console.error('finmap batch: the totals were not recorded', { name: (e as Error | undefined)?.name })
+  }
 }
 
 /** The period widened to the earliest and latest of the days (YYYY-MM-DD compares as text). */
