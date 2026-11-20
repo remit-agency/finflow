@@ -6,7 +6,7 @@ import { finmapCheck } from './check'
 import { finmapFinish } from './finish'
 import { finmapSetup } from './setup'
 
-/** The Finmap import services bound to production (S14b): entity setup, the duplicate check, the batch writer and the balance fit. Undo comes later. */
+/** The Finmap import services bound to production (S14b): entity setup, the duplicate check, the batch writer and the balance fit. The undo is `imports.undoStep`, which dispatches on the import's kind. */
 export const finmap = {
   setup: (orgId: string, uid: string, req: FinmapSetupRequest) => finmapSetup(importDeps(), orgId, uid, req),
   check: (orgId: string, req: FinmapCheckRequest) => finmapCheck(importDeps(), orgId, req.operations),

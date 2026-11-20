@@ -80,6 +80,22 @@ export async function release(deps: ImportDeps, ref: DocumentReference, token: s
   })
 }
 
+/** Holds the step lock of each account (taken in a stable order, released in `finally`); `already_running` propagates. */
+export async function withAccountLocks<T>(deps: ImportDeps, orgId: string, accountIds: readonly string[], run: () => Promise<T>): Promise<T> {
+  const held: Array<{ ref: DocumentReference; token: string }> = []
+  try {
+    for (const accountId of [...new Set(accountIds)].sort()) {
+      const ref = importLocksCol(deps.db, orgId).doc(accountId)
+      const token = randomUUID()
+      await acquire(deps, ref, token)
+      held.push({ ref, token })
+    }
+    return await run()
+  } finally {
+    for (const { ref, token } of held.reverse()) await release(deps, ref, token)
+  }
+}
+
 async function runStep(deps: ImportDeps, orgId: string, uid: string, account: LedgerAccount, req: ImportStepRequest): Promise<ImportStepResult> {
   const { ref, importId, doc } = await openImport(deps, orgId, uid, req)
   const totals: Totals = { created: 0, seen: 0, bank: 0, refused: [] }

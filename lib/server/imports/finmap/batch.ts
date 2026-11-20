@@ -1,7 +1,7 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { FieldValue, Timestamp, type CollectionReference, type DocumentReference, type DocumentSnapshot, type Firestore } from 'firebase-admin/firestore'
-import { splitByWriteBudget } from '@/lib/domain/import/finmap/budget'
+import { footprintOf, splitByWriteBudget } from '@/lib/domain/import/finmap/budget'
 import type { BatchOp, FinmapBatchRequest } from '@/lib/domain/import/finmap/request'
 import { attachFx, buildTransaction, fxPlan, type FxRequest } from '@/lib/domain/ledger/build'
 import { changeSet, combineChanges, type ChangeSet } from '@/lib/domain/ledger/change'
@@ -301,7 +301,7 @@ async function buildOne(
   const tx: LedgerTransaction = { ...withExcluded(attachFx(base, plan, evidence.map(evidenceOf)), excludedFromTags(o.tagIds, flags)), importId }
 
   const change = changeSet(null, tx, ctx.baseCurrency)
-  const docs = [...Object.keys(change.balanceDeltas).map((id) => `accounts/${id}`), ...[...change.rollupDeltas.keys()].map((id) => `rollups/${id}`)]
+  const docs = footprintOf(change)
   const refs = [
     `accounts/${o.accountId}`,
     ...(o.toAccountId === null ? [] : [`accounts/${o.toAccountId}`]),

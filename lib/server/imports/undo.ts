@@ -1,5 +1,4 @@
 import 'server-only'
-import { randomUUID } from 'node:crypto'
 import { FieldPath, FieldValue, Timestamp, type DocumentReference } from 'firebase-admin/firestore'
 import type { UndoResult } from '@/lib/domain/import/view'
 import { BANK_CLIENT_ID_PREFIX } from '@/lib/domain/ledger/input'
@@ -9,8 +8,9 @@ import { transactionsCol } from '@/lib/server/ledger/paths'
 import { deleteTransaction } from '@/lib/server/ledger/write'
 import type { ImportDeps } from './deps'
 import { ImportError } from './errors'
-import { importLocksCol, importsCol } from './paths'
-import { acquire, release } from './step'
+import { undoFinmapStep } from './finmap/undo'
+import { importsCol } from './paths'
+import { withAccountLocks } from './step'
 import { parseImportDoc, type ImportDoc } from './types'
 
 /** Operations deleted per undo step (S14): one step is one request, so it stays well inside the time limit. */
@@ -27,29 +27,15 @@ export type { UndoResult }
  * an operation without a mark, which the next undo finds again. A ledger refusal puts the mark back and keeps the operation,
  * unless the refusal is `not_found`: someone deleted it meanwhile, so it is neither deleted nor kept. The step lock of every
  * account of the import is held for the step, so a write step of the import cannot run beside it. The last step removes the
- * marks left without an operation (a person deleted it) and marks the import `undone`. Safe to repeat.
+ * marks left without an operation (a person deleted it) and marks the import `undone`. Safe to repeat. A Finmap import (`kind`
+ * `finmap`) is undone by `undoFinmapStep` (batched by the write budget), with the same result.
  */
 export async function undoStep(deps: ImportDeps, orgId: string, uid: string, importId: string, cursor?: string): Promise<UndoResult> {
   const ref = importsCol(deps.db, orgId).doc(importId)
   const doc = await readImport(ref)
   if (doc.status === 'undone') return { deleted: 0, kept: [], next: null, done: true }
+  if (doc.kind === 'finmap') return undoFinmapStep(deps, orgId, uid, importId, cursor)
   return withAccountLocks(deps, orgId, doc.accountIds, () => undoPage(deps, orgId, uid, importId, ref, doc.status, cursor))
-}
-
-/** Holds the step lock of each account (taken in a stable order, released in `finally`); `already_running` propagates. */
-async function withAccountLocks<T>(deps: ImportDeps, orgId: string, accountIds: readonly string[], run: () => Promise<T>): Promise<T> {
-  const held: Array<{ ref: DocumentReference; token: string }> = []
-  try {
-    for (const accountId of [...new Set(accountIds)].sort()) {
-      const ref = importLocksCol(deps.db, orgId).doc(accountId)
-      const token = randomUUID()
-      await acquire(deps, ref, token)
-      held.push({ ref, token })
-    }
-    return await run()
-  } finally {
-    for (const { ref, token } of held.reverse()) await release(deps, ref, token)
-  }
 }
 
 async function undoPage(deps: ImportDeps, orgId: string, uid: string, importId: string, ref: DocumentReference, status: ImportDoc['status'], cursor: string | undefined): Promise<UndoResult> {

@@ -1,8 +1,14 @@
+import type { ChangeSet } from '@/lib/domain/ledger/change'
 import { WRITE_BUDGET } from './types'
 
 /** What one operation adds to a transaction: the documents its change touches (`accounts/{id}`, `rollups/{id}`). */
 export interface OpFootprint {
   docs: readonly string[]
+}
+
+/** The documents a change set writes (`accounts/{id}` for each balance, `rollups/{id}` for each rollup): the footprint of a change. */
+export function footprintOf(change: ChangeSet): string[] {
+  return [...Object.keys(change.balanceDeltas).map((id) => `accounts/${id}`), ...[...change.rollupDeltas.keys()].map((id) => `rollups/${id}`)]
 }
 
 /**
