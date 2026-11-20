@@ -20,6 +20,7 @@ import {
   type FinmapEvent,
   type NewAccountSetting,
 } from '@/lib/domain/import/finmap/state'
+import { batchRefusalTextKey, stopTextKey } from '@/lib/domain/import/finmap/codes'
 import { parseFinmapTable } from '@/lib/domain/import/finmap/rows'
 import { readXlsxTable } from '@/lib/domain/import/finmap/xlsx'
 import {
@@ -65,7 +66,6 @@ const planOptions = (state: State, today: string): FinmapOptions => ({
 
 /** The refusal reasons, in the order the preview lists them. */
 const FINMAP_REFUSALS: readonly FinmapRefusal[] = ['date', 'amount', 'account', 'name', 'planned_off', 'accrual_after_horizon']
-const isRefusal = (reason: string): reason is FinmapRefusal => (FINMAP_REFUSALS as readonly string[]).includes(reason)
 
 /** The Polish header names of the columns a file must have: the file's own text, shown so the user can find them. */
 const REQUIRED_COLUMN_KEYS: Partial<Record<ColumnKey, 'columns.paymentDate' | 'columns.amountAccount' | 'columns.from' | 'columns.to'>> = {
@@ -500,7 +500,7 @@ function FinmapResultBlock({ result, plan, accounts, stopped }: ResultProps) {
       <h3 className="font-medium">{t('resultHeading')}</h3>
       {stoppedBy !== null && stopped !== null && (
         <p role="alert" className="rounded-control bg-expense-soft px-3 py-2 text-expense">
-          {stoppedBy === 'busy' ? t('error.busy') : t('error.stopped')}
+          {stoppedBy === 'busy' ? t('error.busy') : `${t(stopTextKey(result.error ?? ''), { code: result.error ?? '' })} ${t('error.stopped')}`}
         </p>
       )}
       <ul className="tabular-nums">
@@ -523,7 +523,7 @@ function FinmapResultBlock({ result, plan, accounts, stopped }: ResultProps) {
         <ul className="list-inside list-disc text-ink-muted tabular-nums">
           {refusedReasons.map(([reason, n]) => (
             <li key={reason}>
-              {isRefusal(reason) ? t(`refusal.${reason}`) : reason}: {number(n)}
+              {t(batchRefusalTextKey(reason), { code: reason })}: {number(n)}
             </li>
           ))}
         </ul>

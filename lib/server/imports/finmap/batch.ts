@@ -2,11 +2,12 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { FieldValue, Timestamp, type CollectionReference, type DocumentReference, type DocumentSnapshot, type Firestore } from 'firebase-admin/firestore'
 import { footprintOf, splitByWriteBudget } from '@/lib/domain/import/finmap/budget'
+import type { BatchRefusalReason } from '@/lib/domain/import/finmap/codes'
 import type { BatchOp, FinmapBatchRequest } from '@/lib/domain/import/finmap/request'
 import { attachFx, buildTransaction, fxPlan, type FxRequest } from '@/lib/domain/ledger/build'
 import { changeSet, combineChanges, type ChangeSet } from '@/lib/domain/ledger/change'
 import { parseAccount } from '@/lib/domain/ledger/doc'
-import { LedgerError, type LedgerErrorCode } from '@/lib/domain/ledger/errors'
+import { LedgerError } from '@/lib/domain/ledger/errors'
 import { parseTransactionInput } from '@/lib/domain/ledger/input'
 import type { LedgerAccount, LedgerTransaction } from '@/lib/domain/ledger/types'
 import { excludedFromTags, tagFlagsOf, withExcluded, type TagFlags } from '@/lib/domain/tags/exclude'
@@ -23,12 +24,6 @@ import { importLocksCol, importsCol } from '../paths'
 import { acquireAll, releaseAll } from '../step'
 import { parseImportDoc, type ImportDoc } from '../types'
 import { finmapKey, finmapTxId } from './key'
-
-/**
- * Why one operation of a batch was not written: a ledger code (the ledger's own refusal), the batch's duplicate-key rule, or
- * `rate_unavailable` (no NBP rate exists for the operation's day: a permanent answer, unlike a provider outage, which fails the request).
- */
-export type BatchRefusalReason = LedgerErrorCode | 'duplicate_key' | 'rate_unavailable'
 
 export interface FinmapBatchRefusal {
   index: number
