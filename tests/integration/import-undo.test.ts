@@ -92,6 +92,8 @@ describe('listImports: the imports of the company', () => {
       accountIds: ['a1'],
       period: { from: '2026-10-20', to: '2026-10-21' },
       counts: { created: 1, skipped: 0, refused: 0 },
+      // An MT940 import creates no entities: the view carries four zero counts.
+      entities: { accounts: 0, categories: 0, counterparties: 0, tags: 0 },
       statements: [{ source: 'PL61109010140000071219812874', accountId: 'a1', from: '2026-10-20', to: '2026-10-21' }],
       status: 'applied',
       undo: { deleted: 0, kept: 0 },
