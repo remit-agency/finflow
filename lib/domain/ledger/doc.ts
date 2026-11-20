@@ -59,24 +59,26 @@ function parseAutoRules(v: unknown): AutoRuleRef[] | undefined {
 }
 
 /**
- * A bank block (`bank` of an operation, `bank` of a bank mark, `bankTo` without its key): `accountRef` and the optional
- * strings; null when it is not one. The one reader of that shape (S09, S10b).
+ * A bank block (`bank` of an operation, `bank` of a bank mark, `bankTo` without its key): one of `accountRef` (a bank
+ * account, S09) and `importId` (a statement file, S14), and the optional strings; null when it is neither. The one
+ * reader of that shape (S09, S10b, S14).
  */
 export function parseBankInfo(v: unknown): BankInfo | null {
-  if (!isRecord(v) || typeof v.accountRef !== 'string') return null
-  const bank: BankInfo = { accountRef: v.accountRef }
-  for (const key of ['entryReference', 'counterpartyName', 'remittance'] as const) {
+  if (!isRecord(v)) return null
+  const bank: BankInfo = {}
+  for (const key of ['accountRef', 'importId', 'entryReference', 'counterpartyName', 'remittance'] as const) {
     const value = v[key]
     if (typeof value === 'string') bank[key] = value
   }
-  return bank
+  return bank.accountRef === undefined && bank.importId === undefined ? null : bank
 }
 
 function bankInfoToDoc(b: BankInfo): Record<string, string> {
-  const doc: Record<string, string> = { accountRef: b.accountRef }
-  if (b.entryReference !== undefined) doc.entryReference = b.entryReference
-  if (b.counterpartyName !== undefined) doc.counterpartyName = b.counterpartyName
-  if (b.remittance !== undefined) doc.remittance = b.remittance
+  const doc: Record<string, string> = {}
+  for (const key of ['accountRef', 'importId', 'entryReference', 'counterpartyName', 'remittance'] as const) {
+    const value = b[key]
+    if (value !== undefined) doc[key] = value
+  }
   return doc
 }
 

@@ -2,7 +2,7 @@
 
 import { can, type Action, type Role } from '@/lib/shell/permissions'
 
-export type SettingsSection = 'company' | 'language' | 'categories' | 'counterparties' | 'tags' | 'banks' | 'subscription'
+export type SettingsSection = 'company' | 'language' | 'categories' | 'counterparties' | 'tags' | 'banks' | 'imports' | 'subscription'
 
 // The label of a section is `t('shell.settingsSections.<slug>')`.
 export const SETTINGS_SECTIONS: ReadonlyArray<{ slug: SettingsSection }> = [
@@ -12,6 +12,7 @@ export const SETTINGS_SECTIONS: ReadonlyArray<{ slug: SettingsSection }> = [
   { slug: 'counterparties' },
   { slug: 'tags' },
   { slug: 'banks' },
+  { slug: 'imports' },
   { slug: 'subscription' },
 ]
 
@@ -56,6 +57,7 @@ export function settingsIndexRedirect(orgId: string, query: Query): string {
 
 const REQUIRED_ACTION: Partial<Record<SettingsSection, Action>> = {
   banks: 'bank.manage',
+  imports: 'data.write',
   subscription: 'subscription.view',
 }
 

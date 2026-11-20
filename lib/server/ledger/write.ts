@@ -14,7 +14,7 @@ import { doneToDoc, parseDone } from '@/lib/domain/recurring/doc'
 import { parsePlanId, planId } from '@/lib/domain/recurring/plan'
 import type { DoneReason } from '@/lib/domain/recurring/types'
 import type { RateSnapshot } from '@/lib/server/fx/types'
-import { auditData, type AuditAction } from './audit'
+import { auditData, type AuditAction, type AuditMeta } from './audit'
 import type { LedgerDeps } from './deps'
 import { assertUnlocked } from './lock'
 import { accountsCol, auditCol, categoriesCol, counterpartiesCol, orgRef, recurringDoneCol, rollupsCol, tagsCol, transactionsCol } from './paths'
@@ -54,8 +54,8 @@ interface Job {
   txId: string
   prior: { tx: LedgerTransaction; version: Timestamp } | null
   next: Prepared | null
-  /** Set when the rules made the change (S10): the audit entry records it. */
-  via?: 'rule'
+  /** Set when the rules made the change (S10) or a statement import undo deletes (S14): the audit entry records it. */
+  via?: AuditMeta['via']
   /** Set when the write restores a previous state (WriteExtras.restore): archived tags of the new state are accepted. */
   restore?: boolean
   /** The bank keys whose sides a create brings back (S10b): each must be free when the create is written. */
@@ -483,11 +483,23 @@ export async function updateTransaction(
   })
 }
 
-export async function deleteTransaction(deps: LedgerDeps, orgId: string, uid: string, txId: string): Promise<WriteResult> {
+/**
+ * `expectVersion` (the import undo passes the version it read): a stored operation that is no longer that version is a
+ * `conflict`, so an edit made after the read is never deleted unseen.
+ */
+export async function deleteTransaction(deps: LedgerDeps, orgId: string, uid: string, txId: string, via?: 'import-undo', expectVersion?: Timestamp): Promise<WriteResult> {
   const prior = await loadPrior(deps, orgId, txId)
+  if (expectVersion !== undefined && !prior.version.isEqual(expectVersion)) throw new LedgerError('conflict')
   // S11: a planned occurrence a person deletes is marked deleted (the generator never brings it back; an undo does).
   const mark = markChangeOf(prior.tx, null)
-  return commit(deps, orgId, uid, { action: 'tx.delete', txId, prior, next: null, planMark: mark === null ? undefined : { change: mark } })
+  return commit(deps, orgId, uid, {
+    action: 'tx.delete',
+    txId,
+    prior,
+    next: null,
+    planMark: mark === null ? undefined : { change: mark },
+    via,
+  })
 }
 
 /**

@@ -41,10 +41,12 @@ export interface Base {
   accrual: number
 }
 
-/** Where an operation imported from a bank came from (S09). Absent on a manual operation. */
+/** Where an operation imported from a bank came from (S09, S14). Absent on a manual operation. */
 export interface BankInfo {
-  /** Id of the `bankAccounts` document the operation was imported through. */
-  accountRef: string
+  /** Id of the `bankAccounts` document the operation was imported through (S09). Exactly one of `accountRef` and `importId` is set. */
+  accountRef?: string
+  /** Id of the `imports` document of a statement file the operation came from (S14). */
+  importId?: string
   entryReference?: string
   /** The other party as the bank names it (not a FinFlow counterparty). */
   counterpartyName?: string
