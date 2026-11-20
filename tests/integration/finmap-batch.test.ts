@@ -176,7 +176,14 @@ describe('finmapBatch', () => {
     for (const o of ops) {
       const key = keyOf(o)
       // The create of a Finmap id needs the mark the batch writes with the operation (its import link comes from it).
-      await db.doc(`${col(ORG2, 'bankSeen')}/${key}`).set({ txId: finmapTxId(key), at: NOW.toISOString(), importId: IMPORT, kind: 'finmap' })
+      // The mark as the batch writes it, snapshot included (the create checks the body against it).
+      await db.doc(`${col(ORG2, 'bankSeen')}/${key}`).set({
+        txId: finmapTxId(key),
+        at: NOW.toISOString(),
+        importId: IMPORT,
+        kind: 'finmap',
+        snapshot: { type: o.kind, accountId: o.accountId, amountMinor: o.amountMinor, paymentDate: o.day },
+      })
       await createTransaction(ledger2, ORG2, UID, parseTransactionInput(singleBody(o, key), { internal: true }))
     }
 
