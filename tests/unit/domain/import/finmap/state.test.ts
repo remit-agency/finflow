@@ -223,6 +223,16 @@ describe('accountChanged', () => {
     expect(accountSettingOf(s, 'Konto Nowe')).toEqual({ type: 'bank', currency: 'USD', balanceText: '12,50' })
   })
 
+  it('stores a type or a balance without planning again: only the currency takes part in the plan', () => {
+    const s = choosing(planWithNew())
+    const typed = finmapDialogReducer(s, { type: 'accountChanged', name: 'Konto Nowe', patch: { type: 'card' } })
+    expect(typed.phase).toBe('choosing')
+    expect(typed.plan).toBe(s.plan)
+    const balanced = finmapDialogReducer(typed, { type: 'accountChanged', name: 'Konto Nowe', patch: { balanceText: '1' } })
+    expect(balanced.phase).toBe('choosing')
+    expect(accountSettingOf(balanced, 'Konto Nowe')).toEqual({ type: 'card', currency: 'PLN', balanceText: '1' })
+  })
+
   it('finds the setting of a name that differs only in case or spacing', () => {
     const s = finmapDialogReducer(choosing(planWithNew()), { type: 'accountChanged', name: 'Konto Nowe', patch: { type: 'cash' } })
     expect(accountSettingOf(s, 'konto  nowe').type).toBe('cash')
@@ -296,7 +306,7 @@ describe('runStarted', () => {
 
   it('does nothing when a new account has a balance that is not a number', () => {
     const plan = planWith({ create: { accounts: ['Konto Nowe'], categories: [], counterparties: [], tags: [] } })
-    const s = step(choosing(plan), { type: 'accountChanged', name: 'Konto Nowe', patch: { balanceText: 'abc' } }, { type: 'planned', plan })
+    const s = step(choosing(plan), { type: 'accountChanged', name: 'Konto Nowe', patch: { balanceText: 'abc' } })
     expect(s.phase).toBe('choosing')
     expect(finmapDialogReducer(s, { type: 'runStarted' })).toBe(s)
   })
@@ -364,19 +374,20 @@ describe('canRun', () => {
 
   it('is true when every new account has an empty or valid balance', () => {
     const plan = planWith({ create: { accounts: ['Konto A', 'Konto B'], categories: [], counterparties: [], tags: [] } })
-    const s = step(choosing(plan), { type: 'accountChanged', name: 'Konto A', patch: { balanceText: '' } }, { type: 'accountChanged', name: 'Konto B', patch: { balanceText: '-1,5' } }, { type: 'planned', plan })
+    const s = step(choosing(plan), { type: 'accountChanged', name: 'Konto A', patch: { balanceText: '' } }, { type: 'accountChanged', name: 'Konto B', patch: { balanceText: '-1,5' } })
     expect(canRun(s)).toBe(true)
   })
 
   it('is false when a new account has a balance that is not a decimal', () => {
     const plan = planWith({ create: { accounts: ['Konto A'], categories: [], counterparties: [], tags: [] } })
-    const s = step(choosing(plan), { type: 'accountChanged', name: 'Konto A', patch: { balanceText: '1,234' } }, { type: 'planned', plan })
+    const s = step(choosing(plan), { type: 'accountChanged', name: 'Konto A', patch: { balanceText: '1,234' } })
     expect(canRun(s)).toBe(false)
   })
 
   it('ignores a balance text of an account that is no longer new', () => {
     const planNew = planWith({ create: { accounts: ['Konto A'], categories: [], counterparties: [], tags: [] } })
-    const s = step(choosing(planNew), { type: 'accountChanged', name: 'Konto A', patch: { balanceText: 'bad' } }, { type: 'planned', plan: planWith() })
+    const s = step(choosing(planNew), { type: 'accountChanged', name: 'Konto A', patch: { balanceText: 'bad' } }, { type: 'accountChanged', name: 'Konto A', patch: { currency: 'EUR' } }, { type: 'planned', plan: planWith() })
+    expect(s.phase).toBe('choosing')
     expect(canRun(s)).toBe(true)
   })
 

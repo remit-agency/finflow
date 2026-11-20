@@ -181,13 +181,19 @@ export function FinmapDialog({ orgId, onClose }: Props) {
     await planAfterPaint(initialFinmapState<FinmapResult>(companyCurrency), gen)
   }
 
-  /** A switch or a new account's setting changed: the phase moves to planning and the plan is derived again. */
-  const replan = (change: Event) => {
-    const next = reduce(state, change)
-    if (next.phase !== 'planning') return
+  /**
+   * A switch or a new account's setting changed. The reducer says whether the plan is derived again (a switch, or a currency): then the
+   * phase moves to planning and the plan follows after the paint; any other change (a type, a balance) is only stored.
+   */
+  const change = (event: Event) => {
+    const next = reduce(state, event)
+    if (next.phase !== 'planning') {
+      dispatch(event)
+      return
+    }
     const gen = ++generation.current
     checkAbort.current?.abort()
-    dispatch(change)
+    dispatch(event)
     void planAfterPaint(next, gen)
   }
 
@@ -290,7 +296,7 @@ export function FinmapDialog({ orgId, onClose }: Props) {
             includePlanned={state.includePlanned}
             pairTransfers={state.pairTransfers}
             locked={switchesLocked}
-            onOption={(patch) => replan({ type: 'optionChanged', ...patch })}
+            onOption={(patch) => change({ type: 'optionChanged', ...patch })}
           />
         )}
 
@@ -299,7 +305,7 @@ export function FinmapDialog({ orgId, onClose }: Props) {
             names={plan.create.accounts}
             settingOf={(name) => accountSettingOf(state, name)}
             disabled={switchesLocked}
-            onChange={(name, patch: Partial<NewAccountSetting>) => replan({ type: 'accountChanged', name, patch })}
+            onChange={(name, patch: Partial<NewAccountSetting>) => change({ type: 'accountChanged', name, patch })}
           />
         )}
 

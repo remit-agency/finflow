@@ -205,8 +205,12 @@ export function finmapDialogReducer<R extends FinmapRunResult>(state: FinmapDial
       }
     case 'accountChanged': {
       if (state.phase !== 'choosing') return state
+      const before = accountSettingOf(state, event.name)
+      const after = { ...before, ...event.patch }
       const accounts = new Map(state.accounts)
-      accounts.set(normKey(event.name), { ...accountSettingOf(state, event.name), ...event.patch })
+      accounts.set(normKey(event.name), after)
+      // Only the currency takes part in the plan (transfer pairing reads it): a type or a balance is stored without planning again.
+      if (after.currency === before.currency) return { ...state, accounts }
       return { ...state, phase: 'planning', accounts, checking: null, alreadyImported: null, error: null }
     }
     case 'checkProgress':
