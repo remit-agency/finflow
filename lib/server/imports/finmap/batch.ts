@@ -21,7 +21,7 @@ import type { ImportDeps } from '../deps'
 import { ImportError } from '../errors'
 import { importLocksCol, importsCol } from '../paths'
 import { acquire, release } from '../step'
-import { parseImportDoc } from '../types'
+import { parseImportDoc, type ImportDoc } from '../types'
 import { finmapKey, finmapTxId } from './key'
 
 /** Why one operation of a batch was not written: a ledger code (the ledger's own refusal), or the batch's duplicate-key rule. */
@@ -70,12 +70,15 @@ interface Totals {
   skipped: number
   refused: FinmapBatchRefusal[]
   accountIds: Set<string>
+  /** The payment days of the operations created: the import's period widens to cover them. */
+  days: string[]
 }
 
 interface GroupResult {
   created: number
   skipped: number
   accountIds: string[]
+  days: string[]
 }
 
 const refusal = (index: number, reason: BatchRefusalReason, field?: string): FinmapBatchRefusal =>
@@ -115,7 +118,7 @@ export async function finmapBatch(deps: ImportDeps, orgId: string, uid: string, 
   const importRef = await openFinmapImport(deps, orgId, req.importId)
   const accountIds = [...new Set(req.operations.flatMap((o) => (o.toAccountId === null ? [o.accountId] : [o.accountId, o.toAccountId])))].sort()
   const held: Array<{ ref: DocumentReference; token: string }> = []
-  const totals: Totals = { created: 0, skipped: 0, refused: [], accountIds: new Set() }
+  const totals: Totals = { created: 0, skipped: 0, refused: [], accountIds: new Set(), days: [] }
   try {
     for (const id of accountIds) {
       const ref = importLocksCol(deps.db, orgId).doc(id)
@@ -127,7 +130,7 @@ export async function finmapBatch(deps: ImportDeps, orgId: string, uid: string, 
       await writeAll(deps, orgId, uid, req, totals)
     } finally {
       // Recorded even when a transaction throws: the operations written so far are facts of the import.
-      await recordTotals(importRef, totals)
+      await recordTotals(deps.db, importRef, totals)
     }
   } finally {
     for (const h of held.reverse()) await release(deps, h.ref, h.token)
@@ -152,6 +155,7 @@ async function writeAll(deps: ImportDeps, orgId: string, uid: string, req: Finma
     totals.created += r.created
     totals.skipped += r.skipped
     for (const id of r.accountIds) totals.accountIds.add(id)
+    totals.days.push(...r.days)
   }
 }
 
@@ -286,7 +290,7 @@ async function buildOne(
   let base: LedgerTransaction
   let plan: FxRequest[]
   try {
-    const input = parseTransactionInput(bodyOf(o, key), { internal: true })
+    const input = parseTransactionInput(bodyOf(o, key), { internal: true, finmap: true })
     base = buildTransaction(finmapTxId(key), input, { today: ctx.today, account, toAccount, category, baseCurrency: ctx.baseCurrency })
     plan = fxPlan(base, ctx.baseCurrency, ctx.today)
   } catch (e) {
@@ -329,7 +333,7 @@ async function writeGroup(deps: ImportDeps, orgId: string, uid: string, ctx: Con
       const marks = await t.getAll(...group.map((b) => bankSeenCol(db, orgId).doc(b.key)))
       const fresh = group.filter((_, i) => !marks[i].exists)
       const skipped = group.length - fresh.length
-      if (fresh.length === 0) return { created: 0, skipped, accountIds: [] }
+      if (fresh.length === 0) return { created: 0, skipped, accountIds: [], days: [] }
 
       const ts = Timestamp.fromDate(deps.now())
       applyChange(t, db, orgId, combineChanges(...fresh.map((b) => b.change)), ts)
@@ -345,7 +349,7 @@ async function writeGroup(deps: ImportDeps, orgId: string, uid: string, ctx: Con
       }
       t.create(auditCol(db, orgId).doc(), auditData(deps, 'import.batch', uid, importId, null, { importId, created: fresh.length }, { via: 'import' }))
       const accountIds = [...new Set(fresh.flatMap((b) => [b.tx.accountId, ...(b.tx.toAccountId === undefined ? [] : [b.tx.toAccountId])]))]
-      return { created: fresh.length, skipped, accountIds }
+      return { created: fresh.length, skipped, accountIds, days: fresh.map((b) => b.tx.paymentDate) }
     })
   } catch (e) {
     if (isAlreadyExists(e)) throw new LedgerError('conflict')
@@ -359,13 +363,33 @@ function isAlreadyExists(e: unknown): boolean {
   return code === 6 || code === 'already-exists'
 }
 
-/** The batch's totals on the import document, also when a transaction failed (what was written is a fact of the import). */
-async function recordTotals(ref: DocumentReference, totals: Totals): Promise<void> {
-  const update: Record<string, unknown> = {
-    'counts.created': FieldValue.increment(totals.created),
-    'counts.skipped': FieldValue.increment(totals.skipped),
-    'counts.refused': FieldValue.increment(totals.refused.length),
+/**
+ * The batch's totals on the import document, also when a transaction failed (what was written is a fact of the import). One
+ * transaction reads the document and widens its period (`null` at first) to the days created, so two batches racing on one
+ * import cannot lose a day; the counts are increments.
+ */
+async function recordTotals(db: Firestore, ref: DocumentReference, totals: Totals): Promise<void> {
+  if (totals.created === 0 && totals.skipped === 0 && totals.refused.length === 0) return
+  await db.runTransaction(async (t) => {
+    const doc = parseImportDoc((await t.get(ref)).data())
+    const update: Record<string, unknown> = {
+      'counts.created': FieldValue.increment(totals.created),
+      'counts.skipped': FieldValue.increment(totals.skipped),
+      'counts.refused': FieldValue.increment(totals.refused.length),
+    }
+    if (totals.accountIds.size > 0) update.accountIds = FieldValue.arrayUnion(...Array.from(totals.accountIds))
+    if (doc !== null && totals.days.length > 0) update.period = widenPeriod(doc.period, totals.days)
+    t.update(ref, update)
+  })
+}
+
+/** The period widened to the earliest and latest of the days (YYYY-MM-DD compares as text). */
+function widenPeriod(period: ImportDoc['period'], days: readonly string[]): ImportDoc['period'] {
+  let from = period.from
+  let to = period.to
+  for (const d of days) {
+    if (from === null || d < from) from = d
+    if (to === null || d > to) to = d
   }
-  if (totals.accountIds.size > 0) update.accountIds = FieldValue.arrayUnion(...Array.from(totals.accountIds))
-  await ref.update(update)
+  return { from, to }
 }

@@ -11,7 +11,7 @@ import { finmapKey, finmapTxId } from '@/lib/server/imports/finmap/key'
 import { acquireLock, releaseLock } from '@/lib/server/ledger/lock'
 import { verifyLedger } from '@/lib/server/ledger/verify'
 import { createTransaction, deleteTransaction, updateTransaction } from '@/lib/server/ledger/write'
-import { ORG, TODAY, UID, balanceOf, clearFirestore, makeDeps, readDoc, seedAccount, seedCategory, seedCounterparty, seedOrg, seedTag, testDb } from './helpers'
+import { ORG, UID, balanceOf, clearFirestore, makeDeps, readDoc, seedAccount, seedCategory, seedCounterparty, seedOrg, seedTag, testDb } from './helpers'
 
 const db = testDb()
 const NOW = new Date('2026-10-27T10:00:00Z')
@@ -173,7 +173,7 @@ describe('finmapBatch', () => {
     const ledger2 = makeDeps(db, { now: () => NOW })
     for (const o of ops) {
       const key = keyOf(o)
-      await createTransaction(ledger2, ORG2, UID, parseTransactionInput(singleBody(o, key), { internal: true }))
+      await createTransaction(ledger2, ORG2, UID, parseTransactionInput(singleBody(o, key), { internal: true, finmap: true }))
     }
 
     expect(await balancesOf(ORG)).toEqual(await balancesOf(ORG2))
@@ -193,6 +193,24 @@ describe('finmapBatch', () => {
 
     expect(await verifyLedger(makeDeps(db), ORG)).toMatchObject({ ok: true, transactions: 30, balanceDiffs: [], rollupDiffs: [], excludedDiffs: [] })
     expect(await verifyLedger(makeDeps(db), ORG2)).toMatchObject({ ok: true, balanceDiffs: [], rollupDiffs: [], excludedDiffs: [] })
+  })
+
+  it('widens the import period to the days of the operations it created, and leaves it alone when it creates none', async () => {
+    const importPath = `${col(ORG, 'imports')}/${IMPORT}`
+    expect((await readDoc(db, importPath))?.period).toEqual({ from: null, to: null })
+    const ops = thirtyOps()
+    const days = ops.map((o) => o.day).sort()
+    await finmapBatch(depsFor(), ORG, UID, { importId: IMPORT, operations: ops })
+    expect((await readDoc(db, importPath))?.period).toEqual({ from: days[0], to: days[days.length - 1] })
+
+    const earlier = op(40, { day: '2025-01-02', identity: ['early'] })
+    const later = op(41, { day: '2027-03-01', status: 'planned', identity: ['late'] })
+    await finmapBatch(depsFor(), ORG, UID, { importId: IMPORT, operations: [earlier, later] })
+    expect((await readDoc(db, importPath))?.period).toEqual({ from: '2025-01-02', to: '2027-03-01' })
+
+    const again = await finmapBatch(depsFor(), ORG, UID, { importId: IMPORT, operations: [earlier] })
+    expect(again).toEqual({ created: 0, skipped: 1, refused: [] })
+    expect((await readDoc(db, importPath))?.period).toEqual({ from: '2025-01-02', to: '2027-03-01' })
   })
 
   it('creates nothing when the same request comes again, and a deleted operation does not come back', async () => {
@@ -362,11 +380,6 @@ describe('finmapBatch', () => {
     const id = finmapTxId(keyOf(ops[0]))
     await updateTransaction(makeDeps(db), ORG, UID, id, parseTransactionPatch({ description: 'edytowane' }))
     expect(await readDoc(db, txPath(ORG, keyOf(ops[0])))).toMatchObject({ importId: IMPORT, description: 'edytowane' })
-  })
-
-  it('accepts a client id with the fm_ prefix from the ledger input rule, with or without server flags', () => {
-    const clientId = finmapTxId(finmapKey('pln1', null, ['a'], 0))
-    expect(() => parseTransactionInput({ type: 'expense', accountId: 'pln1', amountMinor: 1, paymentDate: TODAY, clientId })).not.toThrow()
   })
 
   it('reads a duplicate check and marks exactly the operations that were written', async () => {

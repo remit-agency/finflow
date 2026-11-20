@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_FUTURE_DAYS } from '@/lib/domain/ledger/build'
+import { addDays } from '@/lib/domain/ledger/days'
 import { finmapIdentity, planFinmap } from '@/lib/domain/import/finmap/plan'
 import type { FinmapExisting, FinmapOptions, FinmapRow } from '@/lib/domain/import/finmap/types'
 
@@ -364,6 +366,37 @@ describe('planFinmap: determinism and totals', () => {
 })
 
 // One run on the owner-size scale with synthetic rows: about 40 000 rows, 700 expense+income pairs, many identical rows.
+describe('planFinmap: the ledger horizon (MAX_FUTURE_DAYS, the ledger refuses a day or an accrual end after it)', () => {
+  const today = '2026-10-20'
+  const horizon = addDays(today, MAX_FUTURE_DAYS)
+  const afterHorizon = addDays(horizon, 1)
+
+  it('accepts a payment day on the horizon day and refuses the day after it as a date', () => {
+    const plan = planFinmap(sheet({ paymentDay: horizon }, { paymentDay: afterHorizon }), existing(), opts({ includePlanned: true, today }))
+    expect(plan.operations.map((o) => o.day)).toEqual([horizon])
+    expect(plan.counts.refused).toEqual({ date: 1 })
+  })
+
+  it('refuses a payment far beyond the horizon as a date, with or without planned rows', () => {
+    for (const includePlanned of [true, false]) {
+      const plan = planFinmap(sheet({ paymentDay: '2040-01-01' }), existing(), opts({ includePlanned, today }))
+      expect(plan.operations).toEqual([])
+      expect(plan.counts.refused).toEqual({ date: 1 })
+    }
+  })
+
+  it('accepts an accrual that ends on the horizon day and refuses one that ends the day after as accrual_after_horizon', () => {
+    const from = addDays(horizon, -40)
+    const plan = planFinmap(sheet(
+      { paymentDay: today, period: { from, to: horizon } },
+      { paymentDay: today, period: { from, to: afterHorizon } },
+    ), existing(), opts({ today }))
+    expect(plan.operations.map((o) => o.accrual)).toEqual([{ from, to: horizon }])
+    expect(plan.counts.refused).toEqual({ accrual_after_horizon: 1 })
+    expect(plan.counts.warnings.accrualIgnored).toBe(0)
+  })
+})
+
 // Prints the elapsed time; asserts counts only. Runs with FINMAP_LARGE=1.
 describe.skipIf(process.env.FINMAP_LARGE !== '1')('planFinmap at 40 000 rows', () => {
   it('plans the rows and reports the time', () => {

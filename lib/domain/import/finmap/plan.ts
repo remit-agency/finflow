@@ -1,4 +1,5 @@
-import { isDay, monthsBetween } from '@/lib/domain/ledger/days'
+import { MAX_FUTURE_DAYS } from '@/lib/domain/ledger/build'
+import { addDays, isDay, monthsBetween } from '@/lib/domain/ledger/days'
 import { MAX_PERIOD_MONTHS } from '@/lib/domain/ledger/input'
 import { MAX_MINOR } from '@/lib/domain/ledger/money'
 import { normKey } from './fold'
@@ -279,6 +280,8 @@ export function planFinmap(rows: readonly FinmapRow[], existing: FinmapExisting,
     refused[reason] = (refused[reason] ?? 0) + 1
   }
   const warnings: Warnings = { commentCut: 0, subcounterparty: 0, project: 0, accrualIgnored: 0, categoryIgnored: 0 }
+  // The ledger refuses a payment day or an accrual end after this day (`buildTransaction`, the same constant).
+  const horizon = addDays(options.today, MAX_FUTURE_DAYS)
 
   const cands: Cand[] = []
   for (const row of rows) {
@@ -286,7 +289,7 @@ export function planFinmap(rows: readonly FinmapRow[], existing: FinmapExisting,
     const amount = row.amountMinor
     const kind = rowKind(row)
     const account = kind === 'expense' ? row.from : kind === 'income' ? row.to : null
-    if (!isDay(day)) {
+    if (!isDay(day) || day > horizon) {
       refuse('date')
       continue
     }
@@ -303,15 +306,19 @@ export function planFinmap(rows: readonly FinmapRow[], existing: FinmapExisting,
       refuse('planned_off')
       continue
     }
+    // A period that is used as the accrual must end on or before the horizon; one that is not a valid period is ignored instead.
+    let accrual: Cand['accrual'] = null
+    if (row.period !== null) {
+      if (!periodOk(row.period)) warnings.accrualIgnored++
+      else if (row.period.to > horizon) {
+        refuse('accrual_after_horizon')
+        continue
+      } else accrual = { from: row.period.from, to: row.period.to }
+    }
     const category = categoryOf(row, kind)
     if (category.ignored) warnings.categoryIgnored++
     if (row.hasSubcounterparty) warnings.subcounterparty++
     if (row.hasProject) warnings.project++
-    let accrual: Cand['accrual'] = null
-    if (row.period !== null) {
-      if (periodOk(row.period)) accrual = { from: row.period.from, to: row.period.to }
-      else warnings.accrualIgnored++
-    }
     cands.push({
       row, pos: cands.length, kind, status, day, account, amountMinor: amount, category: category.ref,
       counterparty: row.counterparty, tags: row.tags, comment: row.comment, accrual, partner: null, folded: false,
