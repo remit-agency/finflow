@@ -371,9 +371,17 @@ async function assertCompanyRoom(deps: ImportDeps, orgId: string, req: FinmapSet
   if (tags.size + countNew(tags, req.tags) > MAX_TAGS) throw new ImportError('limit_reached', 'tags')
 }
 
+/**
+ * The error of a wanted entity that no pass resolved (unreachable with valid input). It names the kind and the position in the
+ * request, never the name: the message can reach the server log.
+ */
+export function unresolvedError(kind: string, index: number): Error {
+  return new Error(`finmap setup: ${kind} #${index} was not resolved`)
+}
+
 /** A value a pass must have resolved: every wanted entity is either matched or created before the last pass returns. */
-function resolvedId<V>(value: V | undefined, what: string): V {
-  if (value === undefined) throw new Error(`finmap setup: ${what} was not resolved`)
+function resolvedId<V>(value: V | undefined, kind: string, index: number): V {
+  if (value === undefined) throw unresolvedError(kind, index)
   return value
 }
 
@@ -402,7 +410,7 @@ export async function finmapSetup(deps: ImportDeps, orgId: string, uid: string, 
   } while (pass.remaining > 0)
 
   const accounts: Record<string, string> = {}
-  for (const a of wants.accounts) accounts[a.key] = resolvedId(pass.accounts.get(a.key), `account ${a.key}`)
+  wants.accounts.forEach((a, i) => (accounts[a.key] = resolvedId(pass.accounts.get(a.key), 'account', i)))
   // Recorded before the rest: a failure in counterparties or tags keeps the accounts, their balances and the counts.
   await recordAccounts(deps, orgId, opened, wants, accounts, createdAccountKeys, created)
 
@@ -450,12 +458,12 @@ export async function finmapSetup(deps: ImportDeps, orgId: string, uid: string, 
     }
   }
 
-  const categories = req.categories.map((ref) => ({
+  const categories = req.categories.map((ref, i) => ({
     ref,
     id:
       ref.child === null
-        ? resolvedId(pass.parents.get(catKey(ref.type, ref.parent)), `category ${ref.parent}`).id
-        : resolvedId(pass.children.get(`${catKey(ref.type, ref.parent)}|${normKey(ref.child)}`), `subcategory ${ref.child}`),
+        ? resolvedId(pass.parents.get(catKey(ref.type, ref.parent)), 'category', i).id
+        : resolvedId(pass.children.get(`${catKey(ref.type, ref.parent)}|${normKey(ref.child)}`), 'subcategory', i),
   }))
 
   // The counts of the rest (the accounts and categories were recorded above; an increment is never written twice).
@@ -466,8 +474,8 @@ export async function finmapSetup(deps: ImportDeps, orgId: string, uid: string, 
     importId,
     accounts,
     categories,
-    counterparties: Object.fromEntries(req.counterparties.map((name) => [normKey(name), resolvedId(counterparties.get(normKey(name)), `counterparty ${name}`)])),
-    tags: Object.fromEntries(req.tags.map((name) => [normKey(name), resolvedId(tags.get(normKey(name)), `tag ${name}`)])),
+    counterparties: Object.fromEntries(req.counterparties.map((name, i) => [normKey(name), resolvedId(counterparties.get(normKey(name)), 'counterparty', i)])),
+    tags: Object.fromEntries(req.tags.map((name, i) => [normKey(name), resolvedId(tags.get(normKey(name)), 'tag', i)])),
     created,
   }
 }
