@@ -88,6 +88,16 @@ describe('previewImport: statuses of the chosen account', () => {
     expect(stmt.chosen).toEqual({ accountId: 'a1', accountCurrency: 'PLN', balanceMinor: 6_000, counts: { new: 1, seen: 1, bank: 1, refused: 0 } })
   })
 
+  it('numbers identical lines of two statements of one account apart: a line written from one statement does not mark the other', async () => {
+    const same = [':61:261020C100,NTRFNONREF', ':86:Kawa']
+    const text = [statementText(same, 'C261020PLN100,'), statementText(same, 'C261020PLN100,', 'PL11111111111111111111111111')].join('\n')
+    const first = (await preview(text)).statements[0]
+    await importStep(depsFor(), ORG, UID, stepOf(first, [first.operations[0]]))
+
+    const res = await preview(text, ['a1', 'a1'])
+    expect(res.statements.map((s) => s.operations.map((o) => o.status))).toEqual([['seen'], ['new']])
+  })
+
   it('refuses every line of a statement in another currency than the account', async () => {
     await seedAccount(db, ORG, 'a2', 'EUR', 0)
     const res = await preview(statementText([...A, ...B], 'C261021PLN60,'), ['a2'])

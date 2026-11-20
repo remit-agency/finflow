@@ -7,7 +7,7 @@ import { RequireAction } from '@/components/shell/RequireAction'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { undoImport, type UndoTotals } from '@/lib/api/import-client'
-import type { ImportView } from '@/lib/domain/import/view'
+import { canUndo, type ImportView } from '@/lib/domain/import/view'
 import { useImports } from '@/lib/hooks/useImports'
 import { useShell } from '@/lib/hooks/useShell'
 import { useFormatters } from '@/lib/i18n/useFormatters'
@@ -121,7 +121,7 @@ function ImportRow({
         <span className="min-w-0 text-sm font-medium break-all text-ink">
           {t('row', { file: row.fileName, created: row.counts.created, date: date(new Date(row.createdAt), { dateStyle: 'medium' }) })}
         </span>
-        {row.status === 'applied' && (
+        {canUndo(row.status) && (
           <Button type="button" data-testid="import-undo" variant="outline" size="sm" disabled={disabled} onClick={onUndo}>
             {t('undo')}
           </Button>

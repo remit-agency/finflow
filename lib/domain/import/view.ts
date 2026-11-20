@@ -4,6 +4,11 @@ import type { ImportOp, LineIssue, OpStatus, ParseIssue, RefusalReason, Statemen
 
 export type ImportStatus = 'applied' | 'undoing' | 'undone'
 
+/** An applied import can be undone; an undo that stopped part way (`undoing`) is undone again: it resumes from the start. */
+export function canUndo(status: ImportStatus): boolean {
+  return status === 'applied' || status === 'undoing'
+}
+
 export interface ImportPeriod {
   from: string | null
   to: string | null

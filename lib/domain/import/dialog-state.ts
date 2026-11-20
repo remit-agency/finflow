@@ -146,6 +146,18 @@ export function isBusy(phase: DialogPhase): boolean {
   return phase === 'reading' || phase === 'previewing' || phase === 'counting' || phase === 'running'
 }
 
+/**
+ * The dialog error of a refused request: the status and code of the answer, and the body's `field` and `line` when the server
+ * names them. A file that is not MT940 is `invalid_input` in the `file` field; any other refusal is a plain failure.
+ */
+export function dialogErrorOf(status: number, code: string, details?: Record<string, unknown>): DialogError {
+  if (status === 413 || code === 'payload_too_large') return { code: 'too_big', line: null }
+  if (code === 'too_many_operations') return { code: 'too_many', line: null }
+  if (code === 'already_running') return { code: 'busy', line: null }
+  if (code === 'invalid_input' && details?.field === 'file') return { code: 'not_mt940', line: typeof details.line === 'number' ? details.line : null }
+  return { code: 'failed', line: null }
+}
+
 export function importDialogReducer(state: DialogState, event: DialogEvent): DialogState {
   switch (event.type) {
     case 'pick': {

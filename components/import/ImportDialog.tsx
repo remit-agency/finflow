@@ -9,6 +9,7 @@ import { LedgerApiError } from '@/lib/api/ledger-client'
 import { decodeStatementBytes } from '@/lib/domain/import/decode'
 import {
   canRun,
+  dialogErrorOf,
   importDialogReducer,
   initialDialogState,
   isBusy,
@@ -32,13 +33,9 @@ interface Props {
   onClose: () => void
 }
 
-/** The server's refusal of a request becomes a dialog error; anything else is a plain failure. */
+/** The server's refusal of a request becomes a dialog error (`dialogErrorOf`); anything else is a plain failure. */
 function toDialogError(error: unknown): DialogError {
-  if (error instanceof LedgerApiError) {
-    if (error.status === 413 || error.code === 'payload_too_large') return { code: 'too_big', line: null }
-    if (error.code === 'too_many_operations') return { code: 'too_many', line: null }
-    if (error.code === 'already_running') return { code: 'busy', line: null }
-  }
+  if (error instanceof LedgerApiError) return dialogErrorOf(error.status, error.code, error.details)
   return { code: 'failed', line: null }
 }
 

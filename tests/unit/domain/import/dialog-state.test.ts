@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   canRun,
+  dialogErrorOf,
   importDialogReducer,
   initialDialogState,
   needsCount,
@@ -130,6 +131,27 @@ describe('reading and previewing', () => {
   it('ignores decoded and previewed outside their phase', () => {
     expect(run(initialDialogState, { type: 'decoded', text: 'x' })).toBe(initialDialogState)
     expect(run(initialDialogState, { type: 'previewed', preview: preview([statement(0)]) })).toBe(initialDialogState)
+  })
+})
+
+describe('dialogErrorOf: the server refusal as a dialog error', () => {
+  it('a file that is not MT940 (invalid_input in the file field) is not_mt940 with the line the server gives', () => {
+    expect(dialogErrorOf(400, 'invalid_input', { error: 'invalid_input', field: 'file', line: 3 })).toEqual({ code: 'not_mt940', line: 3 })
+  })
+
+  it('a file not MT940 without a line is not_mt940 with no line', () => {
+    expect(dialogErrorOf(400, 'invalid_input', { error: 'invalid_input', field: 'file' })).toEqual({ code: 'not_mt940', line: null })
+  })
+
+  it('another invalid input is a plain failure', () => {
+    expect(dialogErrorOf(400, 'invalid_input', { error: 'invalid_input', field: 'accountIds' })).toEqual({ code: 'failed', line: null })
+  })
+
+  it('the other refusals keep their codes', () => {
+    expect(dialogErrorOf(413, 'payload_too_large')).toEqual({ code: 'too_big', line: null })
+    expect(dialogErrorOf(422, 'too_many_operations')).toEqual({ code: 'too_many', line: null })
+    expect(dialogErrorOf(409, 'already_running')).toEqual({ code: 'busy', line: null })
+    expect(dialogErrorOf(500, 'unknown')).toEqual({ code: 'failed', line: null })
   })
 })
 

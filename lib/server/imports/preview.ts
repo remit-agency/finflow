@@ -1,5 +1,6 @@
 import 'server-only'
 import type { BankOpView } from '@/lib/domain/import/plan'
+import { ordinalsByAccount } from '@/lib/domain/import/identity'
 import { judgeOp, overlapsBank } from '@/lib/domain/import/plan'
 import { normalizeSource, parseMt940 } from '@/lib/domain/import/mt940'
 import type { PreviewRequest } from '@/lib/domain/import/request'
@@ -29,16 +30,20 @@ export type { PreviewResult, PreviewStatement }
 export async function previewImport(deps: ImportDeps, orgId: string, req: PreviewRequest): Promise<PreviewResult> {
   if (req.text.length > MAX_IMPORT_BYTES) throw new ImportError('payload_too_large')
   const parsed = parseMt940(req.text)
-  if (parsed.statements.length === 0) throw new ImportError('invalid_input', 'file')
+  // The file has no statement: the first issue (the line of its first tag, or the start of the text) says where it went wrong.
+  if (parsed.statements.length === 0) throw new ImportError('invalid_input', 'file', parsed.issues[0]?.line)
   const opCount = parsed.statements.reduce((n, s) => n + s.operations.length, 0)
   if (opCount > MAX_IMPORT_OPS) throw new ImportError('too_many_operations')
   if (req.accountIds !== undefined && req.accountIds.length !== parsed.statements.length) throw new ImportError('invalid_input', 'accountIds')
 
+  // The lines are numbered over all statements that go to one account, as the run numbers them (`ordinalsByAccount`).
+  const chosen = parsed.statements.map((_, i) => req.accountIds?.[i] ?? null)
+  const ordinals = ordinalsByAccount(parsed.statements.map((s, i) => ({ accountId: chosen[i], ops: s.operations })))
   const suggestions = await suggestAccounts(deps, orgId, parsed.statements.map((s) => s.source))
   const statements: PreviewStatement[] = []
   for (let i = 0; i < parsed.statements.length; i++) {
-    const stmt = parsed.statements[i]
-    const chosenId = req.accountIds?.[i] ?? null
+    const stmt = { ...parsed.statements[i], operations: parsed.statements[i].operations.map((op, j) => ({ ...op, ordinal: ordinals[i][j] })) }
+    const chosenId = chosen[i]
     statements.push(chosenId === null ? withoutChoice(stmt, suggestions[i]) : await withChoice(deps, orgId, stmt, suggestions[i], chosenId))
   }
   return { statements, issues: parsed.issues, opCount }
