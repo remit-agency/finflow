@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Timestamp } from 'firebase-admin/firestore'
 import { normKey } from '@/lib/domain/import/finmap/fold'
 import type { FinmapSetupRequest } from '@/lib/domain/import/finmap/request'
@@ -11,9 +11,29 @@ const db = testDb()
 const NOW = new Date('2026-11-20T10:00:00Z')
 const path = (col: string) => `organizations/${ORG}/${col}`
 
-function depsFor(): ImportDeps {
-  const ledger = makeDeps(db, { now: () => NOW })
+/** The dependencies of a run `minutes` after NOW (the setup reuses only a recent import). */
+function at(minutes: number): ImportDeps {
+  const when = new Date(NOW.getTime() + minutes * 60_000)
+  const ledger = makeDeps(db, { now: () => when })
   return { db, ledger, now: ledger.now, today: ledger.today }
+}
+
+function depsFor(): ImportDeps {
+  return at(0)
+}
+
+/**
+ * Makes the setup fail after its accounts and categories pass: the counterparty write is the second transaction of a run (the
+ * first is that pass). The caller restores the spy.
+ */
+function failAfterAccounts() {
+  const original = db.runTransaction.bind(db)
+  let calls = 0
+  return vi.spyOn(db, 'runTransaction').mockImplementation(((fn: never, opts?: never) => {
+    calls++
+    if (calls === 2) return Promise.reject(new Error('the counterparty write failed'))
+    return original(fn, opts)
+  }) as never)
 }
 
 /** The request of one run: an account with a balance, one without, categories given child first, and names that match existing ones. */
@@ -171,6 +191,78 @@ describe('finmapSetup', () => {
     expect(r.created.accounts).toBe(1)
     expect(r.counterparties[normKey('Nowy Dostawca')]).not.toBe('other-cp')
     expect(r.created.counterparties).toBe(1)
+  })
+
+  it('keeps the new accounts, their typed balances and their counts when the setup fails after them, and a retry fits them with the same import', async () => {
+    const spy = failAfterAccounts()
+    try {
+      await expect(finmapSetup(depsFor(), ORG, UID, request())).rejects.toThrow('the counterparty write failed')
+    } finally {
+      spy.mockRestore()
+    }
+    const [imp] = (await db.collection(path('imports')).get()).docs
+    expect((await db.collection(path('imports')).get()).size).toBe(1)
+    const karta = (await db.collection(path('accounts')).where('name', '==', 'Karta').get()).docs[0].id
+    const before = await readDoc(db, `${path('imports')}/${imp.id}`)
+    expect(before?.fitTargets).toEqual({ [karta]: 5_000 })
+    expect(before?.accountIds).toEqual(expect.arrayContaining([karta]))
+    expect(before?.entities).toEqual({ accounts: 2, categories: 3, counterparties: 0, tags: 0 })
+
+    const r = await finmapSetup(depsFor(), ORG, UID, request({ importId: imp.id }))
+    expect(r.importId).toBe(imp.id)
+    expect(r.created).toEqual({ accounts: 0, categories: 0, counterparties: 1, tags: 1 })
+    expect(await readDoc(db, `${path('imports')}/${imp.id}`)).toMatchObject({
+      fitTargets: { [karta]: 5_000 },
+      entities: { accounts: 2, categories: 3, counterparties: 1, tags: 1 },
+    })
+    expect(await countOf('accounts')).toBe(3)
+    expect((await db.collection(path('imports')).get()).size).toBe(1)
+  })
+
+  it('records the fit target of an account this import created when the first record of it was lost', async () => {
+    const spy = failAfterAccounts()
+    try {
+      await expect(finmapSetup(depsFor(), ORG, UID, request())).rejects.toThrow('the counterparty write failed')
+    } finally {
+      spy.mockRestore()
+    }
+    const [imp] = (await db.collection(path('imports')).get()).docs
+    const karta = (await db.collection(path('accounts')).where('name', '==', 'Karta').get()).docs[0].id
+    // As if the write that records the target had not landed: the account exists, nothing has been written to it yet.
+    await db.doc(`${path('imports')}/${imp.id}`).update({ fitTargets: {} })
+
+    await finmapSetup(depsFor(), ORG, UID, request({ importId: imp.id }))
+    expect((await readDoc(db, `${path('imports')}/${imp.id}`))?.fitTargets).toEqual({ [karta]: 5_000 })
+  })
+
+  it('a setup without an importId continues the recent applied import of the same file that created no operation, and nothing else', async () => {
+    const spy = failAfterAccounts()
+    try {
+      await expect(finmapSetup(depsFor(), ORG, UID, request())).rejects.toThrow('the counterparty write failed')
+    } finally {
+      spy.mockRestore()
+    }
+    const [imp] = (await db.collection(path('imports')).get()).docs
+    const karta = (await db.collection(path('accounts')).where('name', '==', 'Karta').get()).docs[0].id
+
+    // The request whose answer was lost (a Stop during setup): the same file, a few minutes later, reuses the import.
+    const again = await finmapSetup(at(3), ORG, UID, request())
+    expect(again.importId).toBe(imp.id)
+    expect(again.created.accounts).toBe(0)
+    expect((await readDoc(db, `${path('imports')}/${imp.id}`))?.fitTargets).toEqual({ [karta]: 5_000 })
+    expect((await db.collection(path('imports')).get()).size).toBe(1)
+
+    // Not reused: another file, an import older than 15 minutes, or one that already created an operation.
+    const otherFile = await finmapSetup(at(3), ORG, UID, request({ fileName: 'Inny.xlsx' }))
+    expect(otherFile.importId).not.toBe(imp.id)
+    // Sixteen minutes after the first import: too old to reuse.
+    const lateSame = await finmapSetup(at(16), ORG, UID, request())
+    expect(lateSame.importId).not.toBe(imp.id)
+    // The first import now created an operation: it is not reused either (and the later one is not yet in the window before it).
+    await db.doc(`${path('imports')}/${imp.id}`).update({ 'counts.created': 1 })
+    const withOps = await finmapSetup(at(4), ORG, UID, request())
+    expect(withOps.importId).not.toBe(imp.id)
+    expect(withOps.importId).not.toBe(lateSame.importId)
   })
 
   it('two simultaneous runs with new names create each entity once', async () => {

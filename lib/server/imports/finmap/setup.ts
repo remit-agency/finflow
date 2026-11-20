@@ -14,7 +14,7 @@ import type { CounterpartyDeps } from '@/lib/server/counterparties/deps'
 import { createCounterparty } from '@/lib/server/counterparties/write'
 import { auditData } from '@/lib/server/ledger/audit'
 import { assertUnlocked } from '@/lib/server/ledger/lock'
-import { accountsCol, auditCol, categoriesCol, counterpartiesCol, orgRef, tagsCol } from '@/lib/server/ledger/paths'
+import { accountsCol, auditCol, categoriesCol, counterpartiesCol, orgRef, tagsCol, transactionsCol } from '@/lib/server/ledger/paths'
 import { createTag } from '@/lib/server/tags/write'
 import type { ImportDeps } from '../deps'
 import { ImportError } from '../errors'
@@ -240,17 +240,33 @@ async function accountsAndCategoriesPass(deps: ImportDeps, orgId: string, uid: s
   })
 }
 
+/** The import document a setup run writes into, with the document as it was when the run began. */
+interface OpenedImport {
+  ref: DocumentReference
+  importId: string
+  doc: ImportDoc
+}
+
 /**
- * The import document a setup run writes into: a new one (`kind: 'finmap'`, applied), or the one a retry names. A retry
- * must name an applied Finmap import of this company; anything else is `not_found`.
+ * How long a setup without an importId may continue an import of the same file (see `recentImport`). The client keeps the id
+ * as soon as the setup answers; this window covers a Stop during the setup request itself, when the answer never arrived.
  */
-async function openImport(deps: ImportDeps, orgId: string, uid: string, req: FinmapSetupRequest): Promise<{ ref: DocumentReference; importId: string }> {
+const RECENT_IMPORT_MS = 15 * 60 * 1000
+
+/**
+ * The import document a setup run writes into: the one a retry names (it must be an applied Finmap import of this company,
+ * else `not_found`), the recent import of the same file that a request without an id continues (`recentImport`), or a new one
+ * (`kind: 'finmap'`, applied).
+ */
+async function openImport(deps: ImportDeps, orgId: string, uid: string, req: FinmapSetupRequest): Promise<OpenedImport> {
   if (req.importId !== undefined) {
     const ref = importsCol(deps.db, orgId).doc(req.importId)
     const doc = parseImportDoc((await ref.get()).data())
     if (doc === null || doc.kind !== 'finmap' || doc.status !== 'applied') throw new ImportError('not_found')
-    return { ref, importId: ref.id }
+    return { ref, importId: ref.id, doc }
   }
+  const recent = await recentImport(deps, orgId, req.fileName)
+  if (recent !== null) return recent
   const ref = importsCol(deps.db, orgId).doc()
   const doc: ImportDoc = {
     schemaVersion: 1,
@@ -269,7 +285,72 @@ async function openImport(deps: ImportDeps, orgId: string, uid: string, req: Fin
     undo: { deleted: 0, kept: 0 },
   }
   await ref.set(doc)
-  return { ref, importId: ref.id }
+  return { ref, importId: ref.id, doc }
+}
+
+/**
+ * The newest applied Finmap import of this company with the same file name, created in the last RECENT_IMPORT_MS (not in the
+ * future) and with no operation created yet (`counts.created` 0). Only a setup that came without an importId looks for one: its
+ * request may have stopped before the answer, and a second import of the same file would hold no balances of the first.
+ */
+async function recentImport(deps: ImportDeps, orgId: string, fileName: string): Promise<OpenedImport | null> {
+  const now = deps.now().getTime()
+  const snap = await importsCol(deps.db, orgId).where('createdAt', '>=', Timestamp.fromMillis(now - RECENT_IMPORT_MS)).get()
+  let best: OpenedImport | null = null
+  for (const d of snap.docs) {
+    const doc = parseImportDoc(d.data())
+    if (doc === null || doc.kind !== 'finmap' || doc.status !== 'applied' || doc.fileName !== fileName || doc.counts.created !== 0) continue
+    const created = doc.createdAt.toMillis()
+    if (created > now) continue
+    if (best === null || created > best.doc.createdAt.toMillis()) best = { ref: d.ref, importId: d.id, doc }
+  }
+  return best
+}
+
+/** Whether an account has an operation (as its account or as a transfer's target); a deleted one does not count. */
+async function hasOperations(deps: ImportDeps, orgId: string, accountId: string): Promise<boolean> {
+  const col = transactionsCol(deps.db, orgId)
+  const [from, to] = await Promise.all([col.where('accountId', '==', accountId).limit(1).get(), col.where('toAccountId', '==', accountId).limit(1).get()])
+  return !from.empty || !to.empty
+}
+
+/**
+ * An account the import made, whose target the first record never got: created at or after the import (its `createdAt` is
+ * stamped by the accounts pass, so an account that existed before the import is never one), with no fit state or target yet
+ * and no operation. A matched account is in `accountIds` too, but is not this.
+ */
+async function lostTarget(deps: ImportDeps, orgId: string, doc: ImportDoc, accountId: string): Promise<boolean> {
+  if (!doc.accountIds.includes(accountId) || doc.fit[accountId] !== undefined || doc.fitTargets[accountId] !== undefined) return false
+  const createdAt = (await accountsCol(deps.db, orgId).doc(accountId).get()).get('createdAt')
+  if (!(createdAt instanceof Timestamp) || createdAt.toMillis() < doc.createdAt.toMillis()) return false
+  return !(await hasOperations(deps, orgId, accountId))
+}
+
+/**
+ * Records on the import document what the accounts pass made, before anything else can fail: the accounts used, the fit target
+ * of each new account that was given a balance (and of one the first record lost, see `lostTarget`), and the account and category
+ * counts this run created. Every write is a set or an increment of what this run created, so a retry adds nothing twice.
+ */
+async function recordAccounts(
+  deps: ImportDeps,
+  orgId: string,
+  opened: OpenedImport,
+  wants: Wants,
+  accounts: Record<string, string>,
+  createdAccountKeys: ReadonlySet<string>,
+  created: ImportEntityCounts,
+): Promise<void> {
+  const update: Record<string, unknown> = {}
+  const usedAccountIds = [...new Set(Object.values(accounts))]
+  if (usedAccountIds.length > 0) update.accountIds = FieldValue.arrayUnion(...usedAccountIds)
+  for (const a of wants.accounts) {
+    if (a.balance === null) continue
+    const id = accounts[a.key]
+    if (createdAccountKeys.has(a.key) || (await lostTarget(deps, orgId, opened.doc, id))) update[`fitTargets.${id}`] = a.balance
+  }
+  if (created.accounts > 0) update['entities.accounts'] = FieldValue.increment(created.accounts)
+  if (created.categories > 0) update['entities.categories'] = FieldValue.increment(created.categories)
+  if (Object.keys(update).length > 0) await opened.ref.update(update)
 }
 
 /** A value a pass must have resolved: every wanted entity is either matched or created before the last pass returns. */
@@ -285,7 +366,8 @@ function resolvedId<V>(value: V | undefined, what: string): V {
  * through their own writers, whose unique name keys make a concurrent duplicate fail and be read back.
  */
 export async function finmapSetup(deps: ImportDeps, orgId: string, uid: string, req: FinmapSetupRequest): Promise<FinmapSetupResult> {
-  const { ref, importId } = await openImport(deps, orgId, uid, req)
+  const opened = await openImport(deps, orgId, uid, req)
+  const { importId } = opened
   const wants = wantsOf(req)
   const created: ImportEntityCounts = { ...ZERO }
   const createdAccountKeys = new Set<string>()
@@ -299,6 +381,11 @@ export async function finmapSetup(deps: ImportDeps, orgId: string, uid: string, 
     // Every pass creates the first missing entity (parents and accounts come first), so this cannot loop.
     if (pass.remaining > 0 && pass.created.accounts + pass.created.categories === 0) throw new Error('finmap setup: no progress')
   } while (pass.remaining > 0)
+
+  const accounts: Record<string, string> = {}
+  for (const a of wants.accounts) accounts[a.key] = resolvedId(pass.accounts.get(a.key), `account ${a.key}`)
+  // Recorded before the rest: a failure in counterparties or tags keeps the accounts, their balances and the counts.
+  await recordAccounts(deps, orgId, opened, wants, accounts, createdAccountKeys, created)
 
   // Counterparties: matched by name in the company; a name another spelling already owns (its name key) is read back.
   const counterparties = new Map<string, string>()
@@ -344,8 +431,6 @@ export async function finmapSetup(deps: ImportDeps, orgId: string, uid: string, 
     }
   }
 
-  const accounts: Record<string, string> = {}
-  for (const a of wants.accounts) accounts[a.key] = resolvedId(pass.accounts.get(a.key), `account ${a.key}`)
   const categories = req.categories.map((ref) => ({
     ref,
     id:
@@ -354,17 +439,9 @@ export async function finmapSetup(deps: ImportDeps, orgId: string, uid: string, 
         : resolvedId(pass.children.get(`${catKey(ref.type, ref.parent)}|${normKey(ref.child)}`), `subcategory ${ref.child}`),
   }))
 
-  // The import document: the accounts used, the balance to fit for each NEW account that was given one, the counts created.
-  const update: Record<string, unknown> = {}
-  const usedAccountIds = [...new Set(Object.values(accounts))]
-  if (usedAccountIds.length > 0) update.accountIds = FieldValue.arrayUnion(...usedAccountIds)
-  for (const a of wants.accounts) {
-    if (a.balance !== null && createdAccountKeys.has(a.key)) update[`fitTargets.${accounts[a.key]}`] = a.balance
-  }
-  for (const [field, n] of Object.entries(created)) {
-    if (n > 0) update[`entities.${field}`] = FieldValue.increment(n)
-  }
-  if (Object.keys(update).length > 0) await ref.update(update)
+  // The counts of the rest (the accounts and categories were recorded above; an increment is never written twice).
+  if (created.counterparties > 0) await opened.ref.update({ 'entities.counterparties': FieldValue.increment(created.counterparties) })
+  if (created.tags > 0) await opened.ref.update({ 'entities.tags': FieldValue.increment(created.tags) })
 
   return {
     importId,
