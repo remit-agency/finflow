@@ -322,6 +322,54 @@ describe('runFinmapImport: abort and notification', () => {
   })
 })
 
+describe('runFinmapImport: request size', () => {
+  // Long names: 17 identity strings of 400 characters and a 500-character description, as the parser allows.
+  const longOp = (i: number, char = 'x') =>
+    planOp(i, { identity: Array.from({ length: 17 }, (_, k) => `${i}.${k}.` + char.repeat(400)), description: char.repeat(500) })
+  const bodyBytes = (body: Body) => new TextEncoder().encode(JSON.stringify(body)).length
+  const counts = (calls: Array<{ body: Body }>) => calls.map((c) => (c.body.operations as unknown[]).length)
+
+  it('splits checks by size: each request stays within 180 KB of JSON, every operation is checked once', async () => {
+    const s = serverWith()
+    await run(Array.from({ length: 300 }, (_, i) => longOp(i)))
+    const checks = s.steps('check')
+    expect(checks.length).toBeGreaterThan(1)
+    expect(checks.every((c) => bodyBytes(c.body) <= 180 * 1024 + 64)).toBe(true)
+    expect(counts(checks).every((n) => n <= 500)).toBe(true)
+    expect(counts(checks).reduce((a, b) => a + b, 0)).toBe(300)
+  })
+
+  it('splits batches by size: each request stays within 200 KB of JSON and every operation is sent', async () => {
+    const s = serverWith()
+    const result = await run(Array.from({ length: 80 }, (_, i) => longOp(i)))
+    const batches = s.steps('batch')
+    expect(batches.length).toBeGreaterThan(2)
+    expect(batches.every((c) => bodyBytes(c.body) <= 200 * 1024 + 64)).toBe(true)
+    expect(counts(batches).every((n) => n <= 60)).toBe(true)
+    expect(counts(batches).reduce((a, b) => a + b, 0)).toBe(80)
+    expect(result.created).toBe(80)
+  })
+
+  it('measures Cyrillic by its UTF-8 bytes (two per letter), the length the route checks', async () => {
+    const s = serverWith()
+    await run(Array.from({ length: 120 }, (_, i) => longOp(i, 'ж')))
+    expect(s.steps('check').every((c) => bodyBytes(c.body) <= 180 * 1024 + 64)).toBe(true)
+    expect(s.steps('batch').every((c) => bodyBytes(c.body) <= 200 * 1024 + 64)).toBe(true)
+  })
+
+  it('sends a check operation over the budget alone', async () => {
+    const s = serverWith()
+    await run([planOp(0), planOp(1, { identity: ['h'.repeat(300 * 1024)] }), planOp(2)])
+    expect(counts(s.steps('check'))).toEqual([1, 1, 1])
+  })
+
+  it('sends a batch operation over the budget alone', async () => {
+    const s = serverWith()
+    await run([planOp(0), planOp(1, { identity: ['h'.repeat(300 * 1024)] }), planOp(2)])
+    expect(counts(s.steps('batch'))).toEqual([1, 1, 1])
+  })
+})
+
 describe('finmap-client module', () => {
   it('is browser-safe: no server modules and no node built-ins', () => {
     const src = readFileSync(new URL('../../../lib/api/finmap-client.ts', import.meta.url), 'utf8')

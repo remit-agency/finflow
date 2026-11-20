@@ -106,9 +106,48 @@ export interface FinmapRunArgs {
 
 const ZERO_ENTITIES: FinmapEntityCounts = { accounts: 0, categories: 0, counterparties: 0, tags: 0 }
 
-function chunksOf<T>(items: readonly T[], size: number): T[][] {
-  const out: T[][] = []
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+/** A check request carries at most this much JSON (the route refuses 256 KB; the envelope is small). */
+const CHECK_BUDGET_BYTES = 180 * 1024
+/** A batch request carries at most this much JSON (the route refuses 256 KB). */
+const BATCH_BUDGET_BYTES = 200 * 1024
+
+/** The UTF-8 length of a string: what a request body's Content-Length counts (a Cyrillic letter is 2 bytes, an emoji 4). */
+function utf8Length(s: string): number {
+  let n = 0
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i)
+    if (c < 0x80) n += 1
+    else if (c < 0x800) n += 2
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length && (s.charCodeAt(i + 1) & 0xfc00) === 0xdc00) {
+      n += 4
+      i++
+    } else n += 3
+  }
+  return n
+}
+
+/** The bytes one item adds to a JSON array: its JSON and the comma that follows it. */
+const jsonBytes = (item: unknown): number => utf8Length(JSON.stringify(item)) + 1
+
+/**
+ * Splits `indices` into consecutive chunks of at most `maxCount` items whose JSON, as `bytesOf` measures it, stays within
+ * `maxBytes`. An item that is over the budget by itself is sent alone: the route then answers for it, which is the honest answer.
+ */
+function chunkBySize(indices: readonly number[], maxCount: number, maxBytes: number, bytesOf: (i: number) => number): number[][] {
+  const out: number[][] = []
+  let cur: number[] = []
+  let bytes = 0
+  for (const i of indices) {
+    const b = bytesOf(i)
+    if (cur.length > 0 && (cur.length === maxCount || bytes + b > maxBytes)) {
+      out.push(cur)
+      cur = []
+      bytes = 0
+    }
+    cur.push(i)
+    bytes += b
+  }
+  if (cur.length > 0) out.push(cur)
   return out
 }
 
@@ -194,9 +233,10 @@ export async function runFinmapImport(orgId: string, args: FinmapRunArgs): Promi
       return !newAccounts.has(normKey(op.account)) && (op.toAccount === null || !newAccounts.has(normKey(op.toAccount)))
     })
     const seen = new Array<boolean>(ops.length).fill(false)
-    for (const chunk of chunksOf(checkable, CHECK_LIMIT)) {
+    const checkOf = (i: number): FinmapCheckOp => ({ accountId: ops[i].accountId, toAccountId: ops[i].toAccountId, identity: ops[i].identity, ordinal: ops[i].ordinal })
+    for (const chunk of chunkBySize(checkable, CHECK_LIMIT, CHECK_BUDGET_BYTES, (i) => jsonBytes(checkOf(i)))) {
       throwIfAborted(signal)
-      const r = await finmapCheck(orgId, chunk.map((i) => ({ accountId: ops[i].accountId, toAccountId: ops[i].toAccountId, identity: ops[i].identity, ordinal: ops[i].ordinal })), signal)
+      const r = await finmapCheck(orgId, chunk.map(checkOf), signal)
       chunk.forEach((i, j) => {
         if (r.seen[j]) seen[i] = true
       })
@@ -207,7 +247,7 @@ export async function runFinmapImport(orgId: string, args: FinmapRunArgs): Promi
     if (seenCount > 0) onProgress(done, total)
 
     const toSend = ops.map((_, i) => i).filter((i) => !seen[i])
-    for (const chunk of chunksOf(toSend, FINMAP_BATCH_OPS)) {
+    for (const chunk of chunkBySize(toSend, FINMAP_BATCH_OPS, BATCH_BUDGET_BYTES, (i) => jsonBytes(ops[i]))) {
       throwIfAborted(signal)
       const batch = await sendBatch(orgId, importId, chunk.map((i) => ops[i]), signal)
       result.created += batch.created

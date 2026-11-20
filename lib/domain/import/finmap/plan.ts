@@ -43,17 +43,54 @@ function rowKind(row: FinmapRow): RowKind | null {
   return null
 }
 
-/** The strings that identify a row's operation in its key (a transfer joins its two rows' strings with '+'). */
+/** An identity string up to this many characters is kept as it is; a longer one is shortened by `boundIdentityText`. */
+const IDENTITY_TEXT_LIMIT = 64
+/** The characters a shortened identity string keeps before its length and hash. */
+const IDENTITY_PREFIX = 40
+
+/**
+ * cyrb53 (public domain): a 53-bit hash of a string, pure arithmetic, so the same in every JavaScript engine (the planner runs
+ * in the browser, where node:crypto is not available).
+ */
+function cyrb53(s: string): number {
+  let h1 = 0xdeadbeef
+  let h2 = 0x41c6ce57
+  for (let i = 0; i < s.length; i++) {
+    const ch = s.charCodeAt(i)
+    h1 = Math.imul(h1 ^ ch, 2654435761)
+    h2 = Math.imul(h2 ^ ch, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0)
+}
+
+/**
+ * A string that identifies an operation, bounded so the parser's cap is never reached by data (S14b). At most 64 characters
+ * (code points) are kept as they are. A longer one becomes its first 40 characters, `#`, its length, `#` and the cyrb53 hash of
+ * the whole string in base 36 (at most 60 characters), so two long strings differ unless they are equal.
+ */
+export function boundIdentityText(s: string): string {
+  const chars = [...s]
+  if (chars.length <= IDENTITY_TEXT_LIMIT) return s
+  return `${chars.slice(0, IDENTITY_PREFIX).join('')}#${chars.length}#${cyrb53(s).toString(36)}`
+}
+
+/**
+ * The strings that identify a row's operation in its key (a transfer joins its two rows' strings with '+'). Each string is
+ * bounded by `boundIdentityText`; the tags are sorted, bounded one by one, joined, and the joined text is bounded again.
+ */
 export function finmapIdentity(row: FinmapRow): string[] {
+  const tags = row.tags.map(normKey).sort().map(boundIdentityText).join('|')
   return [
-    row.timeText,
-    String(row.amountMinor),
+    boundIdentityText(row.timeText),
+    boundIdentityText(String(row.amountMinor)),
     rowKind(row) ?? '',
-    normKey(row.category ?? ''),
-    normKey(row.subcategory ?? ''),
-    normKey(row.counterparty ?? ''),
-    normKey(row.comment ?? ''),
-    row.tags.map(normKey).sort().join('|'),
+    boundIdentityText(normKey(row.category ?? '')),
+    boundIdentityText(normKey(row.subcategory ?? '')),
+    boundIdentityText(normKey(row.counterparty ?? '')),
+    boundIdentityText(normKey(row.comment ?? '')),
+    boundIdentityText(tags),
   ]
 }
 
