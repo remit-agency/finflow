@@ -115,8 +115,8 @@ export function FinmapDialog({ orgId, onClose }: Props) {
     companyCurrency,
     accounts: accounts.map((a) => ({ id: a.id, name: a.name, currency: a.currency })),
     categories: [...incomeCategories, ...expenseCategories].map((c) => ({ id: c.id, name: c.name, type: c.type, ...(c.parentId ? { parentId: c.parentId } : {}) })),
-    counterparties: counterparties.map((c) => ({ id: c.id, name: c.name })),
-    tags: tags.map((tag) => ({ id: tag.id, name: tag.name })),
+    counterparties: counterparties.map((c) => ({ id: c.id, name: c.name, archived: c.archived })),
+    tags: tags.map((tag) => ({ id: tag.id, name: tag.name, archived: tag.archived })),
   })
 
   /** The «already imported» count of a fresh plan, when some of its accounts exist. The next plan cancels it. */
@@ -344,7 +344,7 @@ export function FinmapDialog({ orgId, onClose }: Props) {
   )
 }
 
-type WarningKey = 'commentCut' | 'subcounterparty' | 'project' | 'accrualIgnored' | 'categoryIgnored'
+type WarningKey = 'commentCut' | 'subcounterparty' | 'project' | 'accrualIgnored' | 'categoryIgnored' | 'archivedMatched'
 
 interface PreviewProps {
   plan: FinmapPlan
@@ -370,6 +370,7 @@ function FinmapPreview({ plan, rowsRead, alreadyImported, checking, includePlann
     { key: 'project', n: c.warnings.project },
     { key: 'accrualIgnored', n: c.warnings.accrualIgnored },
     { key: 'categoryIgnored', n: c.warnings.categoryIgnored },
+    { key: 'archivedMatched', n: c.warnings.archivedMatched },
   ]
   const warnings = allWarnings.filter((w) => w.n > 0)
   const subcategories = plan.create.categories.filter((ref) => ref.child !== null).length

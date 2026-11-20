@@ -645,7 +645,8 @@
         "subcounterparty": "Subcounterparties skipped: {n}",
         "project": "Projects skipped: {n}",
         "accrualIgnored": "Accrual periods ignored: {n}",
-        "categoryIgnored": "«No category» entries ignored: {n}"
+        "categoryIgnored": "«No category» entries ignored: {n}",
+        "archivedMatched": "Operations with an archived counterparty or tag (refused by the import, not un-archived): {n}"
       },
       "pairCandidatesLeft": "Similar transfers not merged into one: {n}",
       "includePlanned": "Include planned operations (after today)",

@@ -332,7 +332,7 @@ export function planFinmap(rows: readonly FinmapRow[], existing: FinmapExisting,
   const refuse = (reason: FinmapRefusal): void => {
     refused[reason] = (refused[reason] ?? 0) + 1
   }
-  const warnings: Warnings = { commentCut: 0, subcounterparty: 0, project: 0, accrualIgnored: 0, categoryIgnored: 0 }
+  const warnings: Warnings = { commentCut: 0, subcounterparty: 0, project: 0, accrualIgnored: 0, categoryIgnored: 0, archivedMatched: 0 }
   // The ledger refuses a payment day or an accrual end after this day (`buildTransaction`, the same constant).
   const horizon = addDays(options.today, MAX_FUTURE_DAYS)
 
@@ -402,6 +402,15 @@ export function planFinmap(rows: readonly FinmapRow[], existing: FinmapExisting,
     operations.push(c.partner === null ? singleOp(c, warnings) : transferOp(c, c.partner, warnings))
   }
   numberOrdinals(operations)
+
+  // An operation the batch refuses for its archived counterparty or tag: counted here, so the preview can say so before the run.
+  const archivedCounterparties = new Set(existing.counterparties.flatMap((p) => (p.archived === true ? [normKey(p.name)] : [])))
+  const archivedTags = new Set(existing.tags.flatMap((t) => (t.archived === true ? [normKey(t.name)] : [])))
+  for (const op of operations) {
+    if ((op.counterparty !== null && archivedCounterparties.has(normKey(op.counterparty))) || op.tags.some((t) => archivedTags.has(normKey(t)))) {
+      warnings.archivedMatched++
+    }
+  }
 
   const counts: FinmapCounts = {
     rows: rows.length, income: 0, expense: 0, transfer: 0, planned: 0, pairCandidatesLeft, refused, warnings,

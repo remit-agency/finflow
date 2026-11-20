@@ -645,7 +645,8 @@
         "subcounterparty": "Pominięci podkontrahenci: {n}",
         "project": "Pominięte projekty: {n}",
         "accrualIgnored": "Pominięte rozliczenia okresów: {n}",
-        "categoryIgnored": "Pominięte kategorie «bez kategorii»: {n}"
+        "categoryIgnored": "Pominięte kategorie «bez kategorii»: {n}",
+        "archivedMatched": "Operacje z zarchiwizowanym kontrahentem lub tagiem (import je odrzuci, nic nie zostanie odarchiwizowane): {n}"
       },
       "pairCandidatesLeft": "Podobne przelewy, niepołączone w jeden: {n}",
       "includePlanned": "Uwzględnij zaplanowane operacje (po dzisiaj)",

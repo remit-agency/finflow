@@ -19,7 +19,7 @@ const EXISTING: FinmapExisting = {
 
 const COUNTS: FinmapCounts = {
   rows: 0, income: 0, expense: 0, transfer: 0, planned: 0, pairCandidatesLeft: 0, refused: {},
-  warnings: { commentCut: 0, subcounterparty: 0, project: 0, accrualIgnored: 0, categoryIgnored: 0 },
+  warnings: { commentCut: 0, subcounterparty: 0, project: 0, accrualIgnored: 0, categoryIgnored: 0, archivedMatched: 0 },
 }
 
 const ZERO_ENTITIES = { accounts: 0, categories: 0, counterparties: 0, tags: 0 }

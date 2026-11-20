@@ -28,7 +28,7 @@ const COUNTS: FinmapCounts = {
   planned: 0,
   pairCandidatesLeft: 0,
   refused: {},
-  warnings: { commentCut: 0, subcounterparty: 0, project: 0, accrualIgnored: 0, categoryIgnored: 0 },
+  warnings: { commentCut: 0, subcounterparty: 0, project: 0, accrualIgnored: 0, categoryIgnored: 0, archivedMatched: 0 },
 }
 
 const OP: PlannedOp = {

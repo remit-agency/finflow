@@ -52,8 +52,9 @@ export interface FinmapExisting {
   companyCurrency: string
   accounts: Array<{ id: string; name: string; currency: string }>
   categories: Array<{ id: string; name: string; type: 'income' | 'expense'; parentId?: string }>
-  counterparties: Array<{ id: string; name: string }>
-  tags: Array<{ id: string; name: string }>
+  /** `archived`: the setup matches an archived item too, but the batch refuses the operations that use it (not un-archived). */
+  counterparties: Array<{ id: string; name: string; archived?: boolean }>
+  tags: Array<{ id: string; name: string; archived?: boolean }>
 }
 export interface FinmapOptions {
   /** Rows dated after `today` become planned operations when true, and are left out when false. */
@@ -108,7 +109,7 @@ export interface FinmapCounts {
   pairCandidatesLeft: number
   refused: Partial<Record<FinmapRefusal, number>>
   /** Warnings that do not stop a row. */
-  warnings: { commentCut: number; subcounterparty: number; project: number; accrualIgnored: number; categoryIgnored: number }
+  warnings: { commentCut: number; subcounterparty: number; project: number; accrualIgnored: number; categoryIgnored: number; archivedMatched: number }
 }
 
 export interface FinmapPlan {

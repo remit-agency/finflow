@@ -173,6 +173,33 @@ describe('planFinmap: matching existing items', () => {
   })
 })
 
+describe('planFinmap: archived counterparties and tags', () => {
+  it('counts the operations that use an archived counterparty or tag, once each; the names stay matched, not created', () => {
+    const ex = existing({
+      counterparties: [{ id: 'cp1', name: 'Dostawca Stary', archived: true }, { id: 'cp2', name: 'Dostawca Nowy' }],
+      tags: [{ id: 't1', name: 'Stara', archived: true }, { id: 't2', name: 'Nowa' }],
+    })
+    const plan = planFinmap(
+      sheet(
+        { from: 'Konto A', counterparty: 'dostawca  stary' },
+        { from: 'Konto A', counterparty: 'Dostawca Nowy' },
+        { from: 'Konto A', tags: ['Stara', 'Stara 2'] },
+        { from: 'Konto A', tags: ['Nowa'], counterparty: 'Dostawca Stary' },
+      ),
+      ex,
+      opts(),
+    )
+    expect(plan.counts.warnings.archivedMatched).toBe(3)
+    expect(plan.create.counterparties).toEqual([])
+    expect(plan.create.tags).toEqual(['Stara 2'])
+  })
+
+  it('counts nothing when every name is active', () => {
+    const plan = planFinmap(sheet({ from: 'Konto A', counterparty: 'Dostawca Nowy', tags: ['Nowa'] }), existing({ counterparties: [{ id: 'cp2', name: 'Dostawca Nowy' }], tags: [{ id: 't2', name: 'Nowa' }] }), opts())
+    expect(plan.counts.warnings.archivedMatched).toBe(0)
+  })
+})
+
 describe('planFinmap: accrual, comment and warnings', () => {
   it('keeps a valid period of up to 36 months as the accrual', () => {
     const plan = planFinmap(sheet(
