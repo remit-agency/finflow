@@ -195,9 +195,16 @@ describe('parseFinmapBatch', () => {
     expect(parseFinmapBatch(batchBody([op({ description: 5 })]))).toEqual({ ok: false, field: 'operations[0].description' })
   })
 
-  it('refuses an accrual that is not a pair of days, and more identity strings than 12 or one over 400 characters', () => {
+  it('accepts the identity of a transfer the planner makes: two rows of eight strings joined by "+" (17 in all)', () => {
+    const identity = [...Array.from({ length: 8 }, (_, i) => `e${i}`), '+', ...Array.from({ length: 8 }, (_, i) => `i${i}`)]
+    expect(identity).toHaveLength(17)
+    expect(parseFinmapBatch(batchBody([transfer({ identity })])).ok).toBe(true)
+    expect(parseFinmapCheck({ operations: [{ accountId: 'acc-main', toAccountId: 'acc-2', identity, ordinal: 0 }] }).ok).toBe(true)
+  })
+
+  it('refuses an accrual that is not a pair of days, and more identity strings than 17 or one over 400 characters', () => {
     expect(parseFinmapBatch(batchBody([op({ accrual: { from: '2026-10-01' } })]))).toEqual({ ok: false, field: 'operations[0].accrual' })
-    expect(parseFinmapBatch(batchBody([op({ identity: Array.from({ length: 13 }, (_, i) => `s${i}`) })]))).toEqual({ ok: false, field: 'operations[0].identity' })
+    expect(parseFinmapBatch(batchBody([op({ identity: Array.from({ length: 18 }, (_, i) => `s${i}`) })]))).toEqual({ ok: false, field: 'operations[0].identity' })
     expect(parseFinmapBatch(batchBody([op({ identity: ['x'.repeat(401)] })]))).toEqual({ ok: false, field: 'operations[0].identity' })
     expect(parseFinmapBatch(batchBody([op({ identity: 'row' })]))).toEqual({ ok: false, field: 'operations[0].identity' })
   })

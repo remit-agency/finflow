@@ -110,8 +110,8 @@ export function parseFinmapFinish(body: unknown): Parsed<{ importId: string }> {
 
 /** Duplicate-check keys per request (S14b): one lookup per operation of a file page. */
 export const CHECK_LIMIT = 500
-/** Identity strings one operation key carries, and the longest of them. */
-const IDENTITY_MAX = 12
+/** Identity strings one operation key carries (`finmapIdentity` gives 8; a transfer joins two of them with '+': 17), and the longest of them. */
+const IDENTITY_MAX = 17
 const IDENTITY_TEXT_MAX = 400
 const ORDINAL_MAX = 100_000
 const DESCRIPTION_MAX = 500
@@ -154,7 +154,7 @@ export interface FinmapCheckRequest {
 
 const isMinorAmount = (v: unknown): v is number => isMinor(v) && v > 0 && v <= MAX_MINOR
 
-/** The identity strings of a key: at most 12, each a string of at most 400 characters. */
+/** The identity strings of a key: at most IDENTITY_MAX, each a string of at most 400 characters. */
 function identityOf(v: unknown, at: string): Parsed<string[]> {
   if (!Array.isArray(v) || v.length > IDENTITY_MAX) return { ok: false, field: at }
   for (const s of v) if (typeof s !== 'string' || s.length > IDENTITY_TEXT_MAX) return { ok: false, field: at }
