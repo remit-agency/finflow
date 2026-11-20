@@ -11,7 +11,7 @@ import { parseTransactionInput } from '@/lib/domain/ledger/input'
 import type { LedgerAccount, LedgerTransaction } from '@/lib/domain/ledger/types'
 import { excludedFromTags, tagFlagsOf, withExcluded, type TagFlags } from '@/lib/domain/tags/exclude'
 import { bankSeenCol } from '@/lib/server/banking/paths'
-import type { RateSnapshot } from '@/lib/server/fx/types'
+import { FxError, type RateSnapshot } from '@/lib/server/fx/types'
 import { auditData } from '@/lib/server/ledger/audit'
 import { assertUnlocked } from '@/lib/server/ledger/lock'
 import { accountsCol, auditCol, categoriesCol, counterpartiesCol, orgRef, tagsCol, transactionsCol } from '@/lib/server/ledger/paths'
@@ -24,8 +24,11 @@ import { acquireAll, releaseAll } from '../step'
 import { parseImportDoc, type ImportDoc } from '../types'
 import { finmapKey, finmapTxId } from './key'
 
-/** Why one operation of a batch was not written: a ledger code (the ledger's own refusal), or the batch's duplicate-key rule. */
-export type BatchRefusalReason = LedgerErrorCode | 'duplicate_key'
+/**
+ * Why one operation of a batch was not written: a ledger code (the ledger's own refusal), the batch's duplicate-key rule, or
+ * `rate_unavailable` (no NBP rate exists for the operation's day: a permanent answer, unlike a provider outage, which fails the request).
+ */
+export type BatchRefusalReason = LedgerErrorCode | 'duplicate_key' | 'rate_unavailable'
 
 export interface FinmapBatchRefusal {
   index: number
@@ -145,7 +148,11 @@ async function openFinmapImport(deps: ImportDeps, orgId: string, importId: strin
 async function writeAll(deps: ImportDeps, orgId: string, uid: string, req: FinmapBatchRequest, totals: Totals): Promise<void> {
   if (req.operations.length === 0) return
   const ctx = await readContext(deps, orgId, req.operations)
-  const built = await buildOperations(deps, orgId, req, ctx, totals)
+  // Nothing is recorded until every rate is known: a request that fails on the provider writes nothing and counts nothing.
+  const prepared = await buildOperations(deps, orgId, req, ctx)
+  totals.skipped += prepared.skipped
+  totals.refused.push(...prepared.refused)
+  const built = prepared.built
   for (const group of splitByWriteBudget(built.map((b) => ({ docs: b.docs })))) {
     const r = await writeGroup(deps, orgId, uid, ctx, req.importId, group.map((i) => built[i]))
     totals.created += r.created
@@ -217,10 +224,18 @@ function printOf(collection: Collection, s: DocumentSnapshot): string {
 
 /**
  * Keeps the operations that can be written: skips those already marked (one read for the request), refuses those the
- * company or the ledger refuses (with the code), and builds the rest with their rates and their `excluded` flag. Refusals
- * and skips go to `totals` at once.
+ * company or the ledger refuses (with the code), and builds the rest with their rates and their `excluded` flag. A rate
+ * the provider could not give for a transient reason throws (the request fails, nothing is written); a day with no rate
+ * refuses its operation as `rate_unavailable`.
  */
-async function buildOperations(deps: ImportDeps, orgId: string, req: FinmapBatchRequest, ctx: Context, totals: Totals): Promise<Built[]> {
+async function buildOperations(
+  deps: ImportDeps,
+  orgId: string,
+  req: FinmapBatchRequest,
+  ctx: Context,
+): Promise<{ built: Built[]; refused: FinmapBatchRefusal[]; skipped: number }> {
+  let skipped = 0
+  const refused: FinmapBatchRefusal[] = []
   const keys = req.operations.map(keyOf)
   const marked = await seenKeysOf(deps.db, orgId, keys)
   const flags = tagFlagsOf([...ctx.tags.values()])
@@ -241,19 +256,19 @@ async function buildOperations(deps: ImportDeps, orgId: string, req: FinmapBatch
   for (let i = 0; i < req.operations.length; i++) {
     const key = keys[i]
     if (seen.has(key)) {
-      totals.refused.push(refusal(i, 'duplicate_key'))
+      refused.push(refusal(i, 'duplicate_key'))
       continue
     }
     seen.add(key)
     if (marked.has(key)) {
-      totals.skipped++
+      skipped++
       continue
     }
     const outcome = await buildOne(ctx, req.operations[i], i, key, req.importId, flags, rateOf)
-    if ('reason' in outcome) totals.refused.push(outcome)
+    if ('reason' in outcome) refused.push(outcome)
     else built.push(outcome)
   }
-  return built
+  return { built, refused, skipped }
 }
 
 /** One operation: the company's own refusals first, then the ledger's build (its refusals come back with their code). */
@@ -293,7 +308,14 @@ async function buildOne(
     if (e instanceof LedgerError) return refusal(index, e.code, e.field)
     throw e
   }
-  const evidence = await Promise.all(plan.map((r) => rateOf(r.from, r.to, r.date)))
+  let evidence: RateSnapshot[]
+  try {
+    evidence = await Promise.all(plan.map((r) => rateOf(r.from, r.to, r.date)))
+  } catch (e) {
+    // A provider outage is the request's failure (retryable, the caller sends it again); a permanent answer refuses this operation.
+    if (!(e instanceof FxError) || e.code === 'provider_unavailable') throw e
+    return refusal(index, e.code === 'invalid_params' ? 'invalid_input' : 'rate_unavailable', 'paymentDate')
+  }
   const tx: LedgerTransaction = { ...withExcluded(attachFx(base, plan, evidence.map(evidenceOf)), excludedFromTags(o.tagIds, flags)), importId }
 
   const change = changeSet(null, tx, ctx.baseCurrency)

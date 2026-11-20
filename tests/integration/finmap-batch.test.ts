@@ -9,17 +9,19 @@ import { finmapBatch } from '@/lib/server/imports/finmap/batch'
 import { finmapCheck } from '@/lib/server/imports/finmap/check'
 import { finmapKey, finmapTxId } from '@/lib/server/imports/finmap/key'
 import { acquireLock, releaseLock } from '@/lib/server/ledger/lock'
+import type { LedgerDeps } from '@/lib/server/ledger/deps'
 import { verifyLedger } from '@/lib/server/ledger/verify'
 import { createTransaction, deleteTransaction, updateTransaction } from '@/lib/server/ledger/write'
-import { ORG, UID, balanceOf, clearFirestore, makeDeps, readDoc, seedAccount, seedCategory, seedCounterparty, seedOrg, seedTag, testDb } from './helpers'
+import { FxError } from '@/lib/server/fx/types'
+import { ORG, UID, balanceOf, clearFirestore, fakeResolveRate, makeDeps, readDoc, seedAccount, seedCategory, seedCounterparty, seedOrg, seedTag, testDb } from './helpers'
 
 const db = testDb()
 const NOW = new Date('2026-10-27T10:00:00Z')
 const ORG2 = 'org-single'
 const IMPORT = 'imp1'
 
-function depsFor(): ImportDeps {
-  const ledger = makeDeps(db, { now: () => NOW })
+function depsFor(over: Partial<LedgerDeps> = {}): ImportDeps {
+  const ledger = makeDeps(db, { now: () => NOW, ...over })
   return { db, ledger, now: ledger.now, today: ledger.today }
 }
 
@@ -314,6 +316,25 @@ describe('finmapBatch', () => {
     expect(await readDoc(db, `${col(ORG, 'counterparties')}/cp-old`)).toMatchObject({ archived: true })
     expect(await readDoc(db, `${col(ORG, 'tags')}/t-old`)).toMatchObject({ archived: true })
     expect((await readDoc(db, `${col(ORG, 'imports')}/${IMPORT}`))?.counts).toMatchObject({ refused: 2 })
+  })
+
+  it('refuses a row whose day has no rate as rate_unavailable on its payment date, and writes the rest', async () => {
+    const fake = fakeResolveRate()
+    const resolveRate: LedgerDeps['resolveRate'] = (from, to, date) => (date < '2002-01-01' ? Promise.reject(new FxError('no_rate_before')) : fake(from, to, date))
+    const ops = [op(0, { accountId: 'eur1', day: '2001-06-01', identity: ['old'] }), op(1, { accountId: 'eur1', day: '2026-10-02' }), op(2)]
+    const r = await finmapBatch(depsFor({ resolveRate }), ORG, UID, { importId: IMPORT, operations: ops })
+    expect(r).toEqual({ created: 2, skipped: 0, refused: [{ index: 0, reason: 'rate_unavailable', field: 'paymentDate' }] })
+    expect(await readDoc(db, txPath(ORG, keyOf(ops[0])))).toBeUndefined()
+    expect((await readDoc(db, `${col(ORG, 'imports')}/${IMPORT}`))?.counts).toEqual({ created: 2, skipped: 0, refused: 1 })
+  })
+
+  it('fails the whole request as provider_unavailable when the rate provider is down, and writes nothing', async () => {
+    const resolveRate: LedgerDeps['resolveRate'] = () => Promise.reject(new FxError('provider_unavailable'))
+    // A refusal before the rate call must not be recorded either: the request wrote nothing.
+    const ops = [op(0, { day: '2026-11-02' }), op(1, { accountId: 'eur1' })]
+    await expect(finmapBatch(depsFor({ resolveRate }), ORG, UID, { importId: IMPORT, operations: ops })).rejects.toMatchObject({ code: 'provider_unavailable' })
+    expect(Object.keys(await txsOf(ORG))).toHaveLength(0)
+    expect((await readDoc(db, `${col(ORG, 'imports')}/${IMPORT}`))?.counts).toEqual({ created: 0, skipped: 0, refused: 0 })
   })
 
   it('throws ledger_busy and writes nothing while the ledger is locked', async () => {
