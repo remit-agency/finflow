@@ -114,6 +114,7 @@ export function transactionToDoc(tx: LedgerTransaction): Record<string, unknown>
   if (tx.projectId !== undefined) doc.projectId = tx.projectId
   if (tx.fx !== undefined) doc.fx = tx.fx
   if (tx.base !== undefined) doc.base = tx.base
+  if (tx.importId !== undefined) doc.importId = tx.importId
   if (tx.bank !== undefined) {
     doc.source = 'bank'
     doc.bank = bankInfoToDoc(tx.bank)
@@ -210,6 +211,11 @@ export function parseTransaction(id: string, data: unknown): LedgerTransaction |
   if (autoRules !== undefined) tx.autoRules = autoRules
   if (data.excluded !== undefined && typeof data.excluded !== 'boolean') return null
   if (data.excluded === true) tx.excluded = true
+  // S14b: the import that wrote the operation. Malformed, the document is unreadable (as `excluded` is).
+  if (data.importId !== undefined) {
+    if (typeof data.importId !== 'string' || data.importId === '') return null
+    tx.importId = data.importId
+  }
   // S11: the series link. Malformed, on a transfer, or a flag without the link: the document is unreadable (as `excluded`).
   if (data.seriesId !== undefined || data.occurrence !== undefined) {
     if (type === 'transfer' || !isId(data.seriesId) || !isDay(data.occurrence)) return null
