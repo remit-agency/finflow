@@ -17,16 +17,8 @@ import { toast } from 'sonner'
 import { createAccount, updateAccount, LedgerApiError } from '@/lib/api/ledger-client'
 import { useFormatters } from '@/lib/i18n/useFormatters'
 import { formatAmountInput, parseSignedAmountInput } from '@/lib/utils/amount-input'
+import { ACCOUNT_COLORS as PRESET_COLORS } from '@/lib/domain/ledger/account-colors'
 import type { Account } from '@/types'
-
-const PRESET_COLORS = [
-  '#00c896',
-  '#6366f1',
-  '#ef4444',
-  '#f97316',
-  '#3b82f6',
-  '#a855f7',
-]
 
 // The labels are `t('types.<type>')`.
 const ACCOUNT_TYPES: Account['type'][] = ['bank', 'cash', 'card', 'crypto']

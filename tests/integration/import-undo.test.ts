@@ -86,6 +86,7 @@ describe('listImports: the imports of the company', () => {
     expect(views.map((v) => v.id)).toEqual([second.importId, first.importId])
     expect(views[0]).toEqual({
       id: second.importId,
+      kind: 'mt940',
       fileName: 'drugi.sta',
       createdAt: T2.replace('Z', '.000Z'),
       accountIds: ['a1'],
