@@ -1,8 +1,8 @@
 /** Cyrillic letters that look like Latin ones: the Finmap export mixes them into its header names. */
 const LOOKALIKE: Record<string, string> = {
-  'А': 'A', 'а': 'a', 'В': 'B', 'Е': 'E', 'е': 'e', 'К': 'K', 'к': 'k', 'М': 'M', 'Н': 'H', 'О': 'O', 'о': 'o',
-  'Р': 'P', 'р': 'p', 'С': 'C', 'с': 'c', 'Т': 'T', 'Х': 'X', 'х': 'x', 'У': 'Y', 'у': 'y', 'І': 'I', 'і': 'i',
-  'Ѕ': 'S', 'ѕ': 's', 'Ј': 'J', 'ј': 'j',
+  '\u0410': 'A', '\u0430': 'a', '\u0412': 'B', '\u0415': 'E', '\u0435': 'e', '\u041a': 'K', '\u043a': 'k', '\u041c': 'M', '\u041d': 'H', '\u041e': 'O', '\u043e': 'o',
+  '\u0420': 'P', '\u0440': 'p', '\u0421': 'C', '\u0441': 'c', '\u0422': 'T', '\u0425': 'X', '\u0445': 'x', '\u0423': 'Y', '\u0443': 'y', '\u0406': 'I', '\u0456': 'i',
+  '\u0405': 'S', '\u0455': 's', '\u0408': 'J', '\u0458': 'j',
 }
 
 /** A header name as a comparison key: look-alikes to Latin, lower case, no diacritics, only letters and digits. */
