@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { countAlreadyImported, runFinmapImport, type FinmapResult } from '@/lib/api/finmap-client'
+import { MAX_COUNTERPARTIES } from '@/lib/domain/counterparties/types'
 import { planFinmap } from '@/lib/domain/import/finmap/plan'
 import {
   accountSettingOf,
@@ -31,6 +32,7 @@ import {
   type FinmapRow,
 } from '@/lib/domain/import/finmap/types'
 import { fromMinor } from '@/lib/domain/ledger/money'
+import { MAX_TAGS } from '@/lib/domain/tags/types'
 import { useAccounts } from '@/lib/hooks/useAccounts'
 import { useCategories } from '@/lib/hooks/useCategories'
 import { useCounterparties } from '@/lib/hooks/useCounterparties'
@@ -144,7 +146,7 @@ export function FinmapDialog({ orgId, onClose }: Props) {
     const existing = existingNow()
     const plan = planFinmap(rows, existing, planOptions(from, todayDay()))
     if (gen !== generation.current) return
-    dispatch({ type: 'planned', plan })
+    dispatch({ type: 'planned', plan, have: { tags: existing.tags.length, counterparties: existing.counterparties.length } })
     if (plan.matched.accounts > 0) startCheck(plan, existing, gen)
   }
 
@@ -239,6 +241,8 @@ export function FinmapDialog({ orgId, onClose }: Props) {
         return t('error.too_big')
       case 'too_many_entities':
         return t('error.too_many_entities')
+      case 'company_limit':
+        return t(error.limit === 'tags' ? 'error.companyLimit.tags' : 'error.companyLimit.counterparties', { max: number(error.limit === 'tags' ? MAX_TAGS : MAX_COUNTERPARTIES) })
       case 'busy':
         return t('error.busy')
       case 'failed':

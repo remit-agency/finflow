@@ -1,5 +1,6 @@
-import { FieldValue, Timestamp, type DocumentReference } from 'firebase-admin/firestore'
+import { FieldValue, Timestamp, type DocumentReference, type QuerySnapshot } from 'firebase-admin/firestore'
 import { CounterpartyError } from '@/lib/domain/counterparties/errors'
+import { MAX_COUNTERPARTIES } from '@/lib/domain/counterparties/types'
 import { normKey } from '@/lib/domain/import/finmap/fold'
 import type { FinmapSetupRequest } from '@/lib/domain/import/finmap/request'
 import type { CategoryRef } from '@/lib/domain/import/finmap/types'
@@ -8,7 +9,7 @@ import { accountToDoc } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
 import type { AccountType, LedgerAccount } from '@/lib/domain/ledger/types'
 import { TagError } from '@/lib/domain/tags/errors'
-import { TAG_COLORS } from '@/lib/domain/tags/types'
+import { MAX_TAGS, TAG_COLORS } from '@/lib/domain/tags/types'
 import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from '@/lib/firebase/default-categories'
 import type { CounterpartyDeps } from '@/lib/server/counterparties/deps'
 import { createCounterparty } from '@/lib/server/counterparties/write'
@@ -353,6 +354,23 @@ async function recordAccounts(
   if (Object.keys(update).length > 0) await opened.ref.update(update)
 }
 
+/** How many of the wanted names (by `normKey`) the existing documents do not have. */
+function countNew(existing: QuerySnapshot, wanted: readonly string[]): number {
+  const have = new Set(existing.docs.flatMap((d) => (typeof d.get('name') === 'string' ? [normKey(d.get('name') as string)] : [])))
+  return new Set(wanted.map(normKey).filter((k) => !have.has(k))).size
+}
+
+/**
+ * The company caps the new counterparties and tags would cross (MAX_COUNTERPARTIES, MAX_TAGS; archived ones count), checked
+ * before anything is written, so a refused setup creates nothing. Accounts and categories have no company cap of their own:
+ * SETUP_LIMITS bounds one request. The planner and the dialog check the same caps before a run.
+ */
+async function assertCompanyRoom(deps: ImportDeps, orgId: string, req: FinmapSetupRequest): Promise<void> {
+  const [counterparties, tags] = await Promise.all([counterpartiesCol(deps.db, orgId).get(), tagsCol(deps.db, orgId).get()])
+  if (counterparties.size + countNew(counterparties, req.counterparties) > MAX_COUNTERPARTIES) throw new ImportError('limit_reached', 'counterparties')
+  if (tags.size + countNew(tags, req.tags) > MAX_TAGS) throw new ImportError('limit_reached', 'tags')
+}
+
 /** A value a pass must have resolved: every wanted entity is either matched or created before the last pass returns. */
 function resolvedId<V>(value: V | undefined, what: string): V {
   if (value === undefined) throw new Error(`finmap setup: ${what} was not resolved`)
@@ -366,6 +384,7 @@ function resolvedId<V>(value: V | undefined, what: string): V {
  * through their own writers, whose unique name keys make a concurrent duplicate fail and be read back.
  */
 export async function finmapSetup(deps: ImportDeps, orgId: string, uid: string, req: FinmapSetupRequest): Promise<FinmapSetupResult> {
+  await assertCompanyRoom(deps, orgId, req)
   const opened = await openImport(deps, orgId, uid, req)
   const { importId } = opened
   const wants = wantsOf(req)

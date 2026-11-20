@@ -1,8 +1,19 @@
+import { MAX_COUNTERPARTIES } from '@/lib/domain/counterparties/types'
 import { MAX_MINOR } from '@/lib/domain/ledger/money'
 import { LEDGER_CURRENCIES, type AccountType } from '@/lib/domain/ledger/types'
+import { MAX_TAGS } from '@/lib/domain/tags/types'
 import { normKey } from './fold'
 import { SETUP_LIMITS, type FinmapSetupAccount } from './request'
 import { MAX_FINMAP_BYTES, type ColumnKey, type FinmapPlan } from './types'
+
+/** The company's counts of the two entities with a cap of their own (archived items included: the ledger counts them too). */
+export interface CompanyCounts {
+  tags: number
+  counterparties: number
+}
+
+/** The entity whose company cap the plan would go over. */
+export type CompanyLimit = 'tags' | 'counterparties'
 
 /**
  * The Finmap import dialog as a pure state machine (S14b, no React, no I/O). The component reads the file, plans it and asks the
@@ -16,12 +27,14 @@ import { MAX_FINMAP_BYTES, type ColumnKey, type FinmapPlan } from './types'
  */
 export type FinmapPhase = 'idle' | 'reading' | 'planning' | 'choosing' | 'running' | 'done' | 'error'
 
-export type FinmapErrorCode = 'unknown_layout' | 'empty' | 'too_many_rows' | 'not_xlsx' | 'too_big' | 'too_many_entities' | 'busy' | 'failed'
+export type FinmapErrorCode = 'unknown_layout' | 'empty' | 'too_many_rows' | 'not_xlsx' | 'too_big' | 'too_many_entities' | 'company_limit' | 'busy' | 'failed'
 
 export interface FinmapError {
   code: FinmapErrorCode
   /** For `unknown_layout`: the column keys the file does not have. */
   missing?: ColumnKey[]
+  /** For `company_limit`: the entity whose cap the company would exceed. */
+  limit?: CompanyLimit
 }
 
 /** The part of a run's result the dialog reads. The client's result carries more (counts, refusals, entities). */
@@ -67,7 +80,7 @@ export type FinmapEvent<R extends FinmapRunResult = FinmapRunResult> =
   | { type: 'fileChosen'; fileName: string; size: number }
   | { type: 'tableRead'; rowsRead: number }
   | { type: 'failed'; error: FinmapError }
-  | { type: 'planned'; plan: FinmapPlan }
+  | { type: 'planned'; plan: FinmapPlan; have: CompanyCounts }
   | { type: 'optionChanged'; includePlanned?: boolean; pairTransfers?: boolean }
   | { type: 'accountChanged'; name: string; patch: Partial<NewAccountSetting> }
   | { type: 'checkProgress'; done: number; total: number }
@@ -135,6 +148,16 @@ export function entitiesOverLimit(plan: FinmapPlan): boolean {
   )
 }
 
+/**
+ * The company cap the plan would go over, tags first, or null. The setup creates what the plan lacks: a company holds at most
+ * MAX_TAGS tags and MAX_COUNTERPARTIES counterparties, archived ones included, so the plan must fit into what is left.
+ */
+export function companyLimitOf(plan: FinmapPlan, have: CompanyCounts): CompanyLimit | null {
+  if (have.tags + plan.create.tags.length > MAX_TAGS) return 'tags'
+  if (have.counterparties + plan.create.counterparties.length > MAX_COUNTERPARTIES) return 'counterparties'
+  return null
+}
+
 /** A balance as typed: `{ok: true, minor: null}` for empty, `{ok: true, minor}` for a decimal, `{ok: false}` otherwise. */
 export type BalanceParse = { ok: true; minor: number | null } | { ok: false }
 
@@ -182,16 +205,16 @@ export function finmapDialogReducer<R extends FinmapRunResult>(state: FinmapDial
     case 'failed':
       if (!BUSY.has(state.phase)) return state
       return { ...state, phase: 'error', error: event.error, progress: null, checking: null }
-    case 'planned':
+    case 'planned': {
       if (state.phase !== 'planning') return state
-      return {
-        ...state,
-        phase: 'choosing',
-        plan: event.plan,
-        checking: null,
-        alreadyImported: null,
-        error: entitiesOverLimit(event.plan) ? { code: 'too_many_entities' } : null,
-      }
+      const limit = companyLimitOf(event.plan, event.have)
+      const error: FinmapError | null = entitiesOverLimit(event.plan)
+        ? { code: 'too_many_entities' }
+        : limit === null
+          ? null
+          : { code: 'company_limit', limit }
+      return { ...state, phase: 'choosing', plan: event.plan, checking: null, alreadyImported: null, error }
+    }
     case 'optionChanged':
       if (state.phase !== 'choosing') return state
       return {

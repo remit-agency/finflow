@@ -680,6 +680,10 @@
         "not_xlsx": "To nie jest plik .xlsx.",
         "too_big": "Plik jest za duży.",
         "too_many_entities": "Plik dodaje za dużo nowych kont, kategorii, kontrahentów lub tagów naraz. Zmniejsz plik.",
+        "companyLimit": {
+          "tags": "Firma może mieć najwyżej {max} tagów, także zarchiwizowanych. Plik dodaje kolejne. Najpierw zarchiwizuj lub usuń część tagów.",
+          "counterparties": "Firma może mieć najwyżej {max} kontrahentów, także zarchiwizowanych. Plik dodaje kolejnych. Najpierw usuń część kontrahentów."
+        },
         "busy": "Trwa inny zapis. Spróbuj ponownie za minutę.",
         "failed": "Coś poszło nie tak. Spróbuj ponownie.",
         "stopped": "Import zatrzymany. Można ponowić: zapisane operacje się nie dublują."

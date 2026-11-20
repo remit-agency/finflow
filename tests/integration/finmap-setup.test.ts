@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Timestamp } from 'firebase-admin/firestore'
 import { normKey } from '@/lib/domain/import/finmap/fold'
 import type { FinmapSetupRequest } from '@/lib/domain/import/finmap/request'
+import { MAX_TAGS } from '@/lib/domain/tags/types'
 import type { ImportDeps } from '@/lib/server/imports/deps'
 import { finmapSetup } from '@/lib/server/imports/finmap/setup'
 import { ImportError } from '@/lib/server/imports/errors'
@@ -263,6 +264,19 @@ describe('finmapSetup', () => {
     const withOps = await finmapSetup(at(4), ORG, UID, request())
     expect(withOps.importId).not.toBe(imp.id)
     expect(withOps.importId).not.toBe(lateSame.importId)
+  })
+
+  it('refuses a setup that would take the company over its tag cap before it creates anything', async () => {
+    // seedExisting has one tag ('Firma', which the request matches): 99 more make the company hold MAX_TAGS, so the one new tag does not fit.
+    for (let i = 0; i < MAX_TAGS - 1; i++) await seedTag(db, ORG, `t-${i}`, { name: `Etykieta ${i}` })
+    expect(await countOf('tags')).toBe(MAX_TAGS)
+    await expect(finmapSetup(depsFor(), ORG, UID, request())).rejects.toMatchObject({ code: 'limit_reached', field: 'tags' })
+
+    expect(await countOf('accounts')).toBe(1)
+    expect(await countOf('categories')).toBe(3)
+    expect(await countOf('counterparties')).toBe(1)
+    expect(await countOf('tags')).toBe(MAX_TAGS)
+    expect((await db.collection(path('imports')).get()).size).toBe(0)
   })
 
   it('two simultaneous runs with new names create each entity once', async () => {

@@ -680,6 +680,10 @@
         "not_xlsx": "This is not an .xlsx file.",
         "too_big": "The file is too large.",
         "too_many_entities": "The file adds too many new accounts, categories, counterparties or tags at once. Make the file smaller.",
+        "companyLimit": {
+          "tags": "The company can hold at most {max} tags, archived ones included. The file adds more. Archive or remove some tags first.",
+          "counterparties": "The company can hold at most {max} counterparties, archived ones included. The file adds more. Remove some counterparties first."
+        },
         "busy": "Another write is in progress. Try again in a minute.",
         "failed": "Something went wrong. Try again.",
         "stopped": "The import stopped. You can try again: what was written is not duplicated."

@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { normKey as normKeyOf } from '@/lib/domain/import/finmap/fold'
 import { SETUP_LIMITS } from '@/lib/domain/import/finmap/request'
 import { MAX_FINMAP_BYTES, type FinmapCounts, type FinmapPlan, type PlannedOp } from '@/lib/domain/import/finmap/types'
+import { MAX_COUNTERPARTIES } from '@/lib/domain/counterparties/types'
+import { MAX_TAGS } from '@/lib/domain/tags/types'
 import {
   accountSettingOf,
   canRun,
+  companyLimitOf,
   entitiesOverLimit,
   finmapDialogReducer,
   initialFinmapState,
@@ -63,9 +66,12 @@ function step<R extends FinmapRunResult = FinmapRunResult>(state: FinmapDialogSt
   return events.reduce((s, e) => finmapDialogReducer(s, e), state)
 }
 
+/** The company's counts of tags and counterparties when a test does not care about them (an empty company). */
+const EMPTY_COMPANY = { tags: 0, counterparties: 0 }
+
 /** A state in `choosing` with `plan` (a file read and planned). */
 function choosing(plan: FinmapPlan = planWith(), companyCurrency = 'PLN'): FinmapDialogState {
-  return step(start(companyCurrency), { type: 'fileChosen', fileName: 'x.xlsx', size: 10 }, { type: 'tableRead', rowsRead: 1 }, { type: 'planned', plan })
+  return step(start(companyCurrency), { type: 'fileChosen', fileName: 'x.xlsx', size: 10 }, { type: 'tableRead', rowsRead: 1 }, { type: 'planned', plan, have: EMPTY_COMPANY })
 }
 
 describe('initialFinmapState', () => {
@@ -172,7 +178,22 @@ describe('planned', () => {
 
   it('is ignored outside planning', () => {
     const s = choosing()
-    expect(finmapDialogReducer(s, { type: 'planned', plan: planWith() })).toBe(s)
+    expect(finmapDialogReducer(s, { type: 'planned', plan: planWith(), have: EMPTY_COMPANY })).toBe(s)
+  })
+
+  it('blocks the run with company_limit when the company has no room for the tags or counterparties the file adds', () => {
+    const plan = planWith({ create: { accounts: [], categories: [], counterparties: ['Dostawca A'], tags: ['Etykieta A', 'Etykieta B'] } })
+    const s = step(start(), { type: 'fileChosen', fileName: 'x.xlsx', size: 10 }, { type: 'tableRead', rowsRead: 1 }, { type: 'planned', plan, have: { tags: MAX_TAGS - 1, counterparties: 0 } })
+    expect(s.phase).toBe('choosing')
+    expect(s.error).toEqual({ code: 'company_limit', limit: 'tags' })
+    expect(canRun(s)).toBe(false)
+    // Exactly at the cap is allowed: the two new tags fill the company up to MAX_TAGS.
+    const room = step(start(), { type: 'fileChosen', fileName: 'x.xlsx', size: 10 }, { type: 'tableRead', rowsRead: 1 }, { type: 'planned', plan, have: { tags: MAX_TAGS - 2, counterparties: MAX_COUNTERPARTIES - 1 } })
+    expect(room.error).toBeNull()
+    expect(canRun(room)).toBe(true)
+    // One counterparty over the company's cap, the tags fit.
+    const counterparty = step(start(), { type: 'fileChosen', fileName: 'x.xlsx', size: 10 }, { type: 'tableRead', rowsRead: 1 }, { type: 'planned', plan, have: { tags: 0, counterparties: MAX_COUNTERPARTIES } })
+    expect(counterparty.error).toEqual({ code: 'company_limit', limit: 'counterparties' })
   })
 
   it('keeps the plan but blocks the run when a limit of the setup is exceeded', () => {
@@ -188,7 +209,7 @@ describe('planned', () => {
   it('clears a previous count when the plan changes', () => {
     const counted = step(choosing(), { type: 'checkProgress', done: 1, total: 2 }, { type: 'checked', alreadyImported: 1 })
     const s = step(counted, { type: 'optionChanged', includePlanned: true })
-    const replanned = finmapDialogReducer(s, { type: 'planned', plan: planWith() })
+    const replanned = finmapDialogReducer(s, { type: 'planned', plan: planWith(), have: EMPTY_COMPANY })
     expect(replanned.alreadyImported).toBeNull()
     expect(replanned.checking).toBeNull()
   })
@@ -386,7 +407,7 @@ describe('canRun', () => {
 
   it('ignores a balance text of an account that is no longer new', () => {
     const planNew = planWith({ create: { accounts: ['Konto A'], categories: [], counterparties: [], tags: [] } })
-    const s = step(choosing(planNew), { type: 'accountChanged', name: 'Konto A', patch: { balanceText: 'bad' } }, { type: 'accountChanged', name: 'Konto A', patch: { currency: 'EUR' } }, { type: 'planned', plan: planWith() })
+    const s = step(choosing(planNew), { type: 'accountChanged', name: 'Konto A', patch: { balanceText: 'bad' } }, { type: 'accountChanged', name: 'Konto A', patch: { currency: 'EUR' } }, { type: 'planned', plan: planWith(), have: EMPTY_COMPANY })
     expect(s.phase).toBe('choosing')
     expect(canRun(s)).toBe(true)
   })
@@ -444,7 +465,7 @@ describe('setup input from the dialog state', () => {
   it('turns the settings of the new accounts into setup accounts, with a typed balance in minor units', () => {
     const plan = planWith({ create: { accounts: ['Konto A', 'Konto B'], categories: [], counterparties: [], tags: [] } })
     let s = choosing(plan, 'PLN')
-    s = step(s, { type: 'accountChanged', name: 'Konto A', patch: { type: 'card', currency: 'EUR', balanceText: '10,5' } }, { type: 'planned', plan })
+    s = step(s, { type: 'accountChanged', name: 'Konto A', patch: { type: 'card', currency: 'EUR', balanceText: '10,5' } }, { type: 'planned', plan, have: EMPTY_COMPANY })
     expect(setupAccounts(s)).toEqual([
       { name: 'Konto A', type: 'card', currency: 'EUR', currentBalanceMinor: 1050 },
       { name: 'Konto B', type: 'bank', currency: 'PLN', currentBalanceMinor: null },
@@ -454,7 +475,7 @@ describe('setup input from the dialog state', () => {
   it('maps every new account name to its currency for the planner', () => {
     const plan = planWith({ create: { accounts: ['Konto A'], categories: [], counterparties: [], tags: [] } })
     let s = choosing(plan, 'PLN')
-    s = step(s, { type: 'accountChanged', name: 'Konto A', patch: { currency: 'USD' } }, { type: 'planned', plan })
+    s = step(s, { type: 'accountChanged', name: 'Konto A', patch: { currency: 'USD' } }, { type: 'planned', plan, have: EMPTY_COMPANY })
     const currencies = newAccountCurrencies(s)
     expect(currencies[normKeyOf('Konto A')]).toBe('USD')
     expect(Object.keys(currencies)).toHaveLength(1)
@@ -473,5 +494,21 @@ describe('entitiesOverLimit', () => {
     expect(entitiesOverLimit(with_(SETUP_LIMITS.counterparties + 1, 'counterparties'))).toBe(true)
     expect(entitiesOverLimit(with_(SETUP_LIMITS.tags, 'tags'))).toBe(false)
     expect(entitiesOverLimit(with_(SETUP_LIMITS.tags + 1, 'tags'))).toBe(true)
+  })
+})
+
+describe('companyLimitOf', () => {
+  const adds = (n: number, key: 'tags' | 'counterparties'): FinmapPlan =>
+    planWith({ create: { accounts: [], categories: [], counterparties: [], tags: [], [key]: Array.from({ length: n }, (_, i) => `${key} ${i}`) } })
+
+  it('is null while the company stays within its caps, counting the archived items it already has', () => {
+    expect(companyLimitOf(adds(MAX_TAGS, 'tags'), { tags: 0, counterparties: 0 })).toBeNull()
+    expect(companyLimitOf(adds(10, 'tags'), { tags: MAX_TAGS - 10, counterparties: 0 })).toBeNull()
+    expect(companyLimitOf(adds(1, 'counterparties'), { tags: 0, counterparties: MAX_COUNTERPARTIES - 1 })).toBeNull()
+  })
+
+  it('names the cap the plan goes over, tags first', () => {
+    expect(companyLimitOf(adds(1, 'tags'), { tags: MAX_TAGS, counterparties: 0 })).toBe('tags')
+    expect(companyLimitOf(adds(1, 'counterparties'), { tags: 0, counterparties: MAX_COUNTERPARTIES })).toBe('counterparties')
   })
 })
