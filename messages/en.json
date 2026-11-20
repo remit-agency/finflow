@@ -144,6 +144,7 @@
       "categories": "Categories",
       "counterparties": "Counterparties",
       "banks": "Banks",
+      "imports": "Imports",
       "subscription": "Subscription",
       "tags": "Tags"
     },
@@ -600,6 +601,43 @@
       "other": "Other (expense)"
     }
   },
+  "import": {
+    "open": "Import",
+    "title": "Import a statement",
+    "pickFile": "Choose an MT940 file (.sta, .mt940, .txt)",
+    "tooBig": "The file is larger than 4 MB",
+    "tooMany": "The file has more than {limit} operations",
+    "notMt940": "This is not an MT940 statement (line {line})",
+    "failed": "The import failed",
+    "statement": "Statement {n}",
+    "period": "Period",
+    "balances": "Balance: {opening} → {closing}",
+    "account": "FinFlow account",
+    "skip": "Skip this statement",
+    "counts": "New: {new} · already in: {seen} · from the bank: {bank} · refused: {refused}",
+    "noAdd": "The statement does not add up: difference {diff}",
+    "currencyMismatch": "The statement currency ({statement}) differs from the account currency ({account})",
+    "run": "Import",
+    "progress": "{done} of {total}",
+    "busy": "Another import of this account is still running. Try again in a minute.",
+    "created": "Created: {n}",
+    "skippedSeen": "Already there: {n}",
+    "skippedBank": "Already from the bank: {n}",
+    "refused": "Refused: {n}",
+    "reason": {
+      "date": "date out of range",
+      "future_date": "date in the future",
+      "currency_mismatch": "other currency",
+      "amount": "invalid amount"
+    },
+    "status": {
+      "new": "New",
+      "seen": "Already there",
+      "bank": "From the bank"
+    },
+    "fitted": "The opening balance was fitted to the statement",
+    "difference": "The FinFlow balance differs from the statement closing balance by {diff}"
+  },
   "settings": {
     "title": "Settings",
     "counterparties": {
@@ -774,6 +812,18 @@
         "tagMissing": "The tag was not found",
         "tagArchived": "The tag is archived"
       }
+    },
+    "imports": {
+      "title": "Imports",
+      "empty": "No imports yet",
+      "undo": "Undo import",
+      "undoConfirm": "Remove the operations of this import? Operations you changed afterwards stay.",
+      "undone": "Undone {date}: removed {deleted}, kept {kept}",
+      "kept": "Kept because changed after the import: {n}",
+      "row": "{file} · {created} operations · {date}",
+      "undoing": "Undo in progress",
+      "deleted": "Deleted {n}",
+      "failed": "The imports could not be loaded or undone"
     },
     "banks": {
       "title": "Bank connection",

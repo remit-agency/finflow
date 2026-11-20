@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { X } from 'lucide-react'
 import { CashGapBanner } from '@/components/forecast/CashGapBanner'
 import { ConfirmDialog } from '@/components/forms/transaction/ConfirmDialog'
+import { ImportButton } from '@/components/import/ImportButton'
 import { BulkEditDialog } from '@/components/transactions/BulkEditDialog'
 import { ConvertTransferDialog } from '@/components/transactions/ConvertTransferDialog'
 import { ExportButton } from '@/components/transactions/ExportButton'
@@ -389,6 +390,7 @@ export default function TransactionsPage() {
                 </button>
               </span>
             )}
+            {canEdit && <ImportButton orgId={orgId} accounts={accounts} />}
             <ExportButton
               orgId={orgId}
               filters={filters}

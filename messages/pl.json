@@ -144,6 +144,7 @@
       "categories": "Kategorie",
       "counterparties": "Kontrahenci",
       "banks": "Banki",
+      "imports": "Importy",
       "subscription": "Subskrypcja",
       "tags": "Tagi"
     },
@@ -600,6 +601,43 @@
       "other": "Inne (wydatek)"
     }
   },
+  "import": {
+    "open": "Import",
+    "title": "Import wyciągu",
+    "pickFile": "Wybierz plik MT940 (.sta, .mt940, .txt)",
+    "tooBig": "Plik większy niż 4 MB",
+    "tooMany": "W pliku jest ponad {limit} operacji",
+    "notMt940": "To nie jest wyciąg MT940 (wiersz {line})",
+    "failed": "Nie udało się zaimportować pliku",
+    "statement": "Wyciąg {n}",
+    "period": "Okres",
+    "balances": "Saldo: {opening} → {closing}",
+    "account": "Rachunek FinFlow",
+    "skip": "Pomiń wyciąg",
+    "counts": "Nowych: {new} · już są: {seen} · z banku: {bank} · odrzuconych: {refused}",
+    "noAdd": "Wyciąg się nie zgadza: różnica {diff}",
+    "currencyMismatch": "Waluta wyciągu ({statement}) różni się od waluty rachunku ({account})",
+    "run": "Importuj",
+    "progress": "{done} z {total}",
+    "busy": "Inny import tego rachunku jeszcze trwa. Spróbuj za minutę.",
+    "created": "Utworzono: {n}",
+    "skippedSeen": "Już były: {n}",
+    "skippedBank": "Już są z banku: {n}",
+    "refused": "Odrzucono: {n}",
+    "reason": {
+      "date": "data poza zakresem",
+      "future_date": "data w przyszłości",
+      "currency_mismatch": "inna waluta",
+      "amount": "nieprawidłowa kwota"
+    },
+    "status": {
+      "new": "Nowa",
+      "seen": "Już jest",
+      "bank": "Z banku"
+    },
+    "fitted": "Saldo początkowe dopasowano do wyciągu",
+    "difference": "Saldo FinFlow różni się od salda końcowego wyciągu o {diff}"
+  },
   "settings": {
     "title": "Ustawienia",
     "counterparties": {
@@ -774,6 +812,18 @@
         "tagMissing": "Nie znaleziono tagu",
         "tagArchived": "Tag jest w archiwum"
       }
+    },
+    "imports": {
+      "title": "Importy",
+      "empty": "Nie było jeszcze importów",
+      "undo": "Cofnij import",
+      "undoConfirm": "Usunąć operacje tego importu? Operacje zmienione po imporcie zostaną.",
+      "undone": "Cofnięto {date}: usunięto {deleted}, zostawiono {kept}",
+      "kept": "Zostawiono, bo zmieniono po imporcie: {n}",
+      "row": "{file} · {created} operacji · {date}",
+      "undoing": "Trwa cofanie",
+      "deleted": "Usunięto {n}",
+      "failed": "Nie udało się wczytać ani cofnąć importów"
     },
     "banks": {
       "title": "Połączenie z bankiem",

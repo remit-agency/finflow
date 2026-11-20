@@ -31,7 +31,7 @@ describe('isSettingsPath', () => {
 
 describe('SETTINGS_SECTIONS', () => {
   it('lists the sections in menu order', () => {
-    expect(SETTINGS_SECTIONS.map((s) => s.slug)).toEqual(['company', 'language', 'categories', 'counterparties', 'tags', 'banks', 'subscription'])
+    expect(SETTINGS_SECTIONS.map((s) => s.slug)).toEqual(['company', 'language', 'categories', 'counterparties', 'tags', 'banks', 'imports', 'subscription'])
   })
 })
 
@@ -53,6 +53,7 @@ describe('activeSettingsSection', () => {
     ['/org1/settings/counterparties', 'counterparties'],
     ['/org1/settings/tags', 'tags'],
     ['/org1/settings/banks', 'banks'],
+    ['/org1/settings/imports', 'imports'],
     ['/org1/settings/subscription/extra', 'subscription'],
   ])('%s -> %s', (path, section) => {
     expect(activeSettingsSection(path, 'org1')).toBe(section)
@@ -103,11 +104,14 @@ describe('role-aware settings sections', () => {
   const slugs = (role: Parameters<typeof visibleSettingsSections>[0]) => visibleSettingsSections(role).map((s) => s.slug)
 
   it('owner sees everything', () => {
-    expect(slugs('owner')).toEqual(['company', 'language', 'categories', 'counterparties', 'tags', 'banks', 'subscription'])
+    expect(slugs('owner')).toEqual(['company', 'language', 'categories', 'counterparties', 'tags', 'banks', 'imports', 'subscription'])
   })
 
-  it('accountant and viewer do not see banks and subscription', () => {
-    expect(slugs('accountant')).toEqual(['company', 'language', 'categories', 'counterparties', 'tags'])
+  it('accountant sees imports but not banks and subscription', () => {
+    expect(slugs('accountant')).toEqual(['company', 'language', 'categories', 'counterparties', 'tags', 'imports'])
+  })
+
+  it('viewer sees neither banks, imports nor subscription', () => {
     expect(slugs('viewer')).toEqual(['company', 'language', 'categories', 'counterparties', 'tags'])
   })
 
@@ -121,5 +125,8 @@ describe('role-aware settings sections', () => {
     expect(canOpenSection('accountant', 'banks')).toBe(false)
     expect(canOpenSection('viewer', 'subscription')).toBe(false)
     expect(canOpenSection('viewer', 'categories')).toBe(true)
+    expect(canOpenSection('accountant', 'imports')).toBe(true)
+    expect(canOpenSection('owner', 'imports')).toBe(true)
+    expect(canOpenSection('viewer', 'imports')).toBe(false)
   })
 })
