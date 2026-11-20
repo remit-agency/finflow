@@ -42,3 +42,86 @@ export interface TableIssue {
   /** For `unknown_layout`: the column keys that were not found. */
   missing?: ColumnKey[]
 }
+
+export type FinmapRefusal = 'date' | 'amount' | 'account' | 'planned_off' | 'accrual_after_horizon'
+export type OpKind = 'income' | 'expense' | 'transfer'
+
+/** What the import knows of FinFlow before it starts (names only; ids come back from the setup step). */
+export interface FinmapExisting {
+  companyCurrency: string
+  accounts: Array<{ id: string; name: string; currency: string }>
+  categories: Array<{ id: string; name: string; type: 'income' | 'expense'; parentId?: string }>
+  counterparties: Array<{ id: string; name: string }>
+  tags: Array<{ id: string; name: string }>
+}
+export interface FinmapOptions {
+  /** Rows dated after `today` become planned operations when true, and are left out when false. */
+  includePlanned: boolean
+  pairTransfers: boolean
+  /** The Warsaw day. */
+  today: string
+  /** Currency of accounts that do not exist yet, keyed by `normKey` of the account name. Default: the company currency. */
+  newAccountCurrency?: Record<string, string>
+}
+
+/** A category reference by names; `child` is the subcategory name. */
+export interface CategoryRef {
+  type: 'income' | 'expense'
+  parent: string
+  child: string | null
+}
+
+/** One operation the import will write, by names (the client resolves ids after the setup step). */
+export interface PlannedOp {
+  kind: OpKind
+  status: 'actual' | 'planned'
+  day: string
+  amountMinor: number
+  /** Account names: `account` is the source (the expense side or the transfer's source), `toAccount` the target. */
+  account: string
+  toAccount: string | null
+  /** The amount that arrives (transfers between accounts of different currencies); null otherwise. */
+  toAmountMinor: number | null
+  category: CategoryRef | null
+  counterparty: string | null
+  tags: string[]
+  description: string | null
+  accrual: { from: string; to: string } | null
+  /** The strings that identify the operation in its key besides the account ids and the ordinal. */
+  identity: string[]
+  ordinal: number
+  /** The sheet lines it came from (one, or two for a transfer): for messages only. */
+  lines: number[]
+}
+
+export interface FinmapCounts {
+  rows: number
+  income: number
+  expense: number
+  transfer: number
+  planned: number
+  /**
+   * Pairs not made only because a side has a real category or a counterparty: groups of exactly one expense and one income
+   * on different accounts with the same currency. 0 when pairing is off.
+   */
+  pairCandidatesLeft: number
+  refused: Partial<Record<FinmapRefusal, number>>
+  /** Warnings that do not stop a row. */
+  warnings: { commentCut: number; subcounterparty: number; project: number; accrualIgnored: number; categoryIgnored: number }
+}
+
+export interface FinmapPlan {
+  operations: PlannedOp[]
+  /** The first and last day of the operations; null when there are none. */
+  period: { from: string; to: string } | null
+  /** What does not exist in FinFlow yet (by normalised name; categories parents first). */
+  create: {
+    accounts: string[]
+    categories: CategoryRef[]
+    counterparties: string[]
+    tags: string[]
+  }
+  /** Names matched to existing FinFlow items (counts for the preview). */
+  matched: { accounts: number; categories: number; counterparties: number; tags: number }
+  counts: FinmapCounts
+}
