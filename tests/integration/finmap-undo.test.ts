@@ -239,8 +239,8 @@ describe('undoFinmapStep', () => {
     const defaultCalls = spyDefault.mock.calls.length
     spyDefault.mockRestore()
     expect(first).toMatchObject({ deleted: 60, done: false })
-    // Locks (acquire and release per account, three accounts) plus one transaction for the group.
-    expect(defaultCalls).toBe(3 * 2 + 1)
+    // The locks of the three accounts (taken in one transaction, freed in one) plus one transaction for the group.
+    expect(defaultCalls).toBe(2 + 1)
     await undoAll()
 
     // The same shape on a second import, with a budget small enough to split it.
@@ -251,7 +251,7 @@ describe('undoFinmapStep', () => {
     const splitCalls = spy.mock.calls.length
     spy.mockRestore()
     expect(split).toMatchObject({ deleted: 60, kept: [], done: false })
-    expect(splitCalls).toBeGreaterThan(3 * 2 + 1)
+    expect(splitCalls).toBeGreaterThan(2 + 1)
     await undoAll('imp-b')
     expect(await txIds()).toEqual([])
     expect(await verifyLedger(ledgerDeps(), ORG)).toMatchObject({ ok: true, transactions: 0, balanceDiffs: [], rollupDiffs: [] })

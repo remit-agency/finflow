@@ -332,8 +332,20 @@ describe('finmapBatch', () => {
     const ops = [op(0, { accountId: 'eur1', kind: 'income', categoryId: 'inc' }), op(1, { accountId: 'pln1' })]
     await expect(finmapBatch(depsFor(), ORG, UID, { importId: IMPORT, operations: ops })).rejects.toMatchObject({ code: 'already_running' })
     expect(Object.keys(await txsOf(ORG))).toHaveLength(0)
-    expect((await readDoc(db, `${col(ORG, 'importLocks')}/eur1`))?.until).toBe(0)
+    expect((await readDoc(db, `${col(ORG, 'importLocks')}/eur1`))?.until ?? 0).toBe(0)
     expect((await readDoc(db, `${col(ORG, 'importLocks')}/pln1`))?.until).toBe(future)
+  })
+
+  it('takes the account locks of a request in one transaction and frees them in one, not one per account', async () => {
+    const spy = vi.spyOn(db, 'runTransaction')
+    try {
+      await finmapBatch(depsFor(), ORG, UID, { importId: IMPORT, operations: thirtyOps() })
+      // Three accounts: one transaction takes the three locks, one writes the group, one records the totals, one frees the locks.
+      expect(spy.mock.calls.length).toBeLessThanOrEqual(4)
+    } finally {
+      spy.mockRestore()
+    }
+    for (const id of ['pln1', 'pln2', 'eur1']) expect((await readDoc(db, `${col(ORG, 'importLocks')}/${id}`))?.until ?? 0).toBe(0)
   })
 
   it('writes an operation once when two identical requests run at the same time', async () => {

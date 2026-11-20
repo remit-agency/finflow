@@ -20,7 +20,7 @@ import { seenKeysOf } from '../bank-ops'
 import type { ImportDeps } from '../deps'
 import { ImportError } from '../errors'
 import { importLocksCol, importsCol } from '../paths'
-import { acquire, release } from '../step'
+import { acquireAll, releaseAll } from '../step'
 import { parseImportDoc, type ImportDoc } from '../types'
 import { finmapKey, finmapTxId } from './key'
 
@@ -117,15 +117,11 @@ function bodyOf(o: BatchOp, key: string): Record<string, unknown> {
 export async function finmapBatch(deps: ImportDeps, orgId: string, uid: string, req: FinmapBatchRequest): Promise<FinmapBatchResult> {
   const importRef = await openFinmapImport(deps, orgId, req.importId)
   const accountIds = [...new Set(req.operations.flatMap((o) => (o.toAccountId === null ? [o.accountId] : [o.accountId, o.toAccountId])))].sort()
-  const held: Array<{ ref: DocumentReference; token: string }> = []
+  const lockRefs = accountIds.map((id) => importLocksCol(deps.db, orgId).doc(id))
+  const token = randomUUID()
   const totals: Totals = { created: 0, skipped: 0, refused: [], accountIds: new Set(), days: [] }
+  await acquireAll(deps, lockRefs, token)
   try {
-    for (const id of accountIds) {
-      const ref = importLocksCol(deps.db, orgId).doc(id)
-      const token = randomUUID()
-      await acquire(deps, ref, token)
-      held.push({ ref, token })
-    }
     try {
       await writeAll(deps, orgId, uid, req, totals)
     } finally {
@@ -133,7 +129,7 @@ export async function finmapBatch(deps: ImportDeps, orgId: string, uid: string, 
       await recordTotals(deps.db, importRef, totals)
     }
   } finally {
-    for (const h of held.reverse()) await release(deps, h.ref, h.token)
+    await releaseAll(deps, lockRefs, token)
   }
   return { created: totals.created, skipped: totals.skipped, refused: totals.refused }
 }
