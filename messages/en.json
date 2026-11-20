@@ -602,6 +602,95 @@
     }
   },
   "import": {
+    "source": {
+      "title": "Import source",
+      "description": "Choose the format of the file with the operations.",
+      "mt940": "Bank statement (MT940)",
+      "mt940Hint": "A .sta, .mt940 or .txt file from the bank",
+      "finmap": "Finmap «Płatności» export",
+      "finmapHint": "A .xlsx file from Finmap"
+    },
+    "finmap": {
+      "title": "Import from Finmap",
+      "pickFile": "Choose the .xlsx file («Płatności» export)",
+      "reading": "Reading the file…",
+      "planning": "Analysing the operations…",
+      "rowsRead": "Rows in the file: {n}",
+      "noPeriod": "The file has no operations to import.",
+      "period": "Period: {from} – {to}",
+      "income": "Income: {n}",
+      "expense": "Expenses: {n}",
+      "transfer": "Transfers between accounts: {n}",
+      "planned": "Planned (after today): {n}",
+      "createHeading": "Will be created",
+      "createAccounts": "Accounts: {n}",
+      "createCategories": "Categories: {n}, subcategories: {sub}",
+      "createCounterparties": "Counterparties: {n}",
+      "createTags": "Tags: {n}",
+      "matched": "Already in FinFlow: accounts {accounts}, categories {categories}, counterparties {counterparties}, tags {tags}",
+      "alreadyImported": "Already imported earlier: {n}",
+      "checking": "Checking what is already imported: {done} of {total}",
+      "refusedHeading": "Rows refused: {n}",
+      "refusal": {
+        "date": "Invalid date",
+        "amount": "Invalid amount",
+        "account": "No account",
+        "name": "Name empty or too long",
+        "planned_off": "Planned operations are off",
+        "accrual_after_horizon": "Accrual beyond the horizon"
+      },
+      "warningsHeading": "Warnings",
+      "warning": {
+        "commentCut": "Comments shortened: {n}",
+        "subcounterparty": "Subcounterparties skipped: {n}",
+        "project": "Projects skipped: {n}",
+        "accrualIgnored": "Accrual periods ignored: {n}",
+        "categoryIgnored": "«No category» entries ignored: {n}"
+      },
+      "pairCandidatesLeft": "Similar transfers not merged into one: {n}",
+      "includePlanned": "Include planned operations (after today)",
+      "pairTransfers": "Merge an income and an expense pair into a transfer",
+      "accounts": {
+        "heading": "New accounts",
+        "hint": "Enter the current balance. It is matched at the end of the import.",
+        "type": "Type",
+        "currency": "Currency",
+        "balance": "Current balance",
+        "balanceInvalid": "Enter an amount, for example 1,234.50"
+      },
+      "run": "Import",
+      "stop": "Stop",
+      "retry": "Try again",
+      "progress": "{done} of {total}",
+      "resultHeading": "Result",
+      "created": "Operations created: {n}",
+      "skipped": "Skipped, already there: {n}",
+      "refused": "Refused: {n}",
+      "sample": "File rows with refusal samples: {n}",
+      "transfers": "Transfers: {n}",
+      "entities": "Created: accounts {accounts}, categories {categories}, counterparties {counterparties}, tags {tags}",
+      "fitted": "Accounts with a matched balance: {n}",
+      "differencesHeading": "Balance difference",
+      "difference": "{name}: {diff}",
+      "tagsDropped": "Tags dropped (more than ten on an operation): {n}",
+      "error": {
+        "unknown_layout": "This does not look like a Finmap «Płatności» export. Missing columns: {columns}.",
+        "empty": "The file has no rows with operations.",
+        "too_many_rows": "The file has too many rows.",
+        "not_xlsx": "This is not an .xlsx file.",
+        "too_big": "The file is too large.",
+        "too_many_entities": "The file adds too many new accounts, categories, counterparties or tags at once. Make the file smaller.",
+        "busy": "Another write is in progress. Try again in a minute.",
+        "failed": "Something went wrong. Try again.",
+        "stopped": "The import stopped. You can try again: what was written is not duplicated."
+      },
+      "columns": {
+        "paymentDate": "Data płatności",
+        "amountAccount": "Kwota w walucie konta",
+        "from": "Z konta",
+        "to": "Na konto"
+      }
+    },
     "open": "Import",
     "title": "Import a statement",
     "pickFile": "Choose an MT940 file (.sta, .mt940, .txt)",
@@ -819,6 +908,11 @@
       }
     },
     "imports": {
+      "kind": {
+        "mt940": "MT940",
+        "finmap": "Finmap"
+      },
+      "entities": "Created: accounts {accounts}, categories {categories}, counterparties {counterparties}, tags {tags}",
       "title": "Imports",
       "empty": "No imports yet",
       "undo": "Undo import",

@@ -51,6 +51,7 @@ async function setupShell(page: Page, request: APIRequestContext, prefix: string
 async function importFixture(page: Page, orgId: string): Promise<void> {
   await page.goto(journalUrl(orgId))
   await page.getByTestId('import-open').click()
+  await page.getByTestId('import-source-mt940').click()
   const dialog = importDialog(page)
   await dialog.getByTestId('import-file').setInputFiles(FIXTURE)
   await dialog.getByTestId('import-account').selectOption(ACCOUNT_ID)
@@ -68,6 +69,7 @@ test.describe('MT940 import and undo (emulators)', () => {
     const user = await setupShell(page, request, 'imp-first')
     await page.goto(journalUrl(user.orgId))
     await page.getByTestId('import-open').click()
+    await page.getByTestId('import-source-mt940').click()
 
     const dialog = importDialog(page)
     await dialog.getByTestId('import-file').setInputFiles(FIXTURE)
@@ -101,6 +103,7 @@ test.describe('MT940 import and undo (emulators)', () => {
 
     await page.goto(journalUrl(user.orgId))
     await page.getByTestId('import-open').click()
+    await page.getByTestId('import-source-mt940').click()
     const dialog = importDialog(page)
     await dialog.getByTestId('import-file').setInputFiles(FIXTURE)
     await dialog.getByTestId('import-account').selectOption(ACCOUNT_ID)
@@ -200,6 +203,7 @@ test.describe('MT940 import and undo (emulators)', () => {
 
     await page.goto(journalUrl(user.orgId))
     await page.getByTestId('import-open').click()
+    await page.getByTestId('import-source-mt940').click()
     const dialog = importDialog(page)
     await dialog.getByTestId('import-file').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') })
     await expect(dialog.getByRole('alert')).toContainText('Це не виписка MT940')

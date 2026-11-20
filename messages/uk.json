@@ -602,6 +602,95 @@
     }
   },
   "import": {
+    "source": {
+      "title": "Джерело імпорту",
+      "description": "Оберіть формат файлу з операціями.",
+      "mt940": "Банківська виписка (MT940)",
+      "mt940Hint": "Файл .sta, .mt940 або .txt з банку",
+      "finmap": "Експорт Finmap «Płatności»",
+      "finmapHint": "Файл .xlsx з Finmap"
+    },
+    "finmap": {
+      "title": "Імпорт з Finmap",
+      "pickFile": "Оберіть файл .xlsx (експорт «Płatności»)",
+      "reading": "Читаю файл…",
+      "planning": "Розбираю операції…",
+      "rowsRead": "Рядків у файлі: {n}",
+      "noPeriod": "У файлі немає операцій для імпорту.",
+      "period": "Період: {from} – {to}",
+      "income": "Доходи: {n}",
+      "expense": "Витрати: {n}",
+      "transfer": "Перекази між рахунками: {n}",
+      "planned": "Заплановані (після сьогодні): {n}",
+      "createHeading": "Буде створено",
+      "createAccounts": "Рахунків: {n}",
+      "createCategories": "Категорій: {n}, підкатегорій: {sub}",
+      "createCounterparties": "Контрагентів: {n}",
+      "createTags": "Тегів: {n}",
+      "matched": "Вже є у FinFlow: рахунків {accounts}, категорій {categories}, контрагентів {counterparties}, тегів {tags}",
+      "alreadyImported": "Вже імпортовано раніше: {n}",
+      "checking": "Перевіряю, що вже імпортовано: {done} з {total}",
+      "refusedHeading": "Відхилено рядків: {n}",
+      "refusal": {
+        "date": "Невірна дата",
+        "amount": "Невірна сума",
+        "account": "Немає рахунку",
+        "name": "Назва порожня або задовга",
+        "planned_off": "Заплановані вимкнено",
+        "accrual_after_horizon": "Нарахування за межами горизонту"
+      },
+      "warningsHeading": "Попередження",
+      "warning": {
+        "commentCut": "Коментарів скорочено: {n}",
+        "subcounterparty": "Підконтрагенти пропущено: {n}",
+        "project": "Проєкти пропущено: {n}",
+        "accrualIgnored": "Нарахування пропущено: {n}",
+        "categoryIgnored": "Категорію «без категорії» пропущено: {n}"
+      },
+      "pairCandidatesLeft": "Схожих переказів, не зведених в один: {n}",
+      "includePlanned": "Включити заплановані операції (після сьогодні)",
+      "pairTransfers": "Зводити пари доходу і витрати в переказ",
+      "accounts": {
+        "heading": "Нові рахунки",
+        "hint": "Вкажіть поточний залишок. Його буде підігнано наприкінці імпорту.",
+        "type": "Тип",
+        "currency": "Валюта",
+        "balance": "Поточний залишок",
+        "balanceInvalid": "Введіть суму, наприклад 1 234,50"
+      },
+      "run": "Імпортувати",
+      "stop": "Зупинити",
+      "retry": "Повторити",
+      "progress": "{done} з {total}",
+      "resultHeading": "Результат",
+      "created": "Створено операцій: {n}",
+      "skipped": "Пропущено, бо вже були: {n}",
+      "refused": "Відхилено: {n}",
+      "sample": "Рядків файлу з прикладами відмов: {n}",
+      "transfers": "Переказів: {n}",
+      "entities": "Створено: рахунків {accounts}, категорій {categories}, контрагентів {counterparties}, тегів {tags}",
+      "fitted": "Рахунків з підігнаним залишком: {n}",
+      "differencesHeading": "Різниця із залишком",
+      "difference": "{name}: {diff}",
+      "tagsDropped": "Теги відкинуто (понад десять на операцію): {n}",
+      "error": {
+        "unknown_layout": "Це не схоже на експорт Finmap «Płatności». Немає колонок: {columns}.",
+        "empty": "У файлі немає рядків з операціями.",
+        "too_many_rows": "Забагато рядків у файлі.",
+        "not_xlsx": "Це не файл .xlsx.",
+        "too_big": "Файл завеликий.",
+        "too_many_entities": "Файл додає забагато нових рахунків, категорій, контрагентів або тегів за один крок. Зменшіть файл.",
+        "busy": "Інший запис триває. Спробуйте ще раз за хвилину.",
+        "failed": "Щось пішло не так. Спробуйте ще раз.",
+        "stopped": "Імпорт зупинено. Можна повторити: записане вже не дублюється."
+      },
+      "columns": {
+        "paymentDate": "Data płatności",
+        "amountAccount": "Kwota w walucie konta",
+        "from": "Z konta",
+        "to": "Na konto"
+      }
+    },
     "open": "Імпорт",
     "title": "Імпорт виписки",
     "pickFile": "Оберіть файл MT940 (.sta, .mt940, .txt)",
@@ -819,6 +908,11 @@
       }
     },
     "imports": {
+      "kind": {
+        "mt940": "MT940",
+        "finmap": "Finmap"
+      },
+      "entities": "Створено: рахунків {accounts}, категорій {categories}, контрагентів {counterparties}, тегів {tags}",
       "title": "Імпорти",
       "empty": "Імпортів ще не було",
       "undo": "Скасувати імпорт",
