@@ -6,6 +6,7 @@ import { MAX_COUNTERPARTIES } from '@/lib/domain/counterparties/types'
 import { MAX_TAGS } from '@/lib/domain/tags/types'
 import {
   accountSettingOf,
+  canRetry,
   canRun,
   companyLimitOf,
   entitiesOverLimit,
@@ -164,6 +165,28 @@ describe('failed', () => {
     expect(finmapDialogReducer(s, { type: 'failed', error: { code: 'failed' } })).toBe(s)
     const chosen = choosing()
     expect(finmapDialogReducer(chosen, { type: 'failed', error: { code: 'failed' } })).toBe(chosen)
+  })
+})
+
+describe('importIdKnown', () => {
+  it('keeps the id of a set-up that answered, so a run that then throws can be retried with the same import', () => {
+    const plan = planWith()
+    let s = choosing(plan)
+    s = step(s, { type: 'runStarted' }, { type: 'importIdKnown', importId: 'imp-7' }, { type: 'failed', error: { code: 'failed' } })
+    expect(s.phase).toBe('error')
+    expect(s.importId).toBe('imp-7')
+    expect(canRetry(s)).toBe(true)
+    s = step(s, { type: 'runStarted' })
+    expect(s.phase).toBe('running')
+    expect(s.importId).toBe('imp-7')
+  })
+
+  it('is ignored outside a run, and a run that failed before its set-up has no id to retry with', () => {
+    const s = choosing(planWith())
+    expect(finmapDialogReducer(s, { type: 'importIdKnown', importId: 'imp-7' })).toBe(s)
+    const failedEarly = step(s, { type: 'runStarted' }, { type: 'failed', error: { code: 'failed' } })
+    expect(failedEarly.importId).toBeNull()
+    expect(canRetry(failedEarly)).toBe(false)
   })
 })
 

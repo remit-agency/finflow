@@ -287,6 +287,15 @@ describe('runFinmapImport: retries and stops', () => {
   })
 })
 
+describe('runFinmapImport: the import id', () => {
+  it('reports the import id as soon as the set-up answers, so a later failure can still be retried with it', async () => {
+    serverWith({ batch: () => { throw new Error('the connection dropped in another way') } })
+    const reported: string[] = []
+    await expect(run([planOp(0)], { onImportId: (id) => reported.push(id) })).rejects.toThrow('the connection dropped in another way')
+    expect(reported).toEqual(['imp1'])
+  })
+})
+
 describe('runFinmapImport: abort and notification', () => {
   it('stops between requests when the signal is aborted, sending no further batch or finish', async () => {
     const controller = new AbortController()

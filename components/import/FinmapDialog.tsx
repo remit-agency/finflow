@@ -222,6 +222,7 @@ export function FinmapDialog({ orgId, onClose }: Props) {
       accounts: setupAccounts(state),
       existing: existingNow(),
       ...(state.importId === null ? {} : { importId: state.importId }),
+      onImportId: (importId) => dispatch({ type: 'importIdKnown', importId }),
       onProgress: (done, total) => dispatch({ type: 'progress', done, total }),
       signal: controller.signal,
     })

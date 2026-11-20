@@ -87,6 +87,8 @@ export type FinmapEvent<R extends FinmapRunResult = FinmapRunResult> =
   | { type: 'checked'; alreadyImported: number }
   | { type: 'checkStopped' }
   | { type: 'runStarted' }
+  /** The set-up answered: the import exists from now on, whatever happens to the run after it. */
+  | { type: 'importIdKnown'; importId: string }
   | { type: 'progress'; done: number; total: number }
   | { type: 'finished'; result: R }
   | { type: 'reset' }
@@ -187,9 +189,12 @@ export function canRun(state: FinmapDialogState<FinmapRunResult>): boolean {
   })
 }
 
-/** A stopped run (busy, or an error) can continue the import it made: the same plan, sent again. */
+/**
+ * A stopped run can continue the import it made: the same plan, sent again with the import's id. A run that failed after its
+ * set-up answered has the id (`importIdKnown`) even when it has no result; one that failed before has neither and starts again.
+ */
 export function canRetry(state: FinmapDialogState<FinmapRunResult>): boolean {
-  return state.phase === 'error' && state.result !== null && state.plan !== null
+  return state.phase === 'error' && state.plan !== null && (state.result !== null || state.importId !== null)
 }
 
 export function finmapDialogReducer<R extends FinmapRunResult>(state: FinmapDialogState<R>, event: FinmapEvent<R>): FinmapDialogState<R> {
@@ -252,6 +257,8 @@ export function finmapDialogReducer<R extends FinmapRunResult>(state: FinmapDial
         error: null,
       }
     }
+    case 'importIdKnown':
+      return state.phase === 'running' ? { ...state, importId: event.importId } : state
     case 'progress':
       return state.phase === 'running' ? { ...state, progress: { done: event.done, total: event.total } } : state
     case 'finished': {

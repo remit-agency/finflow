@@ -107,6 +107,8 @@ export interface FinmapRunArgs {
   existing: FinmapExisting
   /** An applied Finmap import to continue (a retry of a run that stopped). */
   importId?: string
+  /** Called as soon as the set-up answers with the import's id, before any later step can fail: the caller keeps it for a retry. */
+  onImportId?: (importId: string) => void
   /** Operations processed so far (created, skipped or refused) over all operations of the plan. */
   onProgress: (done: number, total: number) => void
   signal?: AbortSignal
@@ -331,6 +333,7 @@ export async function runFinmapImport(orgId: string, args: FinmapRunArgs): Promi
       tags: plan.create.tags,
     }, signal)
     result.importId = setup.importId
+    args.onImportId?.(setup.importId)
     result.entities = setup.created
     result.createdAccounts = args.accounts.flatMap((a) => {
       const id = setup.accounts[normKey(a.name)]
