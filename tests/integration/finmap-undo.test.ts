@@ -67,10 +67,10 @@ function manyOps(count: number, dayOf: (n: number) => string = (n) => addDays('2
 }
 
 /** An import document as the Finmap setup writes it (applied, nothing counted yet). */
-async function seedImport(id: string): Promise<void> {
+async function seedImport(id: string, kind: 'finmap' | 'mt940' = 'finmap'): Promise<void> {
   await db.doc(importPath(id)).set({
     schemaVersion: 1,
-    kind: 'finmap',
+    kind,
     fileName: 'synthetic.xlsx',
     accountIds: [],
     createdAt: Timestamp.fromDate(NOW),
@@ -302,6 +302,97 @@ describe('undoFinmapStep', () => {
     await undoAll()
     expect(await undoFinmapStep(depsFor(), ORG, UID, IMPORT)).toEqual({ deleted: 0, kept: [], next: null, done: true })
     await expect(undoFinmapStep(depsFor(), ORG, UID, 'missing')).rejects.toBeInstanceOf(ImportError)
+  })
+})
+
+/** The body the undo of a delete sends for an imported operation: its draft under its own id (as the browser sends it). */
+function restoreBody(o: BatchOp): Record<string, unknown> {
+  return {
+    clientId: finmapTxId(keyOf(o)),
+    type: o.kind,
+    status: o.status,
+    accountId: o.accountId,
+    amountMinor: o.amountMinor,
+    paymentDate: o.day,
+    tags: o.tagIds,
+    ...(o.categoryId === null ? {} : { categoryId: o.categoryId }),
+  }
+}
+
+/** The Finmap mark of an operation, as the batch writes it, with some fields replaced. */
+async function seedMark(key: string, over: Record<string, unknown> = {}): Promise<void> {
+  await db.doc(markPath(key)).set({ txId: finmapTxId(key), at: NOW.toISOString(), importId: IMPORT, kind: 'finmap', ...over })
+}
+
+const restore = (body: Record<string, unknown>) => createTransaction(ledgerDeps(), ORG, UID, parseTransactionInput(body, { internal: true }))
+
+describe('restoring a deleted Finmap operation (the undo of a delete)', () => {
+  it('brings an imported operation back under its id with its import link, the same balances and rollups, and no second mark', async () => {
+    const ops = manyOps(10)
+    await importAll(IMPORT, ops)
+    const o = ops[3]
+    const id = finmapTxId(keyOf(o))
+    const balances = await balancesOf()
+    const rollups = await liveRollups()
+    const marks = await markKeys()
+
+    await deleteTransaction(ledgerDeps(), ORG, UID, id)
+    expect(await readDoc(db, txPath(id))).toBeUndefined()
+    expect((await restore(restoreBody(o))).transaction.id).toBe(id)
+
+    expect(await readDoc(db, txPath(id))).toMatchObject({ importId: IMPORT, accountId: o.accountId, amountMinor: o.amountMinor, paymentDate: o.day })
+    expect(await balancesOf()).toEqual(balances)
+    expect(await liveRollups()).toEqual(rollups)
+    expect(await markKeys()).toEqual(marks)
+    expect(await verifyLedger(ledgerDeps(), ORG)).toMatchObject({ ok: true, balanceDiffs: [], rollupDiffs: [] })
+  })
+
+  it('refuses a Finmap id without its mark: one the person invents, and one whose mark the undo already removed', async () => {
+    const ops = manyOps(5)
+    await importAll(IMPORT, ops)
+    const invented = { ...restoreBody(ops[0]), clientId: `fm_${'a'.repeat(32)}` }
+    await expect(restore(invented)).rejects.toMatchObject({ code: 'invalid_input', field: 'clientId' })
+
+    const o = ops[1]
+    await deleteTransaction(ledgerDeps(), ORG, UID, finmapTxId(keyOf(o)))
+    await db.doc(markPath(keyOf(o))).delete()
+    await expect(restore(restoreBody(o))).rejects.toMatchObject({ code: 'invalid_input', field: 'clientId' })
+    expect(await txIds()).toHaveLength(4)
+  })
+
+  it('refuses a mark that is not the operation\'s own Finmap mark: another import, a missing import, another kind, another operation', async () => {
+    const ops = manyOps(5)
+    await importAll(IMPORT, ops)
+    const o = ops[2]
+    const key = keyOf(o)
+    await deleteTransaction(ledgerDeps(), ORG, UID, finmapTxId(key))
+    await seedImport('mt940-imp', 'mt940')
+    const cases: Record<string, Record<string, unknown>> = {
+      'an MT940 import': { importId: 'mt940-imp' },
+      'an import that does not exist': { importId: 'gone-imp' },
+      'another kind of mark': { kind: 'mt940' },
+      'a mark of another operation': { txId: `fm_${'b'.repeat(32)}` },
+    }
+    for (const [name, over] of Object.entries(cases)) {
+      await seedMark(key, over)
+      await expect(restore(restoreBody(o)), name).rejects.toMatchObject({ code: 'invalid_input', field: 'clientId' })
+    }
+    expect(await txIds()).toHaveLength(4)
+  })
+
+  it('the import undo afterwards deletes the restored operation, found by its import id', async () => {
+    const ops = manyOps(30)
+    await importAll(IMPORT, ops)
+    const o = ops[3]
+    await deleteTransaction(ledgerDeps(), ORG, UID, finmapTxId(keyOf(o)))
+    await restore(restoreBody(o))
+
+    const steps = await undoAll()
+    expect(deletedOf(steps)).toBe(30)
+    expect(steps.flatMap((s) => s.kept)).toEqual([])
+    expect(await txIds()).toEqual([])
+    expect(await markKeys()).toEqual([])
+    expect(await verifyLedger(ledgerDeps(), ORG)).toMatchObject({ ok: true, transactions: 0, balanceDiffs: [], rollupDiffs: [] })
   })
 })
 

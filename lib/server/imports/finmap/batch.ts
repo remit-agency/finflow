@@ -290,7 +290,7 @@ async function buildOne(
   let base: LedgerTransaction
   let plan: FxRequest[]
   try {
-    const input = parseTransactionInput(bodyOf(o, key), { internal: true, finmap: true })
+    const input = parseTransactionInput(bodyOf(o, key), { internal: true })
     base = buildTransaction(finmapTxId(key), input, { today: ctx.today, account, toAccount, category, baseCurrency: ctx.baseCurrency })
     plan = fxPlan(base, ctx.baseCurrency, ctx.today)
   } catch (e) {

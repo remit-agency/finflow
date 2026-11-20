@@ -24,9 +24,8 @@ export const BANK_CLIENT_ID_PREFIX = 'bk_'
  */
 export const PLAN_CLIENT_ID_PREFIX = 'pl_'
 /**
- * The id prefix of a Finmap operation (S14b: `fm_<key>`). Only the Finmap batch writer names operations this way; it passes
- * `finmap: true`. The create route passes `internal` only, so a person cannot create one (nothing brings a deleted Finmap
- * operation back under its id either: the undo of its deletion is a new operation).
+ * The id prefix of a Finmap operation (S14b: `fm_<key>`). A client may not pick it: as with `bk_`, the create accepts it only
+ * from server code (`internal`), and `createTransaction` admits it only with the Finmap mark of that key (`finmapImportOf`).
  */
 export const FINMAP_CLIENT_ID_PREFIX = 'fm_'
 
@@ -122,8 +121,6 @@ function tagList(v: unknown): string[] {
  */
 export interface ParseOptions {
   internal?: boolean
-  /** Only the Finmap batch writer (S14b) may name an operation `fm_<key>`; `internal` alone does not let it through. */
-  finmap?: boolean
 }
 
 export function parseTransactionInput(body: unknown, opts?: ParseOptions): TransactionInput {
@@ -140,7 +137,7 @@ export function parseTransactionInput(body: unknown, opts?: ParseOptions): Trans
   }
   if (typeof r.clientId === 'string' && r.clientId.startsWith(BANK_CLIENT_ID_PREFIX) && opts?.internal !== true) bad('clientId')
   if (typeof r.clientId === 'string' && r.clientId.startsWith(PLAN_CLIENT_ID_PREFIX) && opts?.internal !== true) bad('clientId')
-  if (typeof r.clientId === 'string' && r.clientId.startsWith(FINMAP_CLIENT_ID_PREFIX) && opts?.finmap !== true) bad('clientId')
+  if (typeof r.clientId === 'string' && r.clientId.startsWith(FINMAP_CLIENT_ID_PREFIX) && opts?.internal !== true) bad('clientId')
   if (!isId(r.accountId)) bad('accountId')
   const paymentDate = day(r.paymentDate, 'paymentDate')
 

@@ -173,7 +173,9 @@ describe('finmapBatch', () => {
     const ledger2 = makeDeps(db, { now: () => NOW })
     for (const o of ops) {
       const key = keyOf(o)
-      await createTransaction(ledger2, ORG2, UID, parseTransactionInput(singleBody(o, key), { internal: true, finmap: true }))
+      // The create of a Finmap id needs the mark the batch writes with the operation (its import link comes from it).
+      await db.doc(`${col(ORG2, 'bankSeen')}/${key}`).set({ txId: finmapTxId(key), at: NOW.toISOString(), importId: IMPORT, kind: 'finmap' })
+      await createTransaction(ledger2, ORG2, UID, parseTransactionInput(singleBody(o, key), { internal: true }))
     }
 
     expect(await balancesOf(ORG)).toEqual(await balancesOf(ORG2))
@@ -185,7 +187,7 @@ describe('finmapBatch', () => {
     for (const id of Object.keys(singleTxs)) {
       expect(comparable(batchTxs[id])).toEqual(comparable(singleTxs[id]))
       expect(batchTxs[id].importId).toBe(IMPORT)
-      expect(singleTxs[id].importId).toBeUndefined()
+      expect(singleTxs[id].importId).toBe(IMPORT)
     }
     // The mix really exercises the flag and the foreign rates.
     expect(Object.values(batchTxs).filter((t) => t.excluded === true).length).toBeGreaterThan(0)
