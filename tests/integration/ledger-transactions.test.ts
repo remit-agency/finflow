@@ -138,6 +138,15 @@ describe('updateTransaction', () => {
     expect(await rollup(db, ORG, 'cash_pln1_2026-10-20')).toEqual({ inMinor: 123460, inBase: 123460 })
   })
 
+  it('an edit keeps the import link the operation was written with (S14b)', async () => {
+    await seedCategory(db, ORG, 'inc2', 'income')
+    const { transaction } = await createTransaction(deps, ORG, UID, input({ categoryId: 'inc' }))
+    await db.doc(`organizations/${ORG}/transactions/${transaction.id}`).update({ importId: 'imp1' })
+    await updateTransaction(deps, ORG, UID, transaction.id, patch({ categoryId: 'inc2' }))
+    const doc = await readDoc(db, `organizations/${ORG}/transactions/${transaction.id}`)
+    expect(doc).toMatchObject({ categoryId: 'inc2', importId: 'imp1' })
+  })
+
   it('moving an operation to another account, type and date rebalances both accounts and the rollups', async () => {
     const { transaction } = await createTransaction(deps, ORG, UID, input({ type: 'income', categoryId: 'inc' }))
     await updateTransaction(deps, ORG, UID, transaction.id, patch({

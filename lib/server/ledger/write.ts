@@ -467,6 +467,9 @@ export async function updateTransaction(
   // toRawInput never carries the series link either (S11): it comes from the prior document, and a person's change of a
   // planned occurrence makes it «змінено вручну».
   if (prior.tx.seriesId !== undefined) next.tx = withSeries(next.tx, prior.tx)
+  // toRawInput never carries the import link either (S14b): an edit keeps the import that wrote the operation. A transfer
+  // rebuilt by convertToTransfer, mergeToTransfer or splitTransferSides (S10b) is a new document and drops it on purpose.
+  if (prior.tx.importId !== undefined) next.tx = { ...next.tx, importId: prior.tx.importId }
   const mark = markChangeOf(prior.tx, next.tx)
   const given = extras.autoRules ?? []
   // toRawInput never carries `autoRules` either: the trace is decided here.
