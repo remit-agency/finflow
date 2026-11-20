@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { FieldValue, Timestamp, type DocumentReference } from 'firebase-admin/firestore'
 import { bankDifference, fittedOpening } from '@/lib/domain/banking/fit'
 import { clean } from '@/lib/domain/banking/map'
-import { judgeOp, overlapsBank } from '@/lib/domain/import/plan'
+import { judgeOp, takeBankMatch } from '@/lib/domain/import/plan'
 import type { ImportStepRequest, StepStatement } from '@/lib/domain/import/request'
 import type { ImportOp, RefusalReason } from '@/lib/domain/import/types'
 import type { ImportStepResult } from '@/lib/domain/import/view'
@@ -154,7 +154,7 @@ async function writeOperations(deps: ImportDeps, orgId: string, uid: string, acc
       totals.seen++
       continue
     }
-    if (overlapsBank(op, bankOps.get(op.day) ?? [])) {
+    if (takeBankMatch(op, bankOps.get(op.day) ?? [])) {
       totals.bank++
       continue
     }

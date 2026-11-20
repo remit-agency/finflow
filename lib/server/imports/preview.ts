@@ -1,7 +1,7 @@
 import 'server-only'
 import type { BankOpView } from '@/lib/domain/import/plan'
 import { ordinalsByAccount } from '@/lib/domain/import/identity'
-import { judgeOp, overlapsBank } from '@/lib/domain/import/plan'
+import { judgeOp, takeBankMatch } from '@/lib/domain/import/plan'
 import { normalizeSource, parseMt940 } from '@/lib/domain/import/mt940'
 import type { PreviewRequest } from '@/lib/domain/import/request'
 import { MAX_IMPORT_BYTES, MAX_IMPORT_OPS, type ImportOp, type OpStatus, type ParsedStatement, type RefusalReason } from '@/lib/domain/import/types'
@@ -63,11 +63,14 @@ function withoutChoice(stmt: ParsedStatement, suggestedAccountId: string | null)
   return { ...describeStatement(stmt, suggestedAccountId), operations: stmt.operations }
 }
 
-/** The status of one operation of a chosen account: refusal, then seen (marked), then bank (overlap), else new. */
-function statusOf(reason: RefusalReason | null, key: string, op: ImportOp, seen: ReadonlySet<string>, bankOps: ReadonlyMap<string, BankOpView[]>): OpStatus {
+/**
+ * The status of one operation of a chosen account, in the step's order: refusal, then seen (marked), then bank (a bank
+ * operation of its day is taken, as the step takes it), else new. `bankOps` is the statement's own map: lines consume it.
+ */
+function statusOf(reason: RefusalReason | null, key: string, op: ImportOp, seen: ReadonlySet<string>, bankOps: Map<string, BankOpView[]>): OpStatus {
   if (reason !== null) return `refused:${reason}`
   if (seen.has(key)) return 'seen'
-  if (overlapsBank(op, bankOps.get(op.day) ?? [])) return 'bank'
+  if (takeBankMatch(op, bankOps.get(op.day) ?? [])) return 'bank'
   return 'new'
 }
 
@@ -79,6 +82,7 @@ async function withChoice(deps: ImportDeps, orgId: string, stmt: ParsedStatement
   const liveKeys = keys.filter((_, i) => reasons[i] === null)
   const seen = await seenKeysOf(deps.db, orgId, liveKeys)
   const range = dayRange(stmt.operations)
+  // Read for this statement alone (a fresh map), so the lines of this statement consume it and no other statement's.
   const bankOps = range.from !== null && range.to !== null && liveKeys.length > 0 ? await bankOpsOf(deps.db, orgId, account.id, range.from, range.to) : new Map<string, BankOpView[]>()
 
   const statuses = stmt.operations.map((op, i) => statusOf(reasons[i], keys[i], op, seen, bankOps))

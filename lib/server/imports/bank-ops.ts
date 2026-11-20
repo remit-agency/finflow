@@ -20,7 +20,7 @@ export async function seenKeysOf(db: Firestore, orgId: string, keys: readonly st
 }
 
 /**
- * The bank operations of the account dated from..to (inclusive, YYYY-MM-DD), grouped by day: what `overlapsBank`
+ * The bank operations of the account dated from..to (inclusive, YYYY-MM-DD), grouped by day: what `takeBankMatch`
  * compares a file line with. Only actual income and expense operations that a bank sync wrote (`bank.accountRef`).
  */
 export async function bankOpsOf(db: Firestore, orgId: string, accountId: string, from: string, to: string): Promise<Map<string, BankOpView[]>> {

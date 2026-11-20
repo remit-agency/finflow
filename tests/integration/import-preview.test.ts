@@ -88,6 +88,14 @@ describe('previewImport: statuses of the chosen account', () => {
     expect(stmt.chosen).toEqual({ accountId: 'a1', accountCurrency: 'PLN', balanceMinor: 6_000, counts: { new: 1, seen: 1, bank: 1, refused: 0 } })
   })
 
+  it('one bank operation covers one line: of two identical lines against one bank operation, one is bank and the other new', async () => {
+    await seedBank(db)
+    await createTransaction(depsFor().ledger, ORG, UID, parseTransactionInput({ clientId: 'manual-bank-2', type: 'income', status: 'actual', accountId: 'a1', amountMinor: 10_000, paymentDate: '2026-10-20' }), { accountRef: 'ba1' })
+    const same = [':61:261020C100,NTRFNONREF', ':86:Kawa']
+    const res = await preview(statementText([...same, ...same], 'C261020PLN200,'), ['a1'])
+    expect(res.statements[0].operations.map((o) => o.status)).toEqual(['bank', 'new'])
+  })
+
   it('numbers identical lines of two statements of one account apart: a line written from one statement does not mark the other', async () => {
     const same = [':61:261020C100,NTRFNONREF', ':86:Kawa']
     const text = [statementText(same, 'C261020PLN100,'), statementText(same, 'C261020PLN100,', 'PL11111111111111111111111111')].join('\n')

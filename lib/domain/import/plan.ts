@@ -18,7 +18,7 @@ export function judgeOp(op: ImportOp, ctx: JudgeContext): RefusalReason | null {
   return null
 }
 
-/** What `overlapsBank` needs from an operation a bank sync wrote (S09). */
+/** What `takeBankMatch` needs from an operation a bank sync wrote (S09). */
 export interface BankOpView {
   type: 'income' | 'expense'
   amountMinor: number
@@ -26,10 +26,15 @@ export interface BankOpView {
 }
 
 /**
- * The line is already in the account through the bank sync: same direction and amount (the caller passes only the
- * bank operations of the line's day), and the same reference when both have one. Known risk: a bank API reference and an
- * MT940 `//ref` usually differ, so with both present this rarely matches (S14 spec, decision 2).
+ * The line is already in the account through the bank sync: same direction and amount (the caller passes the bank operations
+ * of the line's day), and the same reference when both have one. The bank operation matched is taken out of `bankOps`, so one
+ * bank operation covers one line of the statement: an identical second line is a line of its own. The caller keeps one list
+ * per statement and step. Known risk: a bank API reference and an MT940 `//ref` usually differ, so with both present this
+ * rarely matches (S14 spec, decision 2).
  */
-export function overlapsBank(op: ImportOp, bankOps: readonly BankOpView[]): boolean {
-  return bankOps.some((b) => b.type === op.type && b.amountMinor === op.amountMinor && (op.reference === null || b.entryReference === undefined || b.entryReference === op.reference))
+export function takeBankMatch(op: ImportOp, bankOps: BankOpView[]): boolean {
+  const at = bankOps.findIndex((b) => b.type === op.type && b.amountMinor === op.amountMinor && (op.reference === null || b.entryReference === undefined || b.entryReference === op.reference))
+  if (at < 0) return false
+  bankOps.splice(at, 1)
+  return true
 }

@@ -149,6 +149,15 @@ describe('importStep: writes the operations of a statement', () => {
     expect(withRef).toMatchObject({ created: 1, skipped: { bank: 0 } })
   })
 
+  it('one bank operation covers one file line: of two identical lines, one is skipped as bank and the other is written', async () => {
+    await seedBank(db)
+    await syncStep(bankDeps(db, fakeEb({ '': { transactions: [ebTx('EB1', '100.00', 'CRDT', '2026-10-20')], continuationKey: null } }, '100.00')), ORG, UID, 'ba1')
+
+    const twins = [line({ reference: null, ordinal: 0 }), line({ reference: null, ordinal: 1 })]
+    const res = await importStep(depsFor(), ORG, UID, step({ operations: twins }))
+    expect(res).toMatchObject({ created: 1, skipped: { seen: 0, bank: 1 }, refused: [] })
+  })
+
   it('refuses while another holder has the lock, takes over an expired lock, and releases the lock after a step and after an error', async () => {
     await db.doc(lockPath).set({ until: NOW.getTime() + 30_000, token: 'other' })
     await expect(importStep(depsFor(), ORG, UID, step())).rejects.toMatchObject({ code: 'already_running' })
