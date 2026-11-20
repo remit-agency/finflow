@@ -3,6 +3,7 @@ import { addDays, isDay, monthsBetween } from '@/lib/domain/ledger/days'
 import { MAX_PERIOD_MONTHS } from '@/lib/domain/ledger/input'
 import { MAX_MINOR } from '@/lib/domain/ledger/money'
 import { normKey } from './fold'
+import { nameFits, NAME_LIMITS } from './request'
 import {
   NO_CATEGORY_NAMES,
   type CategoryRef, type FinmapCounts, type FinmapExisting, type FinmapOptions, type FinmapPlan, type FinmapRefusal, type FinmapRow, type PlannedOp,
@@ -100,6 +101,21 @@ function categoryOf(row: FinmapRow, kind: RowKind): { ref: CategoryRef | null; i
     return { ref: null, ignored: row.subcategory !== null }
   }
   return { ref: { type: kind, parent: row.category, child: row.subcategory }, ignored: false }
+}
+
+/**
+ * Whether every name the row would write fits the ledger's caps (`NAME_LIMITS`, the same ones the setup step enforces): the
+ * account, the category and subcategory it would use, the counterparty and each tag. A name over its cap refuses the whole row;
+ * nothing is cut.
+ */
+function namesFit(row: FinmapRow, account: string, category: CategoryRef | null): boolean {
+  if (!nameFits(account, NAME_LIMITS.account)) return false
+  if (category !== null) {
+    if (!nameFits(category.parent, NAME_LIMITS.category)) return false
+    if (category.child !== null && !nameFits(category.child, NAME_LIMITS.category)) return false
+  }
+  if (row.counterparty !== null && !nameFits(row.counterparty, NAME_LIMITS.counterparty)) return false
+  return row.tags.every((tag) => nameFits(tag, NAME_LIMITS.tag))
 }
 
 /**
@@ -338,6 +354,11 @@ export function planFinmap(rows: readonly FinmapRow[], existing: FinmapExisting,
       refuse('account')
       continue
     }
+    const category = categoryOf(row, kind)
+    if (!namesFit(row, account, category.ref)) {
+      refuse('name')
+      continue
+    }
     const status = day > options.today ? 'planned' : 'actual'
     if (status === 'planned' && !options.includePlanned) {
       refuse('planned_off')
@@ -352,7 +373,6 @@ export function planFinmap(rows: readonly FinmapRow[], existing: FinmapExisting,
         continue
       } else accrual = { from: row.period.from, to: row.period.to }
     }
-    const category = categoryOf(row, kind)
     if (category.ignored) warnings.categoryIgnored++
     if (row.hasSubcounterparty) warnings.subcounterparty++
     if (row.hasProject) warnings.project++

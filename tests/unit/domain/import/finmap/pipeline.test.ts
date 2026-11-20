@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { normKey } from '@/lib/domain/import/finmap/fold'
 import { planFinmap } from '@/lib/domain/import/finmap/plan'
 import { resolveOps } from '@/lib/domain/import/finmap/resolve'
-import { parseFinmapBatch, parseFinmapCheck } from '@/lib/domain/import/finmap/request'
+import { NAME_LIMITS, parseFinmapBatch, parseFinmapCheck } from '@/lib/domain/import/finmap/request'
 import type { FinmapExisting, FinmapOptions, FinmapRow } from '@/lib/domain/import/finmap/types'
 
 // Synthetic row: every name and comment here is made up for the test.
@@ -22,8 +22,9 @@ const existing: FinmapExisting = {
 const opts: FinmapOptions = { includePlanned: false, pairTransfers: true, today: '2026-10-20' }
 
 describe('Finmap pipeline: planner, resolver and batch parser', () => {
-  it('a row with a 5 000-character comment and a 3 000-character counterparty passes parseFinmapBatch', () => {
-    const counterparty = 'Firma ' + 'p'.repeat(3000)
+  it('a row with a 5 000-character comment and a counterparty at the name cap passes parseFinmapBatch', () => {
+    // A counterparty over the cap is refused by the planner (name-limits.test.ts), so the longest one that is written is at the cap.
+    const counterparty = 'F'.repeat(NAME_LIMITS.counterparty)
     const plan = planFinmap([row({ comment: 'k'.repeat(5000), counterparty })], existing, opts)
     expect(plan.operations).toHaveLength(1)
     // The setup step returns the id of each name it created; here the counterparty is the one new name.
@@ -37,8 +38,9 @@ describe('Finmap pipeline: planner, resolver and batch parser', () => {
   })
 
   it('the same row is also accepted by parseFinmapCheck, with its identity bounded', () => {
-    const plan = planFinmap([row({ comment: 'k'.repeat(5000), counterparty: 'Firma ' + 'p'.repeat(3000) })], existing, opts)
-    const maps = { accounts: {}, categories: [], counterparties: { ['firma ' + 'p'.repeat(3000)]: 'cp-1' }, tags: {} }
+    const counterparty = 'F'.repeat(NAME_LIMITS.counterparty)
+    const plan = planFinmap([row({ comment: 'k'.repeat(5000), counterparty })], existing, opts)
+    const maps = { accounts: {}, categories: [], counterparties: { [counterparty.toLowerCase()]: 'cp-1' }, tags: {} }
     const { ops } = resolveOps(plan.operations, maps, existing)
     const checked = parseFinmapCheck({ operations: ops.map((o) => ({ accountId: o.accountId, toAccountId: o.toAccountId, identity: o.identity, ordinal: o.ordinal })) })
     expect(checked.ok).toBe(true)

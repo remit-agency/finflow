@@ -43,7 +43,8 @@ export interface TableIssue {
   missing?: ColumnKey[]
 }
 
-export type FinmapRefusal = 'date' | 'amount' | 'account' | 'planned_off' | 'accrual_after_horizon'
+/** `name`: a name the row would write (account, category, subcategory, counterparty or tag) is over its cap or has no letter or digit. */
+export type FinmapRefusal = 'date' | 'amount' | 'account' | 'name' | 'planned_off' | 'accrual_after_horizon'
 export type OpKind = 'income' | 'expense' | 'transfer'
 
 /** What the import knows of FinFlow before it starts (names only; ids come back from the setup step). */

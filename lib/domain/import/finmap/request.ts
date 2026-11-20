@@ -33,10 +33,23 @@ export interface FinmapSetupRequest {
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
-/** A name from the body: whitespace normalised, within `max`, and with a letter or digit (a name without one has no comparable key). */
+/** The most characters a name may have, by what it names: the caps the ledger enforces, shared by the parser and the planner (S14b). */
+export const NAME_LIMITS = {
+  account: ENTITY_NAME_MAX,
+  category: ENTITY_NAME_MAX,
+  counterparty: COUNTERPARTY_NAME_MAX,
+  tag: TAG_NAME_MAX,
+} as const
+
+/** Whether a normalised name fits `max` and has a letter or digit (a name without one has no comparable key). */
+export function nameFits(name: string, max: number): boolean {
+  return name.length <= max && nameKeyText(name) !== ''
+}
+
+/** A name from the body: whitespace normalised, and `nameFits`. */
 function nameOf(v: unknown, max: number, field: string): Parsed<string> {
   const name = typeof v === 'string' ? normName(v) : null
-  if (name === null || name.length > max || nameKeyText(name) === '') return { ok: false, field }
+  if (name === null || !nameFits(name, max)) return { ok: false, field }
   return { ok: true, value: name }
 }
 

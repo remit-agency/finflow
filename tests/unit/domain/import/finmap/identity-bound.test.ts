@@ -55,7 +55,7 @@ describe('finmapIdentity with long values', () => {
   it('a transfer of two long rows keeps its 17 strings, each at most 64 characters', () => {
     const plan = planFinmap(
       [
-        row({ line: 2, from: 'Konto A', to: null, comment: 'c'.repeat(5000), tags: Array.from({ length: 30 }, (_, i) => `t${i}${'y'.repeat(60)}`) }),
+        row({ line: 2, from: 'Konto A', to: null, comment: 'c'.repeat(5000), tags: Array.from({ length: 30 }, (_, i) => `t${i}${'y'.repeat(40)}`) }),
         row({ line: 3, from: null, to: 'Konto B', comment: 'd'.repeat(5000) }),
       ],
       existing,
