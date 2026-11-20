@@ -87,7 +87,7 @@ export function initialFinmapState<R extends FinmapRunResult = FinmapRunResult>(
     companyCurrency,
     rowsRead: null,
     plan: null,
-    includePlanned: false,
+    includePlanned: true,
     pairTransfers: true,
     accounts: new Map(),
     checking: null,

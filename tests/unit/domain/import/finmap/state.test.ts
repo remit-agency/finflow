@@ -76,7 +76,7 @@ describe('initialFinmapState', () => {
     expect(s.plan).toBeNull()
     expect(s.result).toBeNull()
     expect(s.error).toBeNull()
-    expect(s.includePlanned).toBe(false)
+    expect(s.includePlanned).toBe(true)
     expect(s.pairTransfers).toBe(true)
   })
 })
@@ -200,7 +200,7 @@ describe('optionChanged', () => {
     const s = finmapDialogReducer(choosing(plan), { type: 'optionChanged', pairTransfers: false })
     expect(s.phase).toBe('planning')
     expect(s.pairTransfers).toBe(false)
-    expect(s.includePlanned).toBe(false)
+    expect(s.includePlanned).toBe(true)
     expect(s.plan).toBe(plan)
   })
 
