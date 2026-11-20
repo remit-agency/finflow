@@ -112,4 +112,18 @@ describe('resolveOps', () => {
   it('returns no operations for no input', () => {
     expect(resolveOps([], maps, existing)).toEqual({ ops: [], tagsDropped: 0 })
   })
+
+  it('gives each tag once: two names that are one tag by normKey do not repeat its id', () => {
+    const r = resolveOps([op({ tags: ['Wakacje', 'wakacje ', 'Nowy', 'NOWY'] })], maps, existing)
+    expect(r.ops[0].tagIds).toEqual(['tag-old', 'tag-new'])
+    expect(r.tagsDropped).toBe(0)
+  })
+
+  it('counts the distinct tags beyond the limit as dropped, not the repeated names', () => {
+    const names = Array.from({ length: MAX_TX_TAGS }, (_, i) => `Tag ${i}`)
+    const tagMaps: ResolveMaps = { ...maps, tags: { ...maps.tags, ...Object.fromEntries(names.map((n, i) => [n.toLowerCase(), `t${i}`])) } }
+    const r = resolveOps([op({ tags: [...names, ...names.map((n) => n.toUpperCase()), 'Nowy'] })], tagMaps, existing)
+    expect(r.ops[0].tagIds).toHaveLength(MAX_TX_TAGS)
+    expect(r.tagsDropped).toBe(names.length + 1 - MAX_TX_TAGS)
+  })
 })

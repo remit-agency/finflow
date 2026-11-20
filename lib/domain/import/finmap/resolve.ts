@@ -79,7 +79,8 @@ export function resolveOps(operations: readonly PlannedOp[], maps: ResolveMaps, 
     const categoryId = op.category === null ? null : need(categoryIdOf(op.category), 'category')
     const counterpartyId =
       op.counterparty === null ? null : need(own(maps.counterparties, normKey(op.counterparty)) ?? counterpartiesOld.get(normKey(op.counterparty)), 'counterparty')
-    const allTagIds = op.tags.map((tag) => need(own(maps.tags, normKey(tag)) ?? tagsOld.get(normKey(tag)), 'tag'))
+    // Two names that are one tag by normKey give one id: the ledger refuses a repeated tag.
+    const allTagIds = [...new Set(op.tags.map((tag) => need(own(maps.tags, normKey(tag)) ?? tagsOld.get(normKey(tag)), 'tag')))]
     const tagIds = allTagIds.slice(0, MAX_TX_TAGS)
     tagsDropped += allTagIds.length - tagIds.length
     return {
