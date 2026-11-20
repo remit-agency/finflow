@@ -49,6 +49,15 @@ interface Prepared {
   currencies: Record<string, string>
 }
 
+/** The body fields of a Finmap create that its mark's snapshot must match, with the key of its id. */
+interface FinmapBody {
+  key: string
+  type: string
+  accountId: string
+  amountMinor: number
+  paymentDate: string
+}
+
 interface Job {
   action: AuditAction
   txId: string
@@ -60,8 +69,11 @@ interface Job {
   restore?: boolean
   /** The bank keys whose sides a create brings back (S10b): each must be free when the create is written. */
   sideKeys?: string[]
-  /** The key of a create under a Finmap id (`fm_` + key, S14b): the operation comes back into the import its mark names. */
-  finmapKey?: string
+  /**
+   * A create under a Finmap id (`fm_` + key, S14b): the operation comes back into the import its mark names, and its body must
+   * be the one the mark's snapshot recorded (type, account, amount, payment date).
+   */
+  finmap?: FinmapBody
   /**
    * The mark of the occurrence this write moves (S11, `markChangeOf`). `restoreReason` is the reason of the mark a create
    * under a plan id came back from: inside the transaction it must still be that mark.
@@ -187,7 +199,7 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
         ? recurringDoneCol(db, orgId).doc(planId(markOf.seriesId, markOf.occurrence))
         : null
     const markSnap = markRef === null ? null : await t.get(markRef)
-    const finmapImport = job.finmapKey === undefined ? undefined : await finmapImportOf(t, db, orgId, job.finmapKey, job.txId)
+    const finmapImport = job.finmap === undefined ? undefined : await finmapImportOf(t, db, orgId, job.finmap, job.txId)
 
     // ---- checks (nothing is written yet) ----
     if (!orgSnap.exists) throw new LedgerError('not_found', 'org')
@@ -342,23 +354,26 @@ async function planRestoreOf(deps: LedgerDeps, orgId: string, input: Transaction
   return { fields, reason: mark.reason }
 }
 
-/** The bank's mark of one imported operation: its bank block and the locked fields of the import; null without them (a failed import). */
 /**
  * The import a Finmap operation (`fm_` + key) comes back into (S14b). Only the Finmap writer's own mark can say so: `bankSeen/{key}`
- * with `kind: 'finmap'` and `txId` equal to the id, naming an applied Finmap import of the company. The mark is read inside the
+ * with `kind: 'finmap'` and `txId` equal to the id, naming an applied Finmap import of the company. The body must repeat the
+ * snapshot the mark recorded (type, account, amount, payment day), as a bank restore does. The mark is read inside the
  * create's transaction, so an undo that removes it meanwhile conflicts. The mark is not written again (a person-deleted
  * operation keeps its mark, as the design says). Anything else is refused (`invalid_input` on `clientId`): a person cannot
  * invent a Finmap id.
  */
-async function finmapImportOf(t: Transaction, db: Firestore, orgId: string, key: string, txId: string): Promise<string> {
-  const mark = await t.get(orgRef(db, orgId).collection('bankSeen').doc(key))
+async function finmapImportOf(t: Transaction, db: Firestore, orgId: string, body: FinmapBody, txId: string): Promise<string> {
+  const mark = await t.get(orgRef(db, orgId).collection('bankSeen').doc(body.key))
   const importId = mark.get('importId')
+  const snapshot = mark.get('snapshot')
   if (!mark.exists || mark.get('kind') !== 'finmap' || mark.get('txId') !== txId || typeof importId !== 'string') refuseClientId()
+  if (!isRecord(snapshot) || !imported(snapshot, body.type, body.accountId, body.amountMinor, body.paymentDate)) refuseClientId()
   const imp = await t.get(orgRef(db, orgId).collection('imports').doc(importId))
   if (!imp.exists || imp.get('kind') !== 'finmap' || imp.get('status') !== 'applied') refuseClientId()
   return importId
 }
 
+/** The bank's mark of one imported operation: its bank block and the locked fields of the import; null without them (a failed import). */
 async function readMark(deps: LedgerDeps, orgId: string, key: string): Promise<{ bank: BankInfo; snapshot: Record<string, unknown> } | null> {
   const snap = await orgRef(deps.db, orgId).collection('bankSeen').doc(key).get()
   const mark = snap.exists ? snap.data() : undefined
@@ -436,7 +451,10 @@ export async function createTransaction(
     next,
     via: autoRules.length > 0 ? 'rule' : undefined,
     sideKeys: restore?.keys ?? [],
-    finmapKey: input.clientId?.startsWith(FINMAP_CLIENT_ID_PREFIX) ? input.clientId.slice(FINMAP_CLIENT_ID_PREFIX.length) : undefined,
+    finmap:
+      input.clientId?.startsWith(FINMAP_CLIENT_ID_PREFIX) === true
+        ? { key: input.clientId.slice(FINMAP_CLIENT_ID_PREFIX.length), type: input.type, accountId: input.accountId, amountMinor: input.amountMinor, paymentDate: input.paymentDate }
+        : undefined,
     planMark: plan === undefined ? undefined : { change: markChangeOf(null, next.tx) ?? 'clear', restoreReason: plan.reason },
   })
 }

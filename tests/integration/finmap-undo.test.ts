@@ -380,6 +380,27 @@ describe('restoring a deleted Finmap operation (the undo of a delete)', () => {
     expect(await txIds()).toHaveLength(4)
   })
 
+  it('refuses a restore whose type, account, amount or payment date is not the one its mark recorded', async () => {
+    const ops = manyOps(5)
+    await importAll(IMPORT, ops)
+    const o = ops[1]
+    const id = finmapTxId(keyOf(o))
+    await deleteTransaction(ledgerDeps(), ORG, UID, id)
+    const changed: Array<[string, Record<string, unknown>]> = [
+      ['amount', { ...restoreBody(o), amountMinor: o.amountMinor + 1 }],
+      ['payment date', { ...restoreBody(o), paymentDate: '2020-01-01' }],
+      ['account', { ...restoreBody(o), accountId: o.accountId === 'pln1' ? 'pln2' : 'pln1' }],
+      // Without a category: the type change must not be refused for the category's type first.
+      ['type', { ...restoreBody(o), type: o.kind === 'expense' ? 'income' : 'expense', categoryId: undefined }],
+    ]
+    for (const [field, body] of changed) {
+      await expect(restore(body), field).rejects.toMatchObject({ code: 'invalid_input', field: 'clientId' })
+    }
+    expect(await readDoc(db, txPath(id))).toBeUndefined()
+    // The operation as the batch wrote it still comes back.
+    expect((await restore(restoreBody(o))).transaction.id).toBe(id)
+  })
+
   it('the import undo afterwards deletes the restored operation, found by its import id', async () => {
     const ops = manyOps(30)
     await importAll(IMPORT, ops)
