@@ -1,7 +1,8 @@
+import { alternativeIndices } from '@/lib/domain/import/finmap/alternatives'
 import { resolveOps, type ResolveMaps } from '@/lib/domain/import/finmap/resolve'
 import { normKey } from '@/lib/domain/import/finmap/fold'
 import { CHECK_LIMIT, type BatchOp, type FinmapCheckOp, type FinmapSetupAccount, type FinmapSetupRequest } from '@/lib/domain/import/finmap/request'
-import type { FinmapExisting, FinmapPlan } from '@/lib/domain/import/finmap/types'
+import type { FinmapExisting, FinmapPlan, PlannedOp } from '@/lib/domain/import/finmap/types'
 import { FINMAP_BATCH_OPS } from '@/lib/domain/import/finmap/types'
 import { notifyLedgerChanged } from './ledger-events'
 import { LedgerApiError, readApiError } from './ledger-client'
@@ -96,6 +97,11 @@ export interface FinmapResult {
 export interface FinmapRunArgs {
   fileName: string
   plan: FinmapPlan
+  /**
+   * The same rows planned with the pairing flipped (`planFinmap` with `pairTransfers` inverted). An operation whose other shape an
+   * earlier import wrote is skipped, so a file imported with pairing on is not imported again with it off, or the reverse.
+   */
+  alternative: PlannedOp[]
   /** The accounts the file needs that FinFlow does not have yet. */
   accounts: FinmapSetupAccount[]
   existing: FinmapExisting
@@ -181,27 +187,82 @@ async function seenFlags(orgId: string, keys: FinmapCheckOp[], signal: AbortSign
   return seen
 }
 
+/** The check key of a planned operation, or null when one of its accounts has no id here (a new account: it cannot hold a duplicate). */
+function checkKeyOf(op: PlannedOp, accountIdOf: (name: string) => string | undefined): FinmapCheckOp | null {
+  const accountId = accountIdOf(op.account)
+  if (accountId === undefined) return null
+  const toAccountId = op.toAccount === null ? null : accountIdOf(op.toAccount)
+  if (toAccountId === undefined) return null
+  return { accountId, toAccountId, identity: op.identity, ordinal: op.ordinal }
+}
+
+/** The ids of the accounts FinFlow has, by `normKey` of the name (the first of each name). */
+function existingAccountIdOf(existing: FinmapExisting): (name: string) => string | undefined {
+  const ids = new Map<string, string>()
+  for (const a of existing.accounts) if (!ids.has(normKey(a.name))) ids.set(normKey(a.name), a.id)
+  return (name) => ids.get(normKey(name))
+}
+
 /**
- * How many operations of `plan` an earlier Finmap import already wrote (the preview's «already imported»). Only operations whose
- * accounts FinFlow has already can be checked: the others are new accounts, which cannot hold a duplicate. Read-only.
+ * Which of the planned operations an earlier Finmap import already wrote: by their own key, or by the key of the other shape of their
+ * rows (`alternative`: the same rows planned with the pairing flipped, see `alternativeIndices`). An operation is skipped when any of
+ * its alternatives was written. Requests of at most CHECK_LIMIT keys, in one stream: the own keys first, then the alternatives that
+ * matter. `accountIdOf` gives null for an account with no id here, which is never checked.
+ */
+async function alreadyWritten(
+  orgId: string,
+  ops: readonly PlannedOp[],
+  alternative: readonly PlannedOp[],
+  accountIdOf: (name: string) => string | undefined,
+  signal: AbortSignal | undefined,
+  onProgress?: (done: number, total: number) => void,
+): Promise<boolean[]> {
+  const alternativesOf = alternativeIndices(ops, alternative)
+  const keys: FinmapCheckOp[] = []
+  const ownAt: number[] = []
+  ops.forEach((op, i) => {
+    const key = checkKeyOf(op, accountIdOf)
+    if (key !== null) {
+      keys.push(key)
+      ownAt.push(i)
+    }
+  })
+  const needed = new Set<number>()
+  for (const list of alternativesOf) for (const j of list) needed.add(j)
+  const altAt: number[] = []
+  for (const j of [...needed].sort((a, b) => a - b)) {
+    const key = checkKeyOf(alternative[j], accountIdOf)
+    if (key !== null) {
+      keys.push(key)
+      altAt.push(j)
+    }
+  }
+  const flags = await seenFlags(orgId, keys, signal, onProgress)
+  const seen = new Array<boolean>(ops.length).fill(false)
+  ownAt.forEach((i, k) => {
+    if (flags[k]) seen[i] = true
+  })
+  const altSeen = new Set<number>()
+  altAt.forEach((j, k) => {
+    if (flags[ownAt.length + k]) altSeen.add(j)
+  })
+  alternativesOf.forEach((list, i) => {
+    if (list.some((j) => altSeen.has(j))) seen[i] = true
+  })
+  return seen
+}
+
+/**
+ * How many operations of `plan` an earlier Finmap import already wrote (the preview's «already imported»), counting the other shape
+ * of their rows too (`alternative`). Read-only.
  */
 export async function countAlreadyImported(
   orgId: string,
   plan: FinmapPlan,
   existing: FinmapExisting,
-  args: { signal?: AbortSignal; onProgress?: (done: number, total: number) => void } = {},
+  args: { alternative: PlannedOp[]; signal?: AbortSignal; onProgress?: (done: number, total: number) => void },
 ): Promise<number> {
-  const accountIds = new Map<string, string>()
-  for (const a of existing.accounts) if (!accountIds.has(normKey(a.name))) accountIds.set(normKey(a.name), a.id)
-  const keys: FinmapCheckOp[] = []
-  for (const op of plan.operations) {
-    const accountId = accountIds.get(normKey(op.account))
-    if (accountId === undefined) continue
-    const toAccountId = op.toAccount === null ? null : (accountIds.get(normKey(op.toAccount)) ?? undefined)
-    if (toAccountId === undefined) continue
-    keys.push({ accountId, toAccountId, identity: op.identity, ordinal: op.ordinal })
-  }
-  const seen = await seenFlags(orgId, keys, args.signal, args.onProgress)
+  const seen = await alreadyWritten(orgId, plan.operations, args.alternative, existingAccountIdOf(existing), args.signal, args.onProgress)
   return seen.filter(Boolean).length
 }
 
@@ -281,18 +342,11 @@ export async function runFinmapImport(orgId: string, args: FinmapRunArgs): Promi
     const ops = resolved.ops
     const importId = setup.importId
 
-    // An operation on an account the run creates cannot be written yet, so it cannot be a duplicate: it is not checked.
+    // An account the run creates cannot be written yet, so an operation on it cannot be a duplicate: it is not checked. The accounts
+    // FinFlow has are the ones the plan does not create (the set-up creates only the new ones).
     const newAccounts = new Set(args.accounts.map((a) => normKey(a.name)))
-    const checkable = ops.map((_, i) => i).filter((i) => {
-      const op = plan.operations[i]
-      return !newAccounts.has(normKey(op.account)) && (op.toAccount === null || !newAccounts.has(normKey(op.toAccount)))
-    })
-    const checkOf = (i: number): FinmapCheckOp => ({ accountId: ops[i].accountId, toAccountId: ops[i].toAccountId, identity: ops[i].identity, ordinal: ops[i].ordinal })
-    const flags = await seenFlags(orgId, checkable.map(checkOf), signal)
-    const seen = new Array<boolean>(ops.length).fill(false)
-    checkable.forEach((i, j) => {
-      if (flags[j]) seen[i] = true
-    })
+    const existingIds = existingAccountIdOf(args.existing)
+    const seen = await alreadyWritten(orgId, plan.operations, args.alternative, (name) => (newAccounts.has(normKey(name)) ? undefined : existingIds(name)), signal)
     const seenCount = seen.filter(Boolean).length
     result.skipped += seenCount
     done += seenCount

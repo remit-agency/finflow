@@ -30,6 +30,7 @@ import {
   type FinmapPlan,
   type FinmapRefusal,
   type FinmapRow,
+  type PlannedOp,
 } from '@/lib/domain/import/finmap/types'
 import { fromMinor } from '@/lib/domain/ledger/money'
 import { MAX_TAGS } from '@/lib/domain/tags/types'
@@ -96,6 +97,8 @@ export function FinmapDialog({ orgId, onClose }: Props) {
 
   // The parsed rows of the file: kept out of the state (large, and only planning reads them).
   const rowsRef = useRef<FinmapRow[] | null>(null)
+  // The other shape of the current plan's rows (pairing flipped): set with the plan, read by the duplicate check and the run.
+  const alternativeRef = useRef<PlannedOp[] | null>(null)
   // Every read, plan or run bumps it: a step that finishes after a newer one stops without dispatching.
   const generation = useRef(0)
   const checkAbort = useRef<AbortController | null>(null)
@@ -120,11 +123,12 @@ export function FinmapDialog({ orgId, onClose }: Props) {
   })
 
   /** The «already imported» count of a fresh plan, when some of its accounts exist. The next plan cancels it. */
-  const startCheck = (plan: FinmapPlan, existing: FinmapExisting, gen: number) => {
+  const startCheck = (plan: FinmapPlan, existing: FinmapExisting, alternative: PlannedOp[], gen: number) => {
     checkAbort.current?.abort()
     const controller = new AbortController()
     checkAbort.current = controller
     countAlreadyImported(orgId, plan, existing, {
+      alternative,
       signal: controller.signal,
       onProgress: (done, total) => {
         if (gen === generation.current) dispatch({ type: 'checkProgress', done, total })
@@ -144,10 +148,14 @@ export function FinmapDialog({ orgId, onClose }: Props) {
     const rows = rowsRef.current
     if (gen !== generation.current || rows === null) return
     const existing = existingNow()
-    const plan = planFinmap(rows, existing, planOptions(from, todayDay()))
+    const options = planOptions(from, todayDay())
+    const plan = planFinmap(rows, existing, options)
+    // The same rows the other way (pairing flipped): their keys are what an import of the other pairing wrote (see alternativeIndices).
+    const alternative = planFinmap(rows, existing, { ...options, pairTransfers: !options.pairTransfers }).operations
     if (gen !== generation.current) return
+    alternativeRef.current = alternative
     dispatch({ type: 'planned', plan, have: { tags: existing.tags.length, counterparties: existing.counterparties.length } })
-    if (plan.matched.accounts > 0) startCheck(plan, existing, gen)
+    if (plan.matched.accounts > 0) startCheck(plan, existing, alternative, gen)
   }
 
   const onFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -158,6 +166,7 @@ export function FinmapDialog({ orgId, onClose }: Props) {
     const gen = ++generation.current
     checkAbort.current?.abort()
     rowsRef.current = null
+    alternativeRef.current = null
     dispatch({ type: 'fileChosen', fileName: file.name, size: file.size })
     if (file.size > MAX_FINMAP_BYTES) return
     await yieldToBrowser()
@@ -200,7 +209,8 @@ export function FinmapDialog({ orgId, onClose }: Props) {
   }
 
   const run = () => {
-    if (state.plan === null || !(canRun(state) || canRetry(state))) return
+    const alternative = alternativeRef.current
+    if (state.plan === null || alternative === null || !(canRun(state) || canRetry(state))) return
     const plan = state.plan
     const controller = new AbortController()
     runAbort.current = controller
@@ -208,6 +218,7 @@ export function FinmapDialog({ orgId, onClose }: Props) {
     void runFinmapImport(orgId, {
       fileName: state.fileName ?? '',
       plan,
+      alternative,
       accounts: setupAccounts(state),
       existing: existingNow(),
       ...(state.importId === null ? {} : { importId: state.importId }),

@@ -6,7 +6,8 @@ vi.mock('@/lib/api/ledger-events', () => ({ notifyLedgerChanged: () => notify() 
 
 import { normKey } from '@/lib/domain/import/finmap/fold'
 import { countAlreadyImported, runFinmapImport, type FinmapResult, type FinmapRunArgs } from '@/lib/api/finmap-client'
-import type { FinmapCounts, FinmapExisting, FinmapPlan, PlannedOp } from '@/lib/domain/import/finmap/types'
+import { planFinmap } from '@/lib/domain/import/finmap/plan'
+import type { FinmapCounts, FinmapExisting, FinmapPlan, FinmapRow, PlannedOp } from '@/lib/domain/import/finmap/types'
 
 // Synthetic names only.
 const EXISTING: FinmapExisting = {
@@ -97,6 +98,7 @@ function run(ops: PlannedOp[], extra: Partial<FinmapRunArgs> = {}): Promise<Finm
   return runFinmapImport('org1', {
     fileName: 'platnosci.xlsx',
     plan: planOf(ops),
+    alternative: [],
     accounts: [],
     existing: EXISTING,
     onProgress: () => {},
@@ -311,7 +313,7 @@ describe('runFinmapImport: abort and notification', () => {
     const s = serverWith()
     const newAccount = { name: 'Konto Nowe', type: 'bank' as const, currency: 'PLN', currentBalanceMinor: 500 }
     const plan = { ...planOf([planOp(0)]), create: { accounts: ['Konto Nowe'], categories: [], counterparties: ['Firma'], tags: ['Tag'] } }
-    await runFinmapImport('org1', { fileName: 'a.xlsx', plan, accounts: [newAccount], existing: EXISTING, importId: 'imp0', onProgress: () => {} })
+    await runFinmapImport('org1', { fileName: 'a.xlsx', plan, alternative: [], accounts: [newAccount], existing: EXISTING, importId: 'imp0', onProgress: () => {} })
     expect(s.steps('setup')[0].body).toEqual({
       importId: 'imp0',
       fileName: 'a.xlsx',
@@ -385,7 +387,7 @@ describe('countAlreadyImported: the preview count', () => {
   it('checks only the operations whose accounts FinFlow has, and counts the ones the server saw', async () => {
     const server = serverWith({ check: (body) => json({ seen: (body.operations as unknown[]).map((_, i) => i === 0) }) })
     const plan = planOf([planOp(1), planOp(2, { account: 'Konto Nowe' }), planOp(3)])
-    const n = await countAlreadyImported('org1', plan, EXISTING)
+    const n = await countAlreadyImported('org1', plan, EXISTING, { alternative: [] })
     expect(n).toBe(1)
     const sent = server.steps('check')
     expect(sent).toHaveLength(1)
@@ -397,7 +399,7 @@ describe('countAlreadyImported: the preview count', () => {
 
   it('sends no request when no operation is on an account FinFlow has', async () => {
     const server = serverWith()
-    expect(await countAlreadyImported('org1', planOf([planOp(1, { account: 'Konto Nowe' })]), EXISTING)).toBe(0)
+    expect(await countAlreadyImported('org1', planOf([planOp(1, { account: 'Konto Nowe' })]), EXISTING, { alternative: [] })).toBe(0)
     expect(server.steps('check')).toHaveLength(0)
   })
 
@@ -405,7 +407,7 @@ describe('countAlreadyImported: the preview count', () => {
     serverWith()
     const ops = Array.from({ length: 1200 }, (_, i) => planOp(i))
     const progress: Array<[number, number]> = []
-    await countAlreadyImported('org1', planOf(ops), EXISTING, { onProgress: (d, t) => progress.push([d, t]) })
+    await countAlreadyImported('org1', planOf(ops), EXISTING, { alternative: [], onProgress: (d, t) => progress.push([d, t]) })
     expect(progress).toEqual([
       [500, 1200],
       [1000, 1200],
@@ -422,8 +424,88 @@ describe('countAlreadyImported: the preview count', () => {
       },
     })
     const ops = Array.from({ length: 600 }, (_, i) => planOp(i))
-    await expect(countAlreadyImported('org1', planOf(ops), EXISTING, { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(countAlreadyImported('org1', planOf(ops), EXISTING, { alternative: [], signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
     expect(server.steps('check')).toHaveLength(1)
+  })
+})
+
+// The same two rows (an expense on account A, an income on account B, the same day, minute and amount) planned both ways.
+const PAIR_EXISTING: FinmapExisting = {
+  companyCurrency: 'PLN',
+  accounts: [{ id: 'acc-a', name: 'Konto Alfa', currency: 'PLN' }, { id: 'acc-b', name: 'Konto Beta', currency: 'PLN' }],
+  categories: [], counterparties: [], tags: [],
+}
+const pairRow = (over: Partial<FinmapRow>): FinmapRow => ({
+  line: 2, paymentDay: '2026-10-05', timeText: '46000.5', minute: 720, amountMinor: 500,
+  from: null, to: null, category: null, subcategory: null, counterparty: null,
+  hasSubcounterparty: false, hasProject: false, tags: [], comment: null, period: null,
+  ...over,
+})
+const PAIR_ROWS = [pairRow({ line: 2, from: 'Konto Alfa' }), pairRow({ line: 3, to: 'Konto Beta' })]
+const pairPlan = (pairTransfers: boolean): FinmapPlan => planFinmap(PAIR_ROWS, PAIR_EXISTING, { includePlanned: false, pairTransfers, today: '2026-10-20' })
+
+/**
+ * A stateful fake of the server's duplicate check and batch: an operation is written once, under its own identity and ordinal
+ * (the key the server derives from them). Returns the written set.
+ */
+function ledgerServer(): Set<string> {
+  const written = new Set<string>()
+  const keyOf = (o: Body): string => JSON.stringify([o.accountId, o.toAccountId, o.identity, o.ordinal])
+  serverWith({
+    check: (body) => json({ seen: (body.operations as Body[]).map((o) => written.has(keyOf(o))) }),
+    batch: (body) => {
+      let created = 0
+      for (const o of body.operations as Body[]) {
+        if (!written.has(keyOf(o))) {
+          written.add(keyOf(o))
+          created++
+        }
+      }
+      return json({ created, skipped: 0, refused: [] })
+    },
+  })
+  return written
+}
+
+const pairRun = (plan: FinmapPlan, alternative: PlannedOp[]): Promise<FinmapResult> =>
+  runFinmapImport('org1', { fileName: 'platnosci.xlsx', plan, alternative, accounts: [], existing: PAIR_EXISTING, onProgress: () => {} })
+
+describe('runFinmapImport: the other pairing of the same rows', () => {
+  it('after an import with pairing on, the same file with pairing off creates nothing: its two singles are the transfer already written', async () => {
+    const written = ledgerServer()
+    expect(await pairRun(pairPlan(true), pairPlan(false).operations)).toMatchObject({ created: 1, skipped: 0 })
+    expect(await pairRun(pairPlan(false), pairPlan(true).operations)).toMatchObject({ created: 0, skipped: 2 })
+    expect(written.size).toBe(1)
+  })
+
+  it('and the reverse: after an import with pairing off, the same file with pairing on creates nothing', async () => {
+    const written = ledgerServer()
+    expect(await pairRun(pairPlan(false), pairPlan(true).operations)).toMatchObject({ created: 2, skipped: 0 })
+    expect(await pairRun(pairPlan(true), pairPlan(false).operations)).toMatchObject({ created: 0, skipped: 1 })
+    expect(written.size).toBe(2)
+  })
+
+  it('the preview counts the same operations as the run would skip', async () => {
+    ledgerServer()
+    await pairRun(pairPlan(true), pairPlan(false).operations)
+    expect(await countAlreadyImported('org1', pairPlan(false), PAIR_EXISTING, { alternative: pairPlan(true).operations })).toBe(2)
+    expect(await countAlreadyImported('org1', pairPlan(true), PAIR_EXISTING, { alternative: pairPlan(false).operations })).toBe(1)
+  })
+
+  it('does not check an alternative on an account the run creates; the one on an existing account is checked', async () => {
+    const server = serverWith({ setup: () => json({ ...SETUP_OK, accounts: { [normKey('Konto Beta')]: 'acc-new' } }) })
+    await runFinmapImport('org1', {
+      fileName: 'p.xlsx',
+      plan: pairPlan(true),
+      alternative: pairPlan(false).operations,
+      accounts: [{ name: 'Konto Beta', type: 'bank', currency: 'PLN', currentBalanceMinor: null }],
+      existing: { ...PAIR_EXISTING, accounts: [PAIR_EXISTING.accounts[0]] },
+      onProgress: () => {},
+    })
+    // The transfer touches the new account, so it is not checked. Its single on the existing account is: one key, the expense.
+    const sent = server.steps('check')
+    expect(sent).toHaveLength(1)
+    expect(sent[0].body.operations).toEqual([expect.objectContaining({ accountId: 'acc-a', toAccountId: null })])
   })
 })
 
