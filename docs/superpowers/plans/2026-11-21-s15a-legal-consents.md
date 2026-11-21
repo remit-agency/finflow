@@ -25,7 +25,7 @@
 ## File map
 
 Create:
-- `lib/legal/versions.ts`, `lib/legal/consent.ts`, `lib/legal/operator.ts`, `lib/legal/content-types.ts`
+- `lib/legal/versions.ts`, `lib/legal/consent.ts`, `content/legal/operator.ts`, `lib/legal/content-types.ts`
 - `content/legal/outline.ts`, `content/legal/{terms,privacy,cookies}.{pl,en,uk}.ts` (9), `content/legal/index.ts`, `content/legal/export-readme.ts`
 - `components/legal/LegalDocument.tsx`, `components/legal/LegalLinks.tsx`, `components/legal/DraftBanner.tsx`, `app/legal/[doc]/page.tsx`
 - `lib/server/consent/index.ts`, `app/api/consent/route.ts`, `lib/api/consent-client.ts`
@@ -180,14 +180,14 @@ export function parseConsentBody(body: unknown): ConsentParse {
 ## Task 2: Operator config, content types, outline and draft guard (pure)
 
 **Files:**
-- Create: `lib/legal/operator.ts`, `lib/legal/content-types.ts`, `content/legal/outline.ts`
+- Create: `content/legal/operator.ts`, `lib/legal/content-types.ts`, `content/legal/outline.ts`
 - Test: `tests/unit/legal/operator.test.ts`
 
 - [ ] **Step 1: Write the failing test** `tests/unit/legal/operator.test.ts`
 
 ```ts
 import { describe, expect, it } from 'vitest'
-import { LEGAL_DRAFT, OPERATOR, operatorProblems } from '@/lib/legal/operator'
+import { LEGAL_DRAFT, OPERATOR, operatorProblems } from '@/content/legal/operator'
 
 describe('operator config', () => {
   it('lists problems for empty or placeholder fields', () => {
@@ -214,7 +214,7 @@ describe('operator config', () => {
 ```
 
 - [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement** `lib/legal/operator.ts`
+- [ ] **Step 3: Implement** `content/legal/operator.ts`
 
 ```ts
 // The legal operator of FinFlow and the sub-processors. The OWNER fills the empty fields (see the spec, "Що має
@@ -481,7 +481,7 @@ Test in `tests/unit/consent/gate-state.test.ts`: `undefined`→`loading`; `'erro
 ```ts
 import { OUTLINE } from './outline'
 import type { LegalContent } from '@/lib/legal/content-types'
-import type { Operator } from '@/lib/legal/operator'
+import type { Operator } from '@/content/legal/operator'
 import type { PublicLegalDoc } from '@/lib/legal/versions'
 import type { Locale } from '@/lib/i18n/config'
 import { cookiesPl } from './cookies.pl'

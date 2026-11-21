@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LEGAL_DRAFT, OPERATOR, operatorProblems } from '@/lib/legal/operator'
+import { LEGAL_DRAFT, OPERATOR, operatorProblems } from '@/content/legal/operator'
 
 describe('operator config', () => {
   it('lists problems for empty or placeholder fields', () => {
