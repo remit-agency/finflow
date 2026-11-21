@@ -24,8 +24,14 @@ export const REPORT_LIMITS: readonly RateWindow[] = [
   { name: 'h', seconds: 3600, max: 1200 },
 ]
 
+/** Consent writes are idempotent and tiny; a person accepts once or twice, so the limits only stop a loop. */
+export const CONSENT_LIMITS: readonly RateWindow[] = [
+  { name: 'm', seconds: 60, max: 20 },
+  { name: 'h', seconds: 3600, max: 120 },
+]
+
 /** Throws `HttpError(429, 'rate_limited')` when the user is over a limit of the scope. */
-export async function enforceRateLimit(uid: string, scope: 'lookup' | 'rates' | 'reports', limits: readonly RateWindow[], now: Date = new Date()): Promise<void> {
+export async function enforceRateLimit(uid: string, scope: 'lookup' | 'rates' | 'reports' | 'consent', limits: readonly RateWindow[], now: Date = new Date()): Promise<void> {
   const safeUid = uid.replace(/[^A-Za-z0-9_-]/g, '_')
   if (!(await consumeRateLimit(getAdmin().db, `${scope}_${safeUid}`, limits, now))) throw new HttpError(429, 'rate_limited')
 }
