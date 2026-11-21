@@ -4,7 +4,7 @@ import { assertBankUnlocked, withBankSides } from '@/lib/domain/ledger/bank-lock
 import { changeSet, type ChangeSet } from '@/lib/domain/ledger/change'
 import { parseAccount, parseBankInfo, parseTransaction, transactionToDoc } from '@/lib/domain/ledger/doc'
 import { LedgerError } from '@/lib/domain/ledger/errors'
-import { applyPatch, BANK_CLIENT_ID_PREFIX, PLAN_CLIENT_ID_PREFIX, toRawInput, type TransactionInput, type TransactionPatch } from '@/lib/domain/ledger/input'
+import { applyPatch, BANK_CLIENT_ID_PREFIX, FINMAP_CLIENT_ID_PREFIX, PLAN_CLIENT_ID_PREFIX, toRawInput, type TransactionInput, type TransactionPatch } from '@/lib/domain/ledger/input'
 import { assertNotSeriesTransfer, markChangeOf, withSeries, type MarkChange } from '@/lib/domain/ledger/series'
 import { nest } from '@/lib/domain/ledger/rollups'
 import type { AutoRuleRef, BankInfo, BankToInfo, LedgerTransaction, RateEvidence } from '@/lib/domain/ledger/types'
@@ -49,6 +49,15 @@ interface Prepared {
   currencies: Record<string, string>
 }
 
+/** The body fields of a Finmap create that its mark's snapshot must match, with the key of its id. */
+interface FinmapBody {
+  key: string
+  type: string
+  accountId: string
+  amountMinor: number
+  paymentDate: string
+}
+
 interface Job {
   action: AuditAction
   txId: string
@@ -60,6 +69,11 @@ interface Job {
   restore?: boolean
   /** The bank keys whose sides a create brings back (S10b): each must be free when the create is written. */
   sideKeys?: string[]
+  /**
+   * A create under a Finmap id (`fm_` + key, S14b): the operation comes back into the import its mark names, and its body must
+   * be the one the mark's snapshot recorded (type, account, amount, payment date).
+   */
+  finmap?: FinmapBody
   /**
    * The mark of the occurrence this write moves (S11, `markChangeOf`). `restoreReason` is the reason of the mark a create
    * under a plan id came back from: inside the transaction it must still be that mark.
@@ -185,6 +199,7 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
         ? recurringDoneCol(db, orgId).doc(planId(markOf.seriesId, markOf.occurrence))
         : null
     const markSnap = markRef === null ? null : await t.get(markRef)
+    const finmapImport = job.finmap === undefined ? undefined : await finmapImportOf(t, db, orgId, job.finmap, job.txId)
 
     // ---- checks (nothing is written yet) ----
     if (!orgSnap.exists) throw new LedgerError('not_found', 'org')
@@ -234,7 +249,8 @@ async function commit(deps: LedgerDeps, orgId: string, uid: string, job: Job): P
     // ---- writes ----
     const ts = Timestamp.fromDate(deps.now())
     // `excluded` is the ledger's own field: decided here from the tags read above, never taken from a request.
-    const next = job.next ? withExcluded(job.next.tx, excludedFromTags(nextTags, tagFlagsOf(tagSnaps))) : null
+    const built = job.next ? withExcluded(job.next.tx, excludedFromTags(nextTags, tagFlagsOf(tagSnaps))) : null
+    const next = built && finmapImport !== undefined ? { ...built, importId: finmapImport } : built
     const change = changeSet(job.prior?.tx ?? null, next, baseCurrency)
 
     applyChange(t, db, orgId, change, ts)
@@ -338,6 +354,25 @@ async function planRestoreOf(deps: LedgerDeps, orgId: string, input: Transaction
   return { fields, reason: mark.reason }
 }
 
+/**
+ * The import a Finmap operation (`fm_` + key) comes back into (S14b). Only the Finmap writer's own mark can say so: `bankSeen/{key}`
+ * with `kind: 'finmap'` and `txId` equal to the id, naming an applied Finmap import of the company. The body must repeat the
+ * snapshot the mark recorded (type, account, amount, payment day), as a bank restore does. The mark is read inside the
+ * create's transaction, so an undo that removes it meanwhile conflicts. The mark is not written again (a person-deleted
+ * operation keeps its mark, as the design says). Anything else is refused (`invalid_input` on `clientId`): a person cannot
+ * invent a Finmap id.
+ */
+async function finmapImportOf(t: Transaction, db: Firestore, orgId: string, body: FinmapBody, txId: string): Promise<string> {
+  const mark = await t.get(orgRef(db, orgId).collection('bankSeen').doc(body.key))
+  const importId = mark.get('importId')
+  const snapshot = mark.get('snapshot')
+  if (!mark.exists || mark.get('kind') !== 'finmap' || mark.get('txId') !== txId || typeof importId !== 'string') refuseClientId()
+  if (!isRecord(snapshot) || !imported(snapshot, body.type, body.accountId, body.amountMinor, body.paymentDate)) refuseClientId()
+  const imp = await t.get(orgRef(db, orgId).collection('imports').doc(importId))
+  if (!imp.exists || imp.get('kind') !== 'finmap' || imp.get('status') !== 'applied') refuseClientId()
+  return importId
+}
+
 /** The bank's mark of one imported operation: its bank block and the locked fields of the import; null without them (a failed import). */
 async function readMark(deps: LedgerDeps, orgId: string, key: string): Promise<{ bank: BankInfo; snapshot: Record<string, unknown> } | null> {
   const snap = await orgRef(deps.db, orgId).collection('bankSeen').doc(key).get()
@@ -416,6 +451,10 @@ export async function createTransaction(
     next,
     via: autoRules.length > 0 ? 'rule' : undefined,
     sideKeys: restore?.keys ?? [],
+    finmap:
+      input.clientId?.startsWith(FINMAP_CLIENT_ID_PREFIX) === true
+        ? { key: input.clientId.slice(FINMAP_CLIENT_ID_PREFIX.length), type: input.type, accountId: input.accountId, amountMinor: input.amountMinor, paymentDate: input.paymentDate }
+        : undefined,
     planMark: plan === undefined ? undefined : { change: markChangeOf(null, next.tx) ?? 'clear', restoreReason: plan.reason },
   })
 }
@@ -467,6 +506,9 @@ export async function updateTransaction(
   // toRawInput never carries the series link either (S11): it comes from the prior document, and a person's change of a
   // planned occurrence makes it «змінено вручну».
   if (prior.tx.seriesId !== undefined) next.tx = withSeries(next.tx, prior.tx)
+  // toRawInput never carries the import link either (S14b): an edit keeps the import that wrote the operation. A transfer
+  // rebuilt by convertToTransfer, mergeToTransfer or splitTransferSides (S10b) is a new document and drops it on purpose.
+  if (prior.tx.importId !== undefined) next.tx = { ...next.tx, importId: prior.tx.importId }
   const mark = markChangeOf(prior.tx, next.tx)
   const given = extras.autoRules ?? []
   // toRawInput never carries `autoRules` either: the trace is decided here.

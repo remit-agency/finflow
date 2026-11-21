@@ -80,6 +80,46 @@ export async function release(deps: ImportDeps, ref: DocumentReference, token: s
   })
 }
 
+/**
+ * Takes the step locks of several accounts in one transaction: all of them or none. `already_running` when one is held, and then
+ * none is written, so there is nothing to free.
+ */
+export async function acquireAll(deps: ImportDeps, refs: readonly DocumentReference[], token: string): Promise<void> {
+  if (refs.length === 0) return
+  await deps.db.runTransaction(async (t) => {
+    const snaps = await t.getAll(...refs)
+    const nowMs = deps.now().getTime()
+    for (const snap of snaps) {
+      const held = snap.data()?.until
+      if (typeof held === 'number' && held > nowMs) throw new ImportError('already_running')
+    }
+    for (const ref of refs) t.set(ref, { until: nowMs + LOCK_MS, token })
+  })
+}
+
+/** Frees the step locks of several accounts in one transaction, each only while it is still this holder's. */
+export async function releaseAll(deps: ImportDeps, refs: readonly DocumentReference[], token: string): Promise<void> {
+  if (refs.length === 0) return
+  await deps.db.runTransaction(async (t) => {
+    const snaps = await t.getAll(...refs)
+    refs.forEach((ref, i) => {
+      if (snaps[i].data()?.token === token) t.update(ref, { until: 0, token: null })
+    })
+  })
+}
+
+/** Holds the step lock of each account (taken together, released in `finally`); `already_running` propagates. */
+export async function withAccountLocks<T>(deps: ImportDeps, orgId: string, accountIds: readonly string[], run: () => Promise<T>): Promise<T> {
+  const refs = [...new Set(accountIds)].sort().map((id) => importLocksCol(deps.db, orgId).doc(id))
+  const token = randomUUID()
+  await acquireAll(deps, refs, token)
+  try {
+    return await run()
+  } finally {
+    await releaseAll(deps, refs, token)
+  }
+}
+
 async function runStep(deps: ImportDeps, orgId: string, uid: string, account: LedgerAccount, req: ImportStepRequest): Promise<ImportStepResult> {
   const { ref, importId, doc } = await openImport(deps, orgId, uid, req)
   const totals: Totals = { created: 0, seen: 0, bank: 0, refused: [] }
@@ -105,6 +145,7 @@ async function openImport(deps: ImportDeps, orgId: string, uid: string, req: Imp
   const ref = importsCol(deps.db, orgId).doc()
   const doc: ImportDoc = {
     schemaVersion: 1,
+    kind: 'mt940',
     fileName: req.fileName,
     accountIds: [],
     createdAt: Timestamp.fromDate(deps.now()),
@@ -113,6 +154,8 @@ async function openImport(deps: ImportDeps, orgId: string, uid: string, req: Imp
     counts: { created: 0, skipped: 0, refused: 0 },
     statements: [],
     fit: {},
+    fitTargets: {},
+    entities: { accounts: 0, categories: 0, counterparties: 0, tags: 0 },
     status: 'applied',
     undo: { deleted: 0, kept: 0 },
   }

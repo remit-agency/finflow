@@ -118,8 +118,13 @@ function ImportRow({
   return (
     <li data-testid="imports-row" className="space-y-1.5 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="min-w-0 text-sm font-medium break-all text-ink">
-          {t('row', { file: row.fileName, created: row.counts.created, date: date(new Date(row.createdAt), { dateStyle: 'medium' }) })}
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <span data-testid="import-kind" className="rounded-control border border-line px-1.5 py-0.5 text-xs text-ink-muted">
+            {row.kind === 'finmap' ? t('kind.finmap') : t('kind.mt940')}
+          </span>
+          <span className="min-w-0 text-sm font-medium break-all text-ink">
+            {t('row', { file: row.fileName, created: row.counts.created, date: date(new Date(row.createdAt), { dateStyle: 'medium' }) })}
+          </span>
         </span>
         {canUndo(row.status) && (
           <Button type="button" data-testid="import-undo" variant="outline" size="sm" disabled={disabled} onClick={onUndo}>
@@ -131,6 +136,16 @@ function ImportRow({
       {progress !== null && (
         <p role="status" className="text-sm text-ink-muted tabular-nums">
           {t('deleted', { n: progress })}
+        </p>
+      )}
+      {row.kind === 'finmap' && (
+        <p data-testid="imports-entities" className="text-sm text-ink-muted tabular-nums">
+          {t('entities', {
+            accounts: row.entities.accounts,
+            categories: row.entities.categories,
+            counterparties: row.entities.counterparties,
+            tags: row.entities.tags,
+          })}
         </p>
       )}
       {row.status === 'undone' && row.undoneAt && (

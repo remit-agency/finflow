@@ -130,6 +130,10 @@ test.describe('API guards', () => {
       { method: 'POST', path: '/api/orgs/x/imports', data: {} },
       { method: 'POST', path: '/api/orgs/x/imports/preview', data: { fileName: 'a.sta', text: ':20:x' } },
       { method: 'POST', path: '/api/orgs/x/imports/x/undo', data: {} },
+      { method: 'POST', path: '/api/orgs/x/imports/finmap/check', data: {} },
+      { method: 'POST', path: '/api/orgs/x/imports/finmap/setup', data: {} },
+      { method: 'POST', path: '/api/orgs/x/imports/finmap/batch', data: {} },
+      { method: 'POST', path: '/api/orgs/x/imports/finmap/finish', data: {} },
     ]
     for (const { method, path, data } of calls) {
       const res = await request.fetch(path, { method, headers: origin, data })

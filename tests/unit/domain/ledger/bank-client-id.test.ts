@@ -32,3 +32,23 @@ describe('the bk_ client id prefix is reserved for bank operations', () => {
     expect(parseTransactionInput({ ...BASE, clientId: 'client-12345678' }, { internal: true }).clientId).toBe('client-12345678')
   })
 })
+
+const FINMAP_ID = 'fm_0123456789abcdef0123456789abcdef'
+
+describe('the fm_ client id prefix is reserved for server code (the create checks the Finmap mark)', () => {
+  it('a client id with the Finmap prefix is refused by default', () => {
+    expect(code(() => parseTransactionInput({ ...BASE, clientId: FINMAP_ID }))).toBe('invalid_input:clientId')
+  })
+
+  it('an internal call lets the Finmap prefix through; the ledger still checks the Finmap mark', () => {
+    expect(parseTransactionInput({ ...BASE, clientId: FINMAP_ID }, { internal: true }).clientId).toBe(FINMAP_ID)
+  })
+
+  it('an internal call does not relax the rest of the id rule', () => {
+    expect(code(() => parseTransactionInput({ ...BASE, clientId: 'fm_x' }, { internal: true }))).toBe('invalid_input:clientId')
+  })
+
+  it('an ordinary id that only contains fm_ is an ordinary id', () => {
+    expect(parseTransactionInput({ ...BASE, clientId: 'xfm_12345678' }).clientId).toBe('xfm_12345678')
+  })
+})

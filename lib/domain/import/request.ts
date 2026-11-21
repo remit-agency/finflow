@@ -6,7 +6,7 @@ export type Parsed<T> = { ok: true; value: T } | { ok: false; field: string }
 
 const ID = /^[A-Za-z0-9_-]{1,128}$/
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
-const isId = (v: unknown): v is string => typeof v === 'string' && ID.test(v)
+export const isId = (v: unknown): v is string => typeof v === 'string' && ID.test(v)
 const str = (v: unknown, max: number): string | null | undefined => (v === null ? null : typeof v === 'string' && v.length <= max ? v : undefined)
 
 export interface StepStatement {

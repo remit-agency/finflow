@@ -23,6 +23,11 @@ export const BANK_CLIENT_ID_PREFIX = 'bk_'
  * (`recurringDone`, see `createTransaction` in lib/server/ledger/write.ts): the undo of a delete or of «Пропустити».
  */
 export const PLAN_CLIENT_ID_PREFIX = 'pl_'
+/**
+ * The id prefix of a Finmap operation (S14b: `fm_<key>`). A client may not pick it: as with `bk_`, the create accepts it only
+ * from server code (`internal`), and `createTransaction` admits it only with the Finmap mark of that key (`finmapImportOf`).
+ */
+export const FINMAP_CLIENT_ID_PREFIX = 'fm_'
 
 const CREATE_KEYS = [
   'clientId', 'type', 'status', 'accountId', 'amountMinor', 'toAccountId', 'toAmountMinor', 'paymentDate',
@@ -132,6 +137,7 @@ export function parseTransactionInput(body: unknown, opts?: ParseOptions): Trans
   }
   if (typeof r.clientId === 'string' && r.clientId.startsWith(BANK_CLIENT_ID_PREFIX) && opts?.internal !== true) bad('clientId')
   if (typeof r.clientId === 'string' && r.clientId.startsWith(PLAN_CLIENT_ID_PREFIX) && opts?.internal !== true) bad('clientId')
+  if (typeof r.clientId === 'string' && r.clientId.startsWith(FINMAP_CLIENT_ID_PREFIX) && opts?.internal !== true) bad('clientId')
   if (!isId(r.accountId)) bad('accountId')
   const paymentDate = day(r.paymentDate, 'paymentDate')
 

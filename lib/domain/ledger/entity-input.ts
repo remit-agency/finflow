@@ -4,7 +4,8 @@ import { ACCOUNT_TYPES, LEDGER_CURRENCIES, type AccountType } from './types'
 
 const ACCOUNT_KEYS = ['name', 'type', 'currency', 'color', 'openingMinor'] as const
 const COLOR = /^#[0-9a-fA-F]{6}$/
-const NAME_MAX = 120
+/** The longest account, category or other entity name the ledger accepts. */
+export const NAME_MAX = 120
 
 export interface AccountInput {
   name: string

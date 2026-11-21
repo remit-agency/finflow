@@ -99,6 +99,8 @@ export interface LedgerTransaction {
   fx?: Fx
   base?: Base
   bank?: BankInfo
+  /** The statement or file import (S14) that wrote the operation; never taken from a request. */
+  importId?: string
   /** The incoming side of a transfer when that side was a bank operation (S10b); `bank` is then the outgoing one. Transfers only. */
   bankTo?: BankToInfo
   /** The rules that filled the category or the counterparty (S10). A person's change of either removes it. */
