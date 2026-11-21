@@ -16,7 +16,8 @@ rules_version = '2';
 // bank collections (bankConnections, bankAccounts, bankSeen: S09) are written by the server only (S05, S06, S09). counterpartyKeys and tagKeys
 // (uniqueness keys), bankAccounts and bankSeen (bank sync state), recurringDone (S11: occurrence marks) and the root rateLimits are not
 // readable or writable by clients at all. imports (S14: one document per imported file) and importLocks (S14: the account step
-// locks) are server-only too: no rule below matches them.
+// locks) are server-only too: no rule below matches them. userConsents/{uid} (S15a: the legal documents a user accepted) is readable
+// by its owner only (`get`), and its `events` subcollection by nobody; the server writes both.
 //
 // The name `members` is reserved for memberships: the collection-group rule below applies to
 // every collection called `members`. New subcollections must be added to the lists below.
@@ -82,6 +83,13 @@ service cloud.firestore {
     // Server-only documents (e.g. _meta/health read by GET /api/health).
     match /_meta/{document=**} {
       allow read, write: if false;
+    }
+
+    // S15a: the record of the legal documents a user accepted. A person may read only their own record (the browser
+    // shows the consent gate from it); every write is made by the server (POST /api/consent). The `events`
+    // subcollection (proof per version) matches no rule: closed to clients.
+    match /userConsents/{uid} {
+      allow get: if isSignedIn() && request.auth.uid == uid;
     }
 
     // Cached NBP tables (written and read by the server only, see lib/server/fx).
