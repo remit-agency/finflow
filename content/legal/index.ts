@@ -6,9 +6,13 @@ import type { Locale } from '@/lib/i18n/config'
 import { cookiesPl } from './cookies.pl'
 import { cookiesEn } from './cookies.en'
 import { cookiesUk } from './cookies.uk'
-// terms and privacy are imported in Tasks 7 and 8
+import { privacyPl } from './privacy.pl'
+import { privacyEn } from './privacy.en'
+import { privacyUk } from './privacy.uk'
+// terms is imported in Task 8
 
 const CONTENT: Partial<Record<PublicLegalDoc, Record<Locale, LegalContent>>> = {
+  privacy: { pl: privacyPl, en: privacyEn, uk: privacyUk },
   cookies: { pl: cookiesPl, en: cookiesEn, uk: cookiesUk },
 }
 
