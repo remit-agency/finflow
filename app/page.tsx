@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowRight, Check, BarChart2, Calendar, ArrowLeftRight, Code2, ShoppingCart, HardHat, Briefcase, Factory, PieChart } from 'lucide-react'
 import { LandingNavLogin, LandingHeroLogin } from '@/components/landing/LandingAuthButtons'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { LegalLinks } from '@/components/legal/LegalLinks'
 
 export default function HomePage() {
   return (
@@ -315,10 +316,11 @@ export default function HomePage() {
           <nav className="flex items-center gap-6 text-sm text-black/28 dark:text-white/25">
             <Link href="#features" className="hover:text-black/60 dark:hover:text-white/60 transition-colors">Можливості</Link>
             <Link href="/pricing" className="hover:text-black/60 dark:hover:text-white/60 transition-colors">Ціни</Link>
-            <Link href="#" className="hover:text-black/60 dark:hover:text-white/60 transition-colors">Конфіденційність</Link>
-            <Link href="#" className="hover:text-black/60 dark:hover:text-white/60 transition-colors">Умови</Link>
           </nav>
           <p className="text-sm text-black/18 dark:text-white/18">© 2026 FinFlow</p>
+        </div>
+        <div className="max-w-6xl mx-auto mt-6 flex justify-center">
+          <LegalLinks />
         </div>
       </footer>
 

@@ -1,4 +1,5 @@
 import 'server-only'
+import { LOCALE_COOKIE } from '@/lib/i18n/config'
 
 /** Name kept from the pre-S01 cookie; it now carries a Firebase session cookie (a signed JWT). */
 export const SESSION_COOKIE_NAME = '__session'
@@ -27,6 +28,11 @@ export function readCookie(headers: Headers, name: string): string | null {
 /** Extracts the `__session` value from a request's Cookie header, or null. */
 export function readSessionCookie(headers: Headers): string | null {
   return readCookie(headers, SESSION_COOKIE_NAME)
+}
+
+/** The raw locale cookie value (`NEXT_LOCALE`), or undefined; `resolveLocale` validates it. */
+export function readLocaleCookie(headers: Headers): string | undefined {
+  return readCookie(headers, LOCALE_COOKIE) ?? undefined
 }
 
 function attributes(maxAgeSeconds: number, secure: boolean): string {

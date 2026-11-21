@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isAppPath,
   isAuthPath,
+  isLegalPath,
   isPublicPath,
   loginUrlAfterSessionLoss,
   safeRedirectPath,
@@ -41,10 +42,32 @@ describe('isAppPath', () => {
   ])('is true for %s', (p) => {
     expect(isAppPath(p)).toBe(true)
   })
-  it.each(['/', '/login', '/login/x', '/register', '/forgot-password', '/pricing', '/org1', '//evil/x'])(
-    'is false for %s',
-    (p) => expect(isAppPath(p)).toBe(false),
-  )
+  it.each([
+    '/',
+    '/login',
+    '/login/x',
+    '/register',
+    '/forgot-password',
+    '/pricing',
+    '/org1',
+    '//evil/x',
+    '/legal/terms',
+    '/legal/privacy',
+    '/legal/cookies',
+    '/legal/cookies/',
+  ])('is false for %s', (p) => expect(isAppPath(p)).toBe(false))
+  it.each(['/legal/other', '/legal/terms/x', '/legalx/terms', '/legal/Terms'])('is still an app path: %s', (p) => {
+    expect(isAppPath(p)).toBe(true)
+  })
+})
+
+describe('isLegalPath', () => {
+  it.each(['/legal/terms', '/legal/privacy', '/legal/cookies', '/legal/cookies/'])('is true for %s', (p) => {
+    expect(isLegalPath(p)).toBe(true)
+  })
+  it.each(['/legal', '/legal/', '/legal/other', '/legal/terms/x', '/legalx/terms', '/org1/terms'])('is false for %s', (p) => {
+    expect(isLegalPath(p)).toBe(false)
+  })
 })
 
 describe('safeRedirectPath', () => {

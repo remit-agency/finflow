@@ -38,6 +38,12 @@ export interface EbApi {
   getSession(sessionId: string): Promise<EbSession>
   getBalances(accountUid: string): Promise<EbBalance[]>
   getTransactions(accountUid: string, query: { dateFrom: string; continuationKey?: string | null }): Promise<EbTxPage>
+  /**
+   * Ends a bank session (`DELETE /sessions/{id}`), so the bank access granted to us is revoked. A session the bank no
+   * longer knows (404) or reports as closed or expired (`consent_expired`) counts as already ended.
+   * NOT verified against the real Enable Banking API: the endpoint is assumed from the provider's API reference.
+   */
+  deleteSession(sessionId: string): Promise<void>
 }
 
 /** A bank request that does not answer within this time counts as the bank being unavailable (the route has 60 s). */
@@ -115,21 +121,27 @@ export function createEbApi(opts: EbApiOptions): EbApi {
   const base = opts.base ?? process.env.EB_API_BASE ?? 'https://api.enablebanking.com'
   const doFetch = opts.fetchImpl ?? fetch
 
-  async function get(pathAndQuery: string): Promise<unknown> {
+  /** One authenticated request; a network error or timeout is `bank_unavailable`. The caller checks the status. */
+  async function send(method: 'GET' | 'DELETE', pathAndQuery: string): Promise<Response> {
     const headers: Record<string, string> = { Authorization: `Bearer ${await opts.token()}` }
     if (opts.psu?.ip) headers['psu-ip-address'] = opts.psu.ip
     if (opts.psu?.userAgent) headers['psu-user-agent'] = opts.psu.userAgent
-    let res: Response
     try {
-      res = await doFetch(`${base}${pathAndQuery}`, { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+      return await doFetch(`${base}${pathAndQuery}`, { method, headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
     } catch {
       throw new BankError('bank_unavailable')
     }
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      console.error('Enable Banking call failed:', res.status, sanitize(text))
-      throw new BankError(classifyEbFailure(res.status, text))
-    }
+  }
+
+  async function failure(res: Response): Promise<never> {
+    const text = await res.text().catch(() => '')
+    console.error('Enable Banking call failed:', res.status, sanitize(text))
+    throw new BankError(classifyEbFailure(res.status, text))
+  }
+
+  async function get(pathAndQuery: string): Promise<unknown> {
+    const res = await send('GET', pathAndQuery)
+    if (!res.ok) await failure(res)
     // A body that cannot be read in full (the timeout fires mid-body) or is not JSON is an error, never an empty page:
     // `syncStep` would take an empty page for "nothing more" and move `syncedThrough` past operations it never saw.
     let text: string
@@ -143,6 +155,13 @@ export function createEbApi(opts: EbApiOptions): EbApi {
     } catch {
       throw new BankError('bank_error')
     }
+  }
+
+  /** A DELETE whose answer body is not needed; 404 (nothing to delete) is success. */
+  async function del(path: string): Promise<void> {
+    const res = await send('DELETE', path)
+    if (!res.ok && res.status !== 404) await failure(res)
+    await res.body?.cancel().catch(() => undefined)
   }
 
   return {
@@ -176,6 +195,17 @@ export function createEbApi(opts: EbApiOptions): EbApi {
       return {
         transactions: Array.isArray(body?.transactions) ? (body.transactions as EbTransaction[]) : [],
         continuationKey: str(body?.continuation_key),
+      }
+    },
+    async deleteSession(sessionId) {
+      // NOT verified against the real Enable Banking API: `DELETE /sessions/{session_id}` is taken from the provider's
+      // API reference ("Delete session"); nothing in this repository has exercised it against the real bank.
+      try {
+        await del(`/sessions/${encodeURIComponent(sessionId)}`)
+      } catch (e) {
+        // A session that is already closed, expired or revoked has nothing left to revoke.
+        if (e instanceof BankError && e.code === 'consent_expired') return
+        throw e
       }
     },
   }

@@ -23,11 +23,24 @@ import { auth } from '@/lib/firebase/firebase'
 import { getMyOrganizationsForAuthPage } from '@/lib/firebase/members'
 import { createOrgViaApi } from '@/lib/firebase/orgs-client'
 import { classifyAuthFailure } from '@/lib/firebase/auth-errors'
+import { acceptLegalDocs } from '@/lib/api/consent-client'
+import { LegalLinks } from '@/components/legal/LegalLinks'
+import type { ConsentSource } from '@/lib/legal/consent'
 
 const CURRENCIES = ['UAH', 'EUR', 'USD', 'PLN'] as const
 
 async function hasNoCompany(uid: string): Promise<boolean> {
   return (await getMyOrganizationsForAuthPage(uid)).length === 0
+}
+
+// The account already exists when this runs, and the in-app consent gate asks again on first entry,
+// so a failed record must not stop the registration.
+async function recordConsent(source: ConsentSource): Promise<void> {
+  try {
+    await acceptLegalDocs(source)
+  } catch (err) {
+    console.error('Could not record legal consent', err)
+  }
 }
 
 export default function RegisterPage() {
@@ -42,6 +55,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [orgName, setOrgName] = useState('')
   const [currency, setCurrency] = useState('PLN')
+  const [accepted, setAccepted] = useState(false)
   const [loading, setLoading] = useState(false)
   // True while a company-only submit runs, so that form does not flip while it is busy.
   const [companyOnlySubmit, setCompanyOnlySubmit] = useState(false)
@@ -80,6 +94,10 @@ export default function RegisterPage() {
     } else if (!name || !email || !password || !orgName) {
       return
     }
+    if (!accepted) {
+      toast.error(t('acceptRequired'))
+      return
+    }
 
     setLoading(true)
     if (companyOnly) setCompanyOnlySubmit(true)
@@ -88,12 +106,16 @@ export default function RegisterPage() {
       // or the user was signed in a moment ago): skip the sign-up and only create the company.
       const current = auth.currentUser
       if (current && orgName.trim().length > 0 && (companyOnly || (await hasNoCompany(current.uid)))) {
+        // The session cookie exists: this user is already signed in with a server session.
+        await recordConsent('register')
         const orgId = await createOrgViaApi(orgName.trim(), currency)
         await goToOrg(orgId)
         return
       }
 
+      // signUp mints the server session before it creates the company, so the cookie exists here.
       const { orgId } = await signUp(email, password, name, orgName, currency)
+      await recordConsent('register')
       await goToOrg(orgId)
     } catch (err: unknown) {
       showFailure(err)
@@ -108,6 +130,10 @@ export default function RegisterPage() {
       toast.error(t('googleNeedsCompany'))
       return
     }
+    if (!accepted) {
+      toast.error(t('acceptRequired'))
+      return
+    }
     setLoading(true)
     try {
       const { user: googleUser } = await signInGoogle()
@@ -116,6 +142,8 @@ export default function RegisterPage() {
         await goToOrg(existingOrgs[0].id)
         return
       }
+      // signInGoogle mints the server session before it returns, so the cookie exists here.
+      await recordConsent('google')
       const orgId = await createOrgViaApi(orgName, currency)
       await goToOrg(orgId)
     } catch (err: unknown) {
@@ -132,7 +160,7 @@ export default function RegisterPage() {
   const fromLogin = companyOnly && new URLSearchParams(window.location.search).get('step') === 'org'
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-[#0f0f0f] px-4 py-8">
+    <div className="relative min-h-screen flex flex-col items-center justify-center bg-[#0f0f0f] px-4 py-8">
       <div className="absolute top-4 right-4">
         <LanguageSwitcher variant="select" />
       </div>
@@ -253,11 +281,36 @@ export default function RegisterPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="flex items-start gap-2">
+                <input
+                  id="accept"
+                  type="checkbox"
+                  checked={accepted}
+                  onChange={(e) => setAccepted(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded-[4px] border-[#e5e7eb] accent-[#00c896] focus-visible:ring-2 focus-visible:ring-[#00c896]"
+                  required
+                />
+                <Label htmlFor="accept" className="block text-[#111111] text-sm font-normal leading-snug">
+                  {t.rich('accept', {
+                    terms: (chunks) => (
+                      <Link href="/legal/terms" target="_blank" rel="noopener noreferrer" className="text-[#00c896] hover:underline">
+                        {chunks}
+                      </Link>
+                    ),
+                    privacy: (chunks) => (
+                      <Link href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-[#00c896] hover:underline">
+                        {chunks}
+                      </Link>
+                    ),
+                  })}
+                </Label>
+              </div>
             </div>
 
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || !accepted}
               className="w-full bg-[#00c896] hover:bg-[#00b584] text-white rounded-[8px] font-medium disabled:opacity-50"
             >
               {companyOnly
@@ -292,7 +345,7 @@ export default function RegisterPage() {
                 type="button"
                 variant="outline"
                 onClick={handleGoogle}
-                disabled={loading}
+                disabled={loading || !accepted}
                 className="w-full rounded-[8px] border-[#e5e7eb] text-[#111111] hover:bg-[#f9fafb]"
               >
                 <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
@@ -326,6 +379,9 @@ export default function RegisterPage() {
           )}
         </CardContent>
       </Card>
+      <div className="mt-6 [&>nav]:justify-center [&>nav]:text-white/50">
+        <LegalLinks />
+      </div>
     </div>
   )
 }

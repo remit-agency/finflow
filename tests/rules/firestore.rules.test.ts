@@ -440,6 +440,49 @@ describe('tag keys are closed to every client (S10t)', () => {
   })
 })
 
+describe('user consents (S15a)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(fs(ctx), 'userConsents/alice'), { documents: {} })
+      await setDoc(doc(fs(ctx), 'userConsents/bob'), { documents: {} })
+      await setDoc(doc(fs(ctx), 'userConsents/alice/events/e1'), { version: '1' })
+    })
+  })
+
+  it('a signed-in user can get their own consent record', async () => {
+    await assertSucceeds(getDoc(doc(as('alice'), 'userConsents/alice')))
+  })
+
+  it("a signed-in user cannot get another user's consent record", async () => {
+    await assertFails(getDoc(doc(as('alice'), 'userConsents/bob')))
+  })
+
+  it('a signed-in user cannot list the consent records', async () => {
+    await assertFails(getDocs(collection(as('alice'), 'userConsents')))
+  })
+
+  it('a signed-in user cannot create, update or delete their own consent record', async () => {
+    await assertFails(setDoc(doc(as('alice'), 'userConsents/carol'), { documents: {} }))
+    await assertFails(setDoc(doc(as('carol'), 'userConsents/carol'), { documents: {} }))
+    await assertFails(updateDoc(doc(as('alice'), 'userConsents/alice'), { documents: { terms: '2' } }))
+    await assertFails(deleteDoc(doc(as('alice'), 'userConsents/alice')))
+  })
+
+  it('consent events are closed to every client', async () => {
+    const event = doc(as('alice'), 'userConsents/alice/events/e1')
+    await assertFails(getDoc(event))
+    await assertFails(getDocs(collection(as('alice'), 'userConsents/alice/events')))
+    await assertFails(setDoc(doc(as('alice'), 'userConsents/alice/events/e2'), { version: '1' }))
+    await assertFails(updateDoc(event, { version: '2' }))
+    await assertFails(deleteDoc(event))
+  })
+
+  it('an anonymous caller cannot read a consent record', async () => {
+    await assertFails(getDoc(doc(anon(), 'userConsents/alice')))
+    await assertFails(getDoc(doc(anon(), 'userConsents/alice/events/e1')))
+  })
+})
+
 describe('server-only and unknown paths', () => {
   it('a signed-in user cannot read or write _meta', async () => {
     await assertFails(getDoc(doc(as('alice'), '_meta/health')))

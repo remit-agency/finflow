@@ -60,6 +60,7 @@ test.describe('smoke on emulators', () => {
     await page.getByLabel('Електронна пошта', { exact: true }).fill(email)
     await page.getByLabel('Пароль', { exact: true }).fill('smoke-pass-123')
     await page.getByLabel('Назва компанії', { exact: true }).fill(orgName)
+    await page.getByRole('checkbox', { name: /Умови користування/ }).check()
     await page.getByRole('button', { name: 'Спробувати 14 днів безкоштовно' }).click()
 
     // 2. Redirect to /{orgId}/transactions. The header shows the org name only after

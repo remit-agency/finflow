@@ -25,6 +25,7 @@ async function registerViaUi(page: Page): Promise<{ email: string; orgId: string
   await page.getByLabel('Електронна пошта', { exact: true }).fill(email)
   await page.getByLabel('Пароль', { exact: true }).fill(PASSWORD)
   await page.getByLabel('Назва компанії', { exact: true }).fill(companyName)
+  await page.getByRole('checkbox', { name: /Умови користування/ }).check()
   await page.getByRole('button', { name: 'Спробувати 14 днів безкоштовно' }).click()
   await page.waitForURL(/\/[A-Za-z0-9]{20}\/transactions$/)
   return { email, orgId: new URL(page.url()).pathname.split('/')[1], companyName }

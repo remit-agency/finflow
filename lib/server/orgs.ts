@@ -1,5 +1,6 @@
 import 'server-only'
-import { Timestamp } from 'firebase-admin/firestore'
+import { Timestamp, type Firestore, type Query } from 'firebase-admin/firestore'
+import { isRole, type Role } from '@/lib/shell/permissions'
 import { getAdmin } from '@/lib/server/firebase-admin'
 import { HttpError } from '@/lib/server/http-error'
 import { seedSystemCounterparties } from '@/lib/server/counterparties/seed'
@@ -38,6 +39,23 @@ export function parseCreateOrgInput(body: unknown): CreateOrgInput {
   return { name, currency: currency as OrgCurrency }
 }
 
+/** Every membership document of `uid`, across the companies (collection group `members`, server side: bypasses the rules). */
+export function membershipsQuery(db: Firestore, uid: string): Query {
+  return db.collectionGroup('members').where('uid', '==', uid)
+}
+
+/** The companies `uid` belongs to and the role in each; a membership with an unknown role is left out. */
+export async function listMemberships(db: Firestore, uid: string): Promise<{ orgId: string; role: Role }[]> {
+  const snap = await membershipsQuery(db, uid).get()
+  const out: { orgId: string; role: Role }[] = []
+  for (const d of snap.docs) {
+    const orgId = d.ref.parent.parent?.id
+    const role: unknown = d.get('role')
+    if (orgId && isRole(role)) out.push({ orgId, role })
+  }
+  return out.sort((a, b) => a.orgId.localeCompare(b.orgId))
+}
+
 /**
  * Creates an organization and its owner membership in one Admin transaction after checking the
  * per-user limit. Returns the new organization id. The count and the writes are in the same
@@ -53,7 +71,7 @@ export async function createOrganizationForUser(uid: string, input: CreateOrgInp
   const trialEndsAt = Timestamp.fromDate(new Date(now.getTime() + TRIAL_DAYS * DAY_MS))
 
   await db.runTransaction(async (tx) => {
-    const memberships = await tx.get(db.collectionGroup('members').where('uid', '==', uid))
+    const memberships = await tx.get(membershipsQuery(db, uid))
     const owned = memberships.docs.filter((d) => d.get('role') === 'owner').length
     if (owned >= MAX_OWNED_ORGS) throw new HttpError(409, 'org_limit_reached')
 

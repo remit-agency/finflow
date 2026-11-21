@@ -1,6 +1,15 @@
 // lib/utils/download.ts
 export const exportFileName = (prefix: string, day: string): string => `${prefix}-${day}.csv`
 
+/** `finflow-<company>-<day>.zip`: the company name lowercased, runs of non-alphanumerics become one `-`, trimmed; `company` if nothing is left. */
+export const exportZipFileName = (orgName: string, day: string): string => {
+  const slug = orgName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return `finflow-${slug === '' ? 'company' : slug}-${day}.zip`
+}
+
 /** Hands a file to the browser's download. */
 export function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob)

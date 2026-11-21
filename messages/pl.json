@@ -114,7 +114,9 @@
       "haveAccount": "Masz już konto?",
       "toLogin": "Zaloguj się",
       "notYou": "To nie Ty?",
-      "signOut": "Wyloguj się"
+      "signOut": "Wyloguj się",
+      "accept": "Akceptuję <terms>Regulamin</terms> i zapoznałem/am się z <privacy>Polityką prywatności</privacy>.",
+      "acceptRequired": "Zaakceptuj Regulamin i Politykę prywatności, aby kontynuować."
     },
     "currencies": {
       "UAH": "UAH — hrywna ukraińska",
@@ -146,6 +148,7 @@
       "banks": "Banki",
       "imports": "Importy",
       "subscription": "Subskrypcja",
+      "privacy": "Prywatność i dane",
       "tags": "Tagi"
     },
     "nav": {
@@ -1586,6 +1589,63 @@
         "unvalued": "Brak kursu NBP:",
         "unrequested": "Kursy nie pobrane z NBP:"
       }
+    }
+  },
+  "consent": {
+    "gate": {
+      "title": "Zaktualizowane dokumenty",
+      "body": "Aby korzystać z FinFlow, zaakceptuj Regulamin i Politykę prywatności.",
+      "terms": "Regulamin",
+      "privacy": "Polityka prywatności",
+      "accept": "Akceptuję",
+      "signOut": "Wyloguj się",
+      "accepting": "Zapisywanie…",
+      "reload": "Dokumenty zostały zaktualizowane. Odśwież stronę i spróbuj ponownie.",
+      "failed": "Nie udało się zapisać. Spróbuj ponownie."
+    }
+  },
+  "privacy": {
+    "page": {
+      "title": "Prywatność i dane",
+      "intro": "Tutaj widzisz, jakie dokumenty zaakceptowałeś/aś, i możesz przeczytać je w całości.",
+      "dataRights": "Aby poprosić o usunięcie lub poprawienie swoich danych, napisz na {email}."
+    },
+    "consent": {
+      "title": "Zaakceptowane dokumenty",
+      "accepted": "wersja {version}, zaakceptowano {date}",
+      "notAccepted": "jeszcze nie zaakceptowano",
+      "unavailable": "Nie udało się sprawdzić zaakceptowanych dokumentów. Spróbuj później."
+    },
+    "export": {
+      "title": "Pobierz wszystkie dane firmy",
+      "description": "Pobierz jeden plik ZIP ze wszystkimi danymi tej firmy: osobny plik JSON dla każdej kolekcji oraz dane Twojego konta. Plik zawiera wszystkie dane firmy, więc przechowuj go bezpiecznie. Tokeny dostępu do banków nigdy nie są eksportowane.",
+      "button": "Pobierz wszystkie dane",
+      "progress": "Kolekcja {index}/{total}, odczytane dokumenty: {docs}",
+      "cancel": "Anuluj",
+      "done": "Plik z danymi został pobrany.",
+      "failed": "Nie udało się wyeksportować danych: {reason}",
+      "auditWarning": "Plik został pobrany, ale nie udało się zapisać eksportu w historii."
+    }
+  },
+  "legal": {
+    "draft": "Wersja robocza: dokument jest w trakcie weryfikacji prawnej i może się zmienić.",
+    "version": "Wersja z dnia {version}",
+    "toc": "Spis treści",
+    "links": {
+      "terms": "Regulamin",
+      "privacy": "Polityka prywatności",
+      "cookies": "Cookies"
+    },
+    "processors": {
+      "name": "Podmiot",
+      "purpose": "Cel",
+      "country": "Kraj przetwarzania"
+    },
+    "tables": {
+      "name": "Nazwa",
+      "purpose": "Cel",
+      "lifetime": "Okres ważności",
+      "type": "Rodzaj"
     }
   }
 }

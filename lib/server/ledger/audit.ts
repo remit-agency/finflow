@@ -14,6 +14,8 @@ export type AuditAction =
    * 'import'`. The undo of such an import writes `tx.delete` entries under this action with `via: 'import-undo'`.
    */
   | 'import.batch'
+  /** One entry per finished company export (S15a): `before: null`, `after: { counts }` (documents per collection), no content. */
+  | 'data.export'
 
 /**
  * What made a change when it was not a plain edit of the operation: the rules (S10), a tag's flag (S10t), making or
