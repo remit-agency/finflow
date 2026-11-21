@@ -30,8 +30,17 @@ export const CONSENT_LIMITS: readonly RateWindow[] = [
   { name: 'h', seconds: 3600, max: 120 },
 ]
 
+/**
+ * The company export (S15a): the browser pages through twelve collections (up to 500 documents a page, so a large company
+ * is a few hundred calls) and each page is a read. About 120 pages a minute is a normal run; the limits only stop a loop.
+ */
+export const EXPORT_LIMITS: readonly RateWindow[] = [
+  { name: 'm', seconds: 60, max: 240 },
+  { name: 'h', seconds: 3600, max: 2000 },
+]
+
 /** Throws `HttpError(429, 'rate_limited')` when the user is over a limit of the scope. */
-export async function enforceRateLimit(uid: string, scope: 'lookup' | 'rates' | 'reports' | 'consent', limits: readonly RateWindow[], now: Date = new Date()): Promise<void> {
+export async function enforceRateLimit(uid: string, scope: 'lookup' | 'rates' | 'reports' | 'consent' | 'export', limits: readonly RateWindow[], now: Date = new Date()): Promise<void> {
   const safeUid = uid.replace(/[^A-Za-z0-9_-]/g, '_')
   if (!(await consumeRateLimit(getAdmin().db, `${scope}_${safeUid}`, limits, now))) throw new HttpError(429, 'rate_limited')
 }
