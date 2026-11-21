@@ -9,17 +9,18 @@ import { cookiesUk } from './cookies.uk'
 import { privacyPl } from './privacy.pl'
 import { privacyEn } from './privacy.en'
 import { privacyUk } from './privacy.uk'
-// terms is imported in Task 8
+import { termsPl } from './terms.pl'
+import { termsEn } from './terms.en'
+import { termsUk } from './terms.uk'
 
-const CONTENT: Partial<Record<PublicLegalDoc, Record<Locale, LegalContent>>> = {
+const CONTENT: Readonly<Record<PublicLegalDoc, Record<Locale, LegalContent>>> = {
+  terms: { pl: termsPl, en: termsEn, uk: termsUk },
   privacy: { pl: privacyPl, en: privacyEn, uk: privacyUk },
   cookies: { pl: cookiesPl, en: cookiesEn, uk: cookiesUk },
 }
 
 export function getLegalContent(doc: PublicLegalDoc, locale: Locale): LegalContent {
-  const byLocale = CONTENT[doc]
-  if (!byLocale) throw new Error(`no legal content for ${doc}`)
-  return byLocale[locale]
+  return CONTENT[doc][locale]
 }
 
 const TOKEN_KEYS: readonly string[] = OPERATOR_TOKENS

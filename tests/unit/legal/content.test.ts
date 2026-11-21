@@ -5,9 +5,6 @@ import { OPERATOR_TOKENS, type LegalBlock, type LegalContent } from '@/lib/legal
 import { LOCALES } from '@/lib/i18n/config'
 import { PUBLIC_LEGAL_DOCS } from '@/lib/legal/versions'
 
-// extended in Task 8 (terms)
-const DOCS = PUBLIC_LEGAL_DOCS.filter((d) => d !== 'terms')
-
 function blockTexts(block: LegalBlock): string[] {
   switch (block.kind) {
     case 'p':
@@ -25,7 +22,7 @@ function allTexts(content: LegalContent): string[] {
   return [content.title, content.intro, ...content.sections.flatMap((s) => [s.title, ...s.blocks.flatMap(blockTexts)])]
 }
 
-describe.each(DOCS)('legal content: %s', (doc) => {
+describe.each(PUBLIC_LEGAL_DOCS)('legal content: %s', (doc) => {
   describe.each(LOCALES)('%s', (locale) => {
     const content = getLegalContent(doc, locale)
 
