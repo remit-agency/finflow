@@ -1600,5 +1600,26 @@
       "reload": "The documents have been updated. Reload the page and try again.",
       "failed": "Could not save. Please try again."
     }
+  },
+  "legal": {
+    "draft": "Draft: this document is under legal review and may change.",
+    "version": "Version of {version}",
+    "toc": "Contents",
+    "links": {
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy",
+      "cookies": "Cookies"
+    },
+    "processors": {
+      "name": "Processor",
+      "purpose": "Purpose",
+      "country": "Country of processing"
+    },
+    "tables": {
+      "name": "Name",
+      "purpose": "Purpose",
+      "lifetime": "Lifetime",
+      "type": "Type"
+    }
   }
 }

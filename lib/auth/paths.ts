@@ -1,5 +1,6 @@
 // Path rules shared by proxy.ts (server) and AuthProvider (browser).
-// Pure on purpose: no imports, so it is safe in both bundles.
+// Pure on purpose: only pure imports, so it is safe in both bundles.
+import { isPublicLegalDoc } from '@/lib/legal/versions'
 
 export const PUBLIC_PATHS = ['/login', '/register', '/forgot-password'] as const
 export const AUTH_PATHS = ['/login', '/register'] as const
@@ -19,9 +20,15 @@ export function isAuthPath(pathname: string): boolean {
   return matchesPath(pathname, AUTH_PATHS)
 }
 
+/** `/legal/<doc>` for a public legal document (S15a): open to everyone, signed in or not. */
+export function isLegalPath(pathname: string): boolean {
+  const match = /^\/legal\/([^/]+)\/?$/.exec(pathname)
+  return match !== null && isPublicLegalDoc(match[1])
+}
+
 /** `/<segment>/...`: the organization-scoped app area (same rule the pre-S01 proxy used). */
 export function isAppPath(pathname: string): boolean {
-  return /^\/[a-zA-Z0-9_-]+\//.test(pathname) && !isPublicPath(pathname)
+  return /^\/[a-zA-Z0-9_-]+\//.test(pathname) && !isPublicPath(pathname) && !isLegalPath(pathname)
 }
 
 /**

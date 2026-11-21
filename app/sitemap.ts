@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { PUBLIC_LEGAL_DOCS } from "@/lib/legal/versions";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://finflow.app";
@@ -16,5 +17,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.8,
     },
+    ...PUBLIC_LEGAL_DOCS.map((doc) => ({
+      url: `${baseUrl}/legal/${doc}`,
+      lastModified: new Date(),
+      changeFrequency: "yearly" as const,
+      priority: 0.3,
+    })),
   ];
 }

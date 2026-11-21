@@ -21,6 +21,15 @@ beforeEach(() => {
   auth.isSessionCookieValid.mockReset()
 })
 
+describe('proxy: public legal pages', () => {
+  it.each(['/legal/terms', '/legal/privacy', '/legal/cookies'])('lets %s through with no cookie', async (path) => {
+    const res = await proxy(request(path))
+
+    expect(isNext(res)).toBe(true)
+    expect(auth.isSessionCookieValid).not.toHaveBeenCalled()
+  })
+})
+
 describe('proxy: app pages', () => {
   it('redirects to /login with the original path when there is no cookie, without verifying anything', async () => {
     const res = await proxy(request('/org1/transactions?month=2026-10'))

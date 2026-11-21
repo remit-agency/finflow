@@ -1600,5 +1600,26 @@
       "reload": "Dokumenty zostały zaktualizowane. Odśwież stronę i spróbuj ponownie.",
       "failed": "Nie udało się zapisać. Spróbuj ponownie."
     }
+  },
+  "legal": {
+    "draft": "Wersja robocza: dokument jest w trakcie weryfikacji prawnej i może się zmienić.",
+    "version": "Wersja z dnia {version}",
+    "toc": "Spis treści",
+    "links": {
+      "terms": "Regulamin",
+      "privacy": "Polityka prywatności",
+      "cookies": "Cookies"
+    },
+    "processors": {
+      "name": "Podmiot",
+      "purpose": "Cel",
+      "country": "Kraj przetwarzania"
+    },
+    "tables": {
+      "name": "Nazwa",
+      "purpose": "Cel",
+      "lifetime": "Okres ważności",
+      "type": "Rodzaj"
+    }
   }
 }
