@@ -114,7 +114,9 @@
       "haveAccount": "Masz już konto?",
       "toLogin": "Zaloguj się",
       "notYou": "To nie Ty?",
-      "signOut": "Wyloguj się"
+      "signOut": "Wyloguj się",
+      "accept": "Akceptuję <terms>Regulamin</terms> i zapoznałem/am się z <privacy>Polityką prywatności</privacy>.",
+      "acceptRequired": "Zaakceptuj Regulamin i Politykę prywatności, aby kontynuować."
     },
     "currencies": {
       "UAH": "UAH — hrywna ukraińska",

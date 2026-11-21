@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowRight, Check } from 'lucide-react'
 import type { Metadata } from 'next'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { LegalLinks } from '@/components/legal/LegalLinks'
 
 export const metadata: Metadata = {
   title: 'Ціни — FinFlow',
@@ -146,6 +147,9 @@ export default function PricingPage() {
             <span className="font-display font-bold text-black/50 dark:text-white/50 text-sm">FinFlow</span>
           </Link>
           <p className="text-sm text-black/18 dark:text-white/18">© 2026 FinFlow</p>
+        </div>
+        <div className="max-w-6xl mx-auto mt-6 flex justify-center">
+          <LegalLinks />
         </div>
       </footer>
 

@@ -1,5 +1,5 @@
 import { test, expect, type Browser, type Page } from '@playwright/test'
-import { UI_PASSWORD, registerViaUi, waitForHydration, waitForShell, type RegisteredUser } from './helpers/app-ui'
+import { UI_PASSWORD, acceptTerms, registerViaUi, waitForHydration, waitForShell, type RegisteredUser } from './helpers/app-ui'
 import { EMULATOR_USER_PASSWORD, createEmulatorUser, signInEmulatorUser } from './helpers/emulator-auth'
 import { createDocAs, readDoc, seedDoc, seedMember } from './helpers/emulator-firestore'
 import { seedLedgerAccount, seedLedgerOperation } from './helpers/ledger-seed'
@@ -205,6 +205,7 @@ test.describe('tenancy (emulators)', () => {
 
     const companyName = `Late Co ${Date.now()}`
     await page.getByLabel('Назва компанії', { exact: true }).fill(companyName)
+    await acceptTerms(page)
     await page.getByRole('button', { name: 'Створити компанію' }).click()
     await page.waitForURL(/\/[A-Za-z0-9]{20}\/transactions$/)
     await waitForShell(page, companyName)
@@ -230,6 +231,7 @@ test.describe('tenancy (emulators)', () => {
     await page.getByLabel('Електронна пошта', { exact: true }).fill(`retry-${runId}@finflow.test`)
     await page.getByLabel('Пароль', { exact: true }).fill(UI_PASSWORD)
     await page.getByLabel('Назва компанії', { exact: true }).fill(companyName)
+    await acceptTerms(page) // stays ticked in the company-only form, so the retry needs no second tick
     await page.getByRole('button', { name: 'Спробувати 14 днів безкоштовно' }).click()
 
     // The page switches to the company-only form, keeping what was typed.

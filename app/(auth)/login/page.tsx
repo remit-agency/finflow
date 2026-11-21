@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher'
+import { LegalLinks } from '@/components/legal/LegalLinks'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { getMyOrganizationsForAuthPage } from '@/lib/firebase/members'
 import { safeRedirectPath } from '@/lib/auth/paths'
@@ -68,7 +69,7 @@ export default function LoginPage() {
   const isValid = email.length > 0 && password.length >= 6
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-[#0f0f0f] px-4">
+    <div className="relative min-h-screen flex flex-col items-center justify-center bg-[#0f0f0f] px-4">
       <div className="absolute top-4 right-4">
         <LanguageSwitcher variant="select" />
       </div>
@@ -169,6 +170,9 @@ export default function LoginPage() {
           </p>
         </CardContent>
       </Card>
+      <div className="mt-6 [&>nav]:justify-center [&>nav]:text-white/50">
+        <LegalLinks />
+      </div>
     </div>
   )
 }

@@ -10,6 +10,11 @@ export async function waitForHydration(page: Page, selector: string): Promise<vo
   }, selector)
 }
 
+/** Ticks the required Terms/Privacy checkbox on the register page (every submit there stays disabled until it is ticked). */
+export async function acceptTerms(page: Page): Promise<void> {
+  await page.getByRole('checkbox', { name: /Умови користування/ }).check()
+}
+
 export interface RegisteredUser {
   email: string
   password: string
@@ -34,6 +39,7 @@ export async function registerViaUi(page: Page, prefix: string, currency = 'UAH'
   await page.getByLabel('Назва компанії', { exact: true }).fill(companyName)
   await page.getByLabel('Валюта', { exact: true }).click()
   await page.getByRole('option', { name: new RegExp(`^${currency} `) }).click()
+  await acceptTerms(page)
   await page.getByRole('button', { name: 'Спробувати 14 днів безкоштовно' }).click()
   await page.waitForURL(/\/[A-Za-z0-9]{20}\/transactions$/)
   return { email, password: UI_PASSWORD, orgId: new URL(page.url()).pathname.split('/')[1], companyName }
