@@ -55,6 +55,7 @@ export function fakeEb(pages: Record<string, EbTxPage>, balanceAmount = '1000.00
       if (eb.failTransactions) throw eb.failTransactions
       return eb.pages[q.continuationKey ?? ''] ?? { transactions: [], continuationKey: null }
     },
+    async deleteSession() {},
   }
   return eb
 }

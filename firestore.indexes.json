@@ -142,6 +142,15 @@
       ]
     },
     {
+      "collectionGroup": "audit",
+      "fieldPath": "uid",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
       "collectionGroup": "recurring",
       "fieldPath": "dueOn",
       "indexes": [

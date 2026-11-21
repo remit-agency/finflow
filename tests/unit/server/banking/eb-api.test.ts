@@ -60,6 +60,58 @@ describe('getTransactions / getBalances', () => {
   })
 })
 
+describe('deleteSession', () => {
+  function apiWithMethods(responses: Array<{ status?: number; text?: string } | Error>) {
+    const calls: Array<{ url: string; method: string | undefined; headers: Record<string, string>; signal: AbortSignal | null | undefined }> = []
+    const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, method: init?.method, headers: { ...((init?.headers ?? {}) as Record<string, string>) }, signal: init?.signal })
+      const next = responses.shift()
+      if (next === undefined) throw new Error('no more responses')
+      if (next instanceof Error) throw next
+      const status = next.status ?? 200
+      // A 204 answer cannot carry a body (the Response constructor refuses one).
+      return new Response(status === 204 ? null : next.text ?? '', { status })
+    }) as unknown as typeof fetch
+    return { eb: createEbApi({ base: 'https://eb.test', token: async () => 'tok', fetchImpl }), calls }
+  }
+
+  it('sends an authenticated DELETE /sessions/{id} with a timeout and ignores the body', async () => {
+    const { eb, calls } = apiWithMethods([{ status: 200, text: '{"message":"OK"}' }])
+    await expect(eb.deleteSession('s 1')).resolves.toBeUndefined()
+    expect(calls).toHaveLength(1)
+    expect(calls[0].url).toBe('https://eb.test/sessions/s%201')
+    expect(calls[0].method).toBe('DELETE')
+    expect(calls[0].headers.Authorization).toBe('Bearer tok')
+    expect(calls[0].signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it.each([
+    [204, ''],
+    [404, ''],
+    [404, '{"message":"Not found"}'],
+    [422, '{"message":"Session is closed"}'],
+    [401, '{"error":"SESSION_EXPIRED"}'],
+  ])('HTTP %s %j counts as already gone', async (status, text) => {
+    const { eb } = apiWithMethods([{ status, text }])
+    await expect(eb.deleteSession('s1')).resolves.toBeUndefined()
+  })
+
+  it.each([
+    [429, '{}', 'rate_limited'],
+    [401, '{"message":"Invalid JWT signature"}', 'bank_error'],
+    [503, 'down', 'bank_unavailable'],
+    [400, '{"message":"bad request"}', 'bank_error'],
+  ])('HTTP %s %s fails with %s', async (status, text, code) => {
+    const { eb } = apiWithMethods([{ status, text }])
+    await expect(eb.deleteSession('s1')).rejects.toMatchObject({ code })
+  })
+
+  it('a network error is bank_unavailable', async () => {
+    const { eb } = apiWithMethods([new TypeError('fetch failed')])
+    await expect(eb.deleteSession('s1')).rejects.toMatchObject({ code: 'bank_unavailable' })
+  })
+})
+
 describe('failures', () => {
   it.each([
     [429, '{}', 'rate_limited'],
