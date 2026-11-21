@@ -123,3 +123,35 @@ describe('readExportPage', () => {
     expect(pages.map((p) => p.docs.length)).toEqual([1, 1, 1])
   })
 })
+
+// Opt-in measurement: EXPORT_PERF=<docs> seeds that many transactions (seed time not measured), then pages them all through
+// readExportPage. Nothing is asserted about time; the result goes to stdout as one `EXPORT_PERF {json}` line because vitest hides
+// console output in the emulator run. Emulator, one machine: production latency is not measured here.
+const PERF_DOCS = Number(process.env.EXPORT_PERF ?? 0)
+const perf = PERF_DOCS > 0 ? it : it.skip
+
+describe('export paging performance', () => {
+  perf(`pages ${PERF_DOCS} transactions`, async () => {
+    const createdAt = Timestamp.fromDate(new Date('2026-10-27T10:00:00Z'))
+    const docs = Array.from({ length: PERF_DOCS }, (_, i) => ({
+      path: `organizations/${ORG}/transactions/tx${String(i).padStart(7, '0')}`,
+      data: { orgId: ORG, type: 'expense', amountMinor: i, description: `synthetic operation ${i}`, createdAt },
+    }))
+    await writeAll(db, docs)
+
+    const started = performance.now()
+    let pages = 0
+    let read = 0
+    let after: string | null = null
+    do {
+      const page: ExportPage = await readExportPage(db, ORG, 'transactions', after)
+      pages += 1
+      read += page.docs.length
+      after = page.next
+    } while (after !== null)
+    const elapsedMs = Math.round(performance.now() - started)
+
+    process.stdout.write(`EXPORT_PERF ${JSON.stringify({ docs: PERF_DOCS, read, pages, elapsedMs })}\n`)
+    expect(read).toBe(PERF_DOCS)
+  }, 3_600_000)
+})

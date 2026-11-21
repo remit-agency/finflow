@@ -1615,6 +1615,16 @@
       "accepted": "wersja {version}, zaakceptowano {date}",
       "notAccepted": "jeszcze nie zaakceptowano",
       "unavailable": "Nie udało się sprawdzić zaakceptowanych dokumentów. Spróbuj później."
+    },
+    "export": {
+      "title": "Pobierz wszystkie dane firmy",
+      "description": "Pobierz jeden plik ZIP ze wszystkimi danymi tej firmy: osobny plik JSON dla każdej kolekcji oraz dane Twojego konta. Plik zawiera wszystkie dane firmy, więc przechowuj go bezpiecznie. Tokeny dostępu do banków nigdy nie są eksportowane.",
+      "button": "Pobierz wszystkie dane",
+      "progress": "Kolekcja {index}/{total}, odczytane dokumenty: {docs}",
+      "cancel": "Anuluj",
+      "done": "Plik z danymi został pobrany.",
+      "failed": "Nie udało się wyeksportować danych: {reason}",
+      "auditWarning": "Plik został pobrany, ale nie udało się zapisać eksportu w historii."
     }
   },
   "legal": {

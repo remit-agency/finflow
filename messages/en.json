@@ -1615,6 +1615,16 @@
       "accepted": "version {version}, accepted {date}",
       "notAccepted": "not accepted yet",
       "unavailable": "Could not check the accepted documents. Try again later."
+    },
+    "export": {
+      "title": "Download all company data",
+      "description": "Get one ZIP file with all data of this company: one JSON file per collection, plus your account data. The file contains all company data, so keep it safe. Bank access tokens are never exported.",
+      "button": "Download all data",
+      "progress": "Collection {index}/{total}, documents read: {docs}",
+      "cancel": "Cancel",
+      "done": "The export file has been downloaded.",
+      "failed": "Could not export the data: {reason}",
+      "auditWarning": "The file was downloaded, but the export could not be recorded in the history."
     }
   },
   "legal": {
