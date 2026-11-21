@@ -27,7 +27,12 @@ export function useConsent(): UseConsentResult {
     if (!uid) return
     return onSnapshot(
       doc(db, 'userConsents', uid),
-      (snap) => setRead({ uid, value: snap.exists() ? parseConsentState(snap.data()) : null }),
+      (snap) => {
+        // "Missing" read only from the local cache is not proof that nothing was accepted (offline browser):
+        // keep waiting for the server instead of blocking a person who has already accepted.
+        if (!snap.exists() && snap.metadata.fromCache) return
+        setRead({ uid, value: snap.exists() ? parseConsentState(snap.data()) : null })
+      },
       () => setRead({ uid, value: 'error' }),
     )
   }, [uid])
