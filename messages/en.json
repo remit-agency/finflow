@@ -1587,5 +1587,18 @@
         "unrequested": "Rates not asked of NBP:"
       }
     }
+  },
+  "consent": {
+    "gate": {
+      "title": "Updated documents",
+      "body": "To keep using FinFlow, please accept the Terms of Service and the Privacy Policy.",
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy",
+      "accept": "I accept",
+      "signOut": "Sign out",
+      "accepting": "Saving…",
+      "reload": "The documents have been updated. Reload the page and try again.",
+      "failed": "Could not save. Please try again."
+    }
   }
 }

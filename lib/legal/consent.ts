@@ -20,6 +20,15 @@ export function needsConsent(state: ConsentState | null): boolean {
   return CONSENT_DOCS.some((doc) => state[doc]?.version !== LEGAL_VERSIONS[doc])
 }
 
+export type GateStatus = 'loading' | 'ok' | 'needed' | 'unknown'
+
+/** `read` is what the browser got from userConsents/{uid}: undefined while loading, 'error' when the read failed. */
+export function gateStatus(read: ConsentState | null | undefined | 'error'): GateStatus {
+  if (read === undefined) return 'loading'
+  if (read === 'error') return 'unknown'
+  return needsConsent(read) ? 'needed' : 'ok'
+}
+
 /** Reads a stored `userConsents/{uid}` document; malformed entries are dropped (they then count as missing). */
 export function parseConsentState(data: unknown): ConsentState {
   if (!isRecord(data)) return {}

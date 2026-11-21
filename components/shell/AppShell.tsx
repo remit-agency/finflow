@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import VerifyEmailBanner from '@/components/auth/VerifyEmailBanner'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ConsentGate } from '@/components/consent/ConsentGate'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { AccountsSidebar } from '@/components/shell/AccountsSidebar'
 import { AppHeader } from '@/components/shell/AppHeader'
@@ -97,6 +98,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
         </DialogContent>
       </Dialog>
+      <ConsentGate />
     </div>
   )
 }

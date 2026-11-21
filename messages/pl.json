@@ -1587,5 +1587,18 @@
         "unrequested": "Kursy nie pobrane z NBP:"
       }
     }
+  },
+  "consent": {
+    "gate": {
+      "title": "Zaktualizowane dokumenty",
+      "body": "Aby korzystać z FinFlow, zaakceptuj Regulamin i Politykę prywatności.",
+      "terms": "Regulamin",
+      "privacy": "Polityka prywatności",
+      "accept": "Akceptuję",
+      "signOut": "Wyloguj się",
+      "accepting": "Zapisywanie…",
+      "reload": "Dokumenty zostały zaktualizowane. Odśwież stronę i spróbuj ponownie.",
+      "failed": "Nie udało się zapisać. Spróbuj ponownie."
+    }
   }
 }
