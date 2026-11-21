@@ -61,7 +61,7 @@ export const privacyPl: LegalContent = {
             [
               'Wykazanie akceptacji Regulaminu i Polityki prywatności',
               'Dokument, wersja, czas i język akceptacji',
-              'Art. 6 ust. 1 lit. f RODO oraz art. 7 ust. 1 RODO (rozliczalność: możliwość wykazania akceptacji)',
+              'Art. 6 ust. 1 lit. f RODO oraz art. 5 ust. 2 RODO (rozliczalność: możliwość wykazania akceptacji)',
             ],
           ],
         },

@@ -54,7 +54,7 @@ export const privacyEn: LegalContent = {
             [
               'Proving acceptance of the Terms of Service and the Privacy Policy',
               'Document, version, time and language of acceptance',
-              'Art. 6(1)(f) GDPR and Art. 7(1) GDPR (accountability: being able to prove acceptance)',
+              'Art. 6(1)(f) GDPR and Art. 5(2) GDPR (accountability: being able to prove acceptance)',
             ],
           ],
         },
