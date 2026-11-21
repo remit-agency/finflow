@@ -148,6 +148,7 @@
       "banks": "Banki",
       "imports": "Importy",
       "subscription": "Subskrypcja",
+      "privacy": "Prywatność i dane",
       "tags": "Tagi"
     },
     "nav": {
@@ -1601,6 +1602,19 @@
       "accepting": "Zapisywanie…",
       "reload": "Dokumenty zostały zaktualizowane. Odśwież stronę i spróbuj ponownie.",
       "failed": "Nie udało się zapisać. Spróbuj ponownie."
+    }
+  },
+  "privacy": {
+    "page": {
+      "title": "Prywatność i dane",
+      "intro": "Tutaj widzisz, jakie dokumenty zaakceptowałeś/aś, i możesz przeczytać je w całości.",
+      "dataRights": "Aby poprosić o usunięcie lub poprawienie swoich danych, napisz na {email}."
+    },
+    "consent": {
+      "title": "Zaakceptowane dokumenty",
+      "accepted": "wersja {version}, zaakceptowano {date}",
+      "notAccepted": "jeszcze nie zaakceptowano",
+      "unavailable": "Nie udało się sprawdzić zaakceptowanych dokumentów. Spróbuj później."
     }
   },
   "legal": {

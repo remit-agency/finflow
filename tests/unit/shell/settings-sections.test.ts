@@ -31,7 +31,7 @@ describe('isSettingsPath', () => {
 
 describe('SETTINGS_SECTIONS', () => {
   it('lists the sections in menu order', () => {
-    expect(SETTINGS_SECTIONS.map((s) => s.slug)).toEqual(['company', 'language', 'categories', 'counterparties', 'tags', 'banks', 'imports', 'subscription'])
+    expect(SETTINGS_SECTIONS.map((s) => s.slug)).toEqual(['company', 'language', 'categories', 'counterparties', 'tags', 'banks', 'imports', 'privacy', 'subscription'])
   })
 })
 
@@ -54,6 +54,7 @@ describe('activeSettingsSection', () => {
     ['/org1/settings/tags', 'tags'],
     ['/org1/settings/banks', 'banks'],
     ['/org1/settings/imports', 'imports'],
+    ['/org1/settings/privacy', 'privacy'],
     ['/org1/settings/subscription/extra', 'subscription'],
   ])('%s -> %s', (path, section) => {
     expect(activeSettingsSection(path, 'org1')).toBe(section)
@@ -104,15 +105,15 @@ describe('role-aware settings sections', () => {
   const slugs = (role: Parameters<typeof visibleSettingsSections>[0]) => visibleSettingsSections(role).map((s) => s.slug)
 
   it('owner sees everything', () => {
-    expect(slugs('owner')).toEqual(['company', 'language', 'categories', 'counterparties', 'tags', 'banks', 'imports', 'subscription'])
+    expect(slugs('owner')).toEqual(['company', 'language', 'categories', 'counterparties', 'tags', 'banks', 'imports', 'privacy', 'subscription'])
   })
 
-  it('accountant sees imports but not banks and subscription', () => {
-    expect(slugs('accountant')).toEqual(['company', 'language', 'categories', 'counterparties', 'tags', 'imports'])
+  it('accountant sees imports and privacy but not banks and subscription', () => {
+    expect(slugs('accountant')).toEqual(['company', 'language', 'categories', 'counterparties', 'tags', 'imports', 'privacy'])
   })
 
-  it('viewer sees neither banks, imports nor subscription', () => {
-    expect(slugs('viewer')).toEqual(['company', 'language', 'categories', 'counterparties', 'tags'])
+  it('viewer sees privacy but neither banks, imports nor subscription', () => {
+    expect(slugs('viewer')).toEqual(['company', 'language', 'categories', 'counterparties', 'tags', 'privacy'])
   })
 
   it('without a role nothing opens', () => {
@@ -128,5 +129,7 @@ describe('role-aware settings sections', () => {
     expect(canOpenSection('accountant', 'imports')).toBe(true)
     expect(canOpenSection('owner', 'imports')).toBe(true)
     expect(canOpenSection('viewer', 'imports')).toBe(false)
+    expect(canOpenSection('viewer', 'privacy')).toBe(true)
+    expect(canOpenSection(null, 'privacy')).toBe(false)
   })
 })

@@ -148,6 +148,7 @@
       "banks": "Banks",
       "imports": "Imports",
       "subscription": "Subscription",
+      "privacy": "Privacy and data",
       "tags": "Tags"
     },
     "nav": {
@@ -1601,6 +1602,19 @@
       "accepting": "Saving…",
       "reload": "The documents have been updated. Reload the page and try again.",
       "failed": "Could not save. Please try again."
+    }
+  },
+  "privacy": {
+    "page": {
+      "title": "Privacy and data",
+      "intro": "Here you can see which documents you accepted and read them in full.",
+      "dataRights": "To ask for erasure or correction of your data, write to {email}."
+    },
+    "consent": {
+      "title": "Accepted documents",
+      "accepted": "version {version}, accepted {date}",
+      "notAccepted": "not accepted yet",
+      "unavailable": "Could not check the accepted documents. Try again later."
     }
   },
   "legal": {
